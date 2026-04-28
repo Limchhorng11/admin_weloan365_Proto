@@ -1,0 +1,82 @@
+import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
+import { TableToolbar } from "@/components/table-toolbar";
+import { StatusBadge } from "@/components/status-badge";
+import { CUSTOMERS } from "@/lib/data";
+import { ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
+
+export default function CustomersPage() {
+  return (
+    <div className="space-y-6 max-w-[1400px]">
+      <PageHeader
+        title="All Customer Accounts"
+        subtitle={`${CUSTOMERS.length} records`}
+      />
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-card">
+        <TableToolbar action="Add Customer" />
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                {["ID", "Name", "Phone", "Email", "KYC", "Loans", "Branch"].map(h => (
+                  <th key={h} className="text-left px-6 py-3 text-[12px] font-medium text-gray-500">
+                    <span className="inline-flex items-center gap-1">
+                      {h}
+                      <ArrowUpDown className="w-3 h-3 text-gray-300" />
+                    </span>
+                  </th>
+                ))}
+                <th className="px-6 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {CUSTOMERS.map(c => (
+                <tr key={c.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
+                  <td className="px-6 py-3.5 text-gray-700 font-mono text-xs">{c.id}</td>
+                  <td className="px-6 py-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 text-xs font-semibold flex items-center justify-center">
+                        {c.name.split(" ").map(s => s[0]).join("")}
+                      </div>
+                      <span className="text-gray-900 font-medium">{c.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-3.5 text-gray-600">{c.phone}</td>
+                  <td className="px-6 py-3.5 text-gray-600 text-xs">{c.email}</td>
+                  <td className="px-6 py-3.5">
+                    <StatusBadge
+                      status={c.kyc === "verified" ? "Verified" : c.kyc === "pending" ? "Pending" : "Rejected"}
+                    />
+                  </td>
+                  <td className="px-6 py-3.5 text-gray-700">{c.loans}</td>
+                  <td className="px-6 py-3.5 text-gray-600">{c.branch}</td>
+                  <td className="px-6 py-3.5 text-right">
+                    <Link
+                      href={`/customer/accounts/${c.id}`}
+                      className="text-xs text-brand-600 hover:underline font-medium"
+                    >
+                      Detail
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 text-sm text-gray-500">
+          <div>
+            Showing <span className="font-medium text-gray-700">1-{CUSTOMERS.length}</span> of{" "}
+            <span className="font-medium text-gray-700">{CUSTOMERS.length}</span>
+          </div>
+          <div className="flex gap-1">
+            <button className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 text-gray-500"><ChevronLeft className="w-4 h-4" /></button>
+            <button className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 text-gray-500"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
