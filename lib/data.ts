@@ -111,11 +111,219 @@ export const BLOGS = [
 ];
 
 export const USERS = [
-  { id: "U-01", name: "Laybun N.",   email: "laybunnavitou@kosign.com.kh", role: "Loan Officer",    branch: "Phnom Penh",  status: "Active" },
-  { id: "U-02", name: "Sophea K.",   email: "sophea.k@kosign.com.kh",      role: "Senior Officer",  branch: "Siem Reap",   status: "Active" },
-  { id: "U-03", name: "Ratanak L.",  email: "ratanak.l@kosign.com.kh",     role: "Branch Manager",  branch: "Battambang",  status: "Active" },
-  { id: "U-04", name: "Sreyneang P.",email: "sreyneang.p@kosign.com.kh",   role: "Compliance",      branch: "HQ",          status: "Active" },
-  { id: "U-05", name: "Kosal M.",    email: "kosal.m@kosign.com.kh",       role: "Admin",           branch: "HQ",          status: "Inactive" },
+  { id: "U-01", name: "Laybun N.",    email: "laybunnavitou@kosign.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago" },
+  { id: "U-02", name: "Sophea K.",    email: "sophea.k@kosign.com.kh",      role: "Senior Credit Officer", branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago"  },
+  { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@kosign.com.kh",     role: "Branch Manager",        branch: "Battambang",  status: "Active",   lastActive: "Today"     },
+  { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@kosign.com.kh",   role: "Compliance",            branch: "HQ",          status: "Active",   lastActive: "Today"     },
+  { id: "U-05", name: "Kosal M.",     email: "kosal.m@kosign.com.kh",       role: "Admin",                 branch: "HQ",          status: "Inactive", lastActive: "30 d ago"  },
+  { id: "U-06", name: "Pisey C.",     email: "pisey.c@kosign.com.kh",       role: "Cashier",               branch: "Phnom Penh",  status: "Active",   lastActive: "10 min ago"},
+  { id: "U-07", name: "Mengsrun H.",  email: "mengsrun.h@kosign.com.kh",    role: "Approval Committee",    branch: "HQ",          status: "Active",   lastActive: "Yesterday" },
+];
+
+/* ====================================================================
+   ROLES & PERMISSIONS
+   ==================================================================== */
+
+export type Permission = {
+  key: string;
+  label: string;
+  category: PermissionCategory;
+  /** sensitive permissions are highlighted in the UI */
+  sensitive?: boolean;
+};
+
+export type PermissionCategory =
+  | "Customer"
+  | "Loan Application"
+  | "Disbursement & Repayment"
+  | "Loan Portfolio"
+  | "Reports"
+  | "User & Role"
+  | "Settings"
+  | "Audit";
+
+export const PERMISSIONS: Permission[] = [
+  { key: "customer.view",     label: "View customers",         category: "Customer" },
+  { key: "customer.create",   label: "Create customer",        category: "Customer" },
+  { key: "customer.edit",     label: "Edit customer profile",  category: "Customer" },
+  { key: "customer.kyc",      label: "Run KYC / CBC",          category: "Customer" },
+
+  { key: "loan.view",         label: "View applications",      category: "Loan Application" },
+  { key: "loan.create",       label: "Create application",     category: "Loan Application" },
+  { key: "loan.review",       label: "Review application",     category: "Loan Application" },
+  { key: "loan.approve",      label: "Approve application",    category: "Loan Application", sensitive: true },
+  { key: "loan.reject",       label: "Reject application",     category: "Loan Application" },
+
+  { key: "disburse.execute",  label: "Disburse loan",          category: "Disbursement & Repayment", sensitive: true },
+  { key: "disburse.reverse",  label: "Reverse disbursement",   category: "Disbursement & Repayment", sensitive: true },
+  { key: "payment.record",    label: "Record repayment",       category: "Disbursement & Repayment" },
+  { key: "payment.view",      label: "View payment history",   category: "Disbursement & Repayment" },
+  { key: "payment.reverse",   label: "Reverse payment",        category: "Disbursement & Repayment", sensitive: true },
+
+  { key: "portfolio.view",        label: "View loan portfolio",        category: "Loan Portfolio" },
+  { key: "portfolio.restructure", label: "Restructure loan",           category: "Loan Portfolio", sensitive: true },
+  { key: "portfolio.writeoff",    label: "Write-off loan",             category: "Loan Portfolio", sensitive: true },
+
+  { key: "report.view",   label: "View reports",   category: "Reports" },
+  { key: "report.export", label: "Export reports", category: "Reports" },
+
+  { key: "user.view",   label: "View staff users", category: "User & Role" },
+  { key: "user.create", label: "Create user",      category: "User & Role" },
+  { key: "user.edit",   label: "Edit user",        category: "User & Role" },
+  { key: "role.edit",   label: "Manage roles & permissions", category: "User & Role", sensitive: true },
+
+  { key: "setting.view", label: "View settings", category: "Settings" },
+  { key: "setting.edit", label: "Edit settings", category: "Settings", sensitive: true },
+
+  { key: "audit.view",   label: "View audit log",   category: "Audit" },
+  { key: "audit.export", label: "Export audit log", category: "Audit" },
+];
+
+export type Role = {
+  key: string;
+  name: string;
+  description: string;
+  /** maximum loan amount this role can approve. null = unlimited, 0 = cannot approve */
+  approvalLimit: number | null;
+  branchScope: "own" | "all";
+  /** "*" means all permissions */
+  permissions: string[] | "*";
+  userCount: number;
+  /** system roles cannot be deleted, only the Admin role can edit them */
+  isSystem: boolean;
+};
+
+export const ROLES: Role[] = [
+  {
+    key: "admin",
+    name: "Admin",
+    description: "Full system access. Can manage users, roles, and all settings.",
+    approvalLimit: null,
+    branchScope: "all",
+    permissions: "*",
+    userCount: 1,
+    isSystem: true,
+  },
+  {
+    key: "branch_manager",
+    name: "Branch Manager",
+    description: "Manage branch operations and approve mid-tier loans.",
+    approvalLimit: 50000,
+    branchScope: "own",
+    permissions: [
+      "customer.view", "customer.create", "customer.edit", "customer.kyc",
+      "loan.view", "loan.create", "loan.review", "loan.approve", "loan.reject",
+      "disburse.execute",
+      "payment.view", "payment.record",
+      "portfolio.view", "portfolio.restructure",
+      "report.view", "report.export",
+      "user.view",
+      "audit.view",
+    ],
+    userCount: 1,
+    isSystem: true,
+  },
+  {
+    key: "senior_co",
+    name: "Senior Credit Officer",
+    description: "Senior loan origination with first-tier approval authority.",
+    approvalLimit: 10000,
+    branchScope: "own",
+    permissions: [
+      "customer.view", "customer.create", "customer.edit", "customer.kyc",
+      "loan.view", "loan.create", "loan.review", "loan.approve", "loan.reject",
+      "payment.view",
+      "portfolio.view",
+      "report.view",
+    ],
+    userCount: 1,
+    isSystem: true,
+  },
+  {
+    key: "co",
+    name: "Credit Officer",
+    description: "Originate and review loan applications. Cannot approve.",
+    approvalLimit: 0,
+    branchScope: "own",
+    permissions: [
+      "customer.view", "customer.create", "customer.edit", "customer.kyc",
+      "loan.view", "loan.create", "loan.review",
+      "payment.view",
+      "portfolio.view",
+      "report.view",
+    ],
+    userCount: 1,
+    isSystem: true,
+  },
+  {
+    key: "approval",
+    name: "Approval Committee",
+    description: "Final-tier approval for high-value loans. View-only on operations.",
+    approvalLimit: null,
+    branchScope: "all",
+    permissions: [
+      "customer.view",
+      "loan.view", "loan.approve", "loan.reject",
+      "portfolio.view",
+      "report.view",
+      "audit.view",
+    ],
+    userCount: 1,
+    isSystem: true,
+  },
+  {
+    key: "cashier",
+    name: "Cashier",
+    description: "Disburse approved loans and record customer repayments. Does not handle loan applications.",
+    approvalLimit: 0,
+    branchScope: "own",
+    permissions: [
+      "customer.view",
+      "disburse.execute",
+      "payment.record", "payment.view",
+      "portfolio.view",
+    ],
+    userCount: 1,
+    isSystem: true,
+  },
+  {
+    key: "compliance",
+    name: "Compliance",
+    description: "Read-only access to all data for audit and regulatory reporting.",
+    approvalLimit: 0,
+    branchScope: "all",
+    permissions: [
+      "customer.view",
+      "loan.view",
+      "payment.view",
+      "portfolio.view",
+      "report.view", "report.export",
+      "user.view",
+      "audit.view", "audit.export",
+    ],
+    userCount: 1,
+    isSystem: true,
+  },
+];
+
+/* ---------- Approval layers (multi-tier loan approval workflow) ---------- */
+
+export type ApprovalLayer = {
+  level: number;
+  name: string;
+  role: string;
+  /** layer activates when loan amount > min */
+  min: number;
+  /** layer's max approval amount; null = unlimited */
+  max: number | null;
+  description: string;
+};
+
+export const APPROVAL_LAYERS: ApprovalLayer[] = [
+  { level: 1, name: "Credit Officer Review",     role: "Credit Officer",        min: 0,     max: null,   description: "Initial review, KYC verification, and credit assessment. Always required." },
+  { level: 2, name: "Senior Officer Approval",   role: "Senior Credit Officer", min: 2000,  max: 10000,  description: "Required for loans above $2,000." },
+  { level: 3, name: "Branch Manager Approval",   role: "Branch Manager",        min: 10000, max: 50000,  description: "Required for loans above $10,000." },
+  { level: 4, name: "Loan Committee Approval",   role: "Approval Committee",    min: 50000, max: null,   description: "Required for loans above $50,000." },
 ];
 
 export const BRANCHES = [

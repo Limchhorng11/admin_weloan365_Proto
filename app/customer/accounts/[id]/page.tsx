@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -9,9 +11,11 @@ import {
   Building2,
   MapPin,
   Calendar,
+  Lock,
 } from "lucide-react";
 import { CUSTOMERS, APPLICATIONS } from "@/lib/data";
 import { StatusBadge } from "@/components/status-badge";
+import { useRole } from "@/lib/role-context";
 
 export default function CustomerDetailPage({
   params,
@@ -20,6 +24,21 @@ export default function CustomerDetailPage({
 }) {
   const c = CUSTOMERS.find(x => x.id === params.id);
   if (!c) return notFound();
+
+  const { role, can } = useRole();
+
+  // Block the entire page if the role can't even view customers.
+  if (!can("customer.view")) {
+    return (
+      <div className="max-w-2xl mx-auto mt-12 bg-white rounded-xl border border-gray-200 p-10 text-center shadow-card">
+        <Lock className="w-8 h-8 text-gray-400 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-gray-900">No access</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          The <span className="font-medium">{role.name}</span> role cannot view customer profiles.
+        </p>
+      </div>
+    );
+  }
 
   const initials = c.name.split(" ").map(s => s[0]).join("");
   const kycStatus =
@@ -58,10 +77,12 @@ export default function CustomerDetailPage({
               <MessageCircle className="w-4 h-4 text-gray-500" />
               Send message
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700">
-              <Pencil className="w-4 h-4 text-gray-500" />
-              Edit profile
-            </button>
+            {can("customer.edit") && (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700">
+                <Pencil className="w-4 h-4 text-gray-500" />
+                Edit profile
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -130,7 +151,8 @@ export default function CustomerDetailPage({
         </div>
       </div>
 
-      {/* Customer's applications */}
+      {/* Customer's applications — gated by loan.view */}
+      {can("loan.view") && (
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Loan applications</h2>
@@ -182,6 +204,7 @@ export default function CustomerDetailPage({
           </table>
         )}
       </div>
+      )}
     </div>
   );
 }

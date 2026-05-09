@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -12,22 +12,40 @@ import {
   RefreshCw,
   Plus,
   Download,
+  Banknote,
+  Lock,
+  ShieldAlert,
+  ChevronRight,
+  RotateCcw,
+  ClipboardCheck,
+  Wallet,
+  UserCheck,
 } from "lucide-react";
-import { APPLICATIONS, type Application } from "@/lib/data";
+import { APPLICATIONS, type Application, type ApplicationStatus } from "@/lib/data";
 import { StatusBadge } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
+import { useRole } from "@/lib/role-context";
 
-const TABS = [
+type TabDef = { key: TabKey; label: string; permission?: string };
+
+const TABS: TabDef[] = [
   { key: "status",    label: "Loan Status" },
-  { key: "kyc",       label: "KYC / Docs / CBC" },
-  { key: "repayment", label: "Repayment & Collection" },
+  { key: "kyc",       label: "KYC / Docs / CBC",          permission: "customer.view" },
+  { key: "repayment", label: "Repayment & Collection",    permission: "payment.view" },
   { key: "reminders", label: "Reminders / Notifications" },
-  { key: "audit",     label: "Audit Log" },
-  { key: "reports",   label: "Reports & Analytics" },
+  { key: "audit",     label: "Audit Log",                 permission: "audit.view" },
+  { key: "reports",   label: "Reports & Analytics",       permission: "report.view" },
   { key: "officer",   label: "Person in Charge" },
-] as const;
+];
 
-type TabKey = (typeof TABS)[number]["key"];
+type TabKey =
+  | "status"
+  | "kyc"
+  | "repayment"
+  | "reminders"
+  | "audit"
+  | "reports"
+  | "officer";
 
 export default function ApplicationDetailPage({
   params,
@@ -37,7 +55,56 @@ export default function ApplicationDetailPage({
   const a = APPLICATIONS.find(x => x.id === params.id);
   if (!a) return notFound();
 
+  const { role, can, canApprove } = useRole();
+
+  const visibleTabs = useMemo(
+    () => TABS.filter(t => !t.permission || can(t.permission)),
+    [can]
+  );
+
   const [tab, setTab] = useState<TabKey>("status");
+  // Keep the active tab valid when the role changes.
+  useEffect(() => {
+    if (!visibleTabs.some(t => t.key === tab)) {
+      setTab(visibleTabs[0]?.key ?? "status");
+    }
+  }, [visibleTabs, tab]);
+
+  // ----- Workflow stage helpers -----
+  // Workflow: CO  →  Approval  →  Cashier
+  const inApprovalStage    = a.status === "Pending" || a.status === "Review";
+  const inDisbursementStage = a.status === "Approved";
+  const isTerminal         = a.status === "Disbursed" || a.status === "Rejected";
+
+  // ----- Action button gates: combine permission + workflow status -----
+  const mayRequestInfo = can("loan.review")     && inApprovalStage;
+  const mayReject      = can("loan.reject")     && inApprovalStage;
+  const mayApprove     = can("loan.approve")    && inApprovalStage;
+  const mayApproveAmt  = canApprove(a.amount); // amount within approval limit
+  const mayDisburse    = can("disburse.execute") && inDisbursementStage;
+  const mayReopen      = role.key === "admin"   && a.status === "Rejected"; // admin override
+  const mayUnreject    = role.key === "admin"   && a.status === "Disbursed"; // admin reverse
+
+  // Tell the user *why* approve is blocked (no perm vs amount over limit)
+  const approveBlockedReason =
+    !can("loan.approve")
+      ? "This role cannot approve loan applications."
+      : role.approvalLimit !== null && a.amount > role.approvalLimit
+      ? `Above your approval limit of $${role.approvalLimit.toLocaleString()}. Will route to a higher-tier approver.`
+      : null;
+
+  // No view permission at all → block the page
+  if (!can("loan.view")) {
+    return (
+      <div className="max-w-2xl mx-auto mt-12 bg-white rounded-xl border border-gray-200 p-10 text-center shadow-card">
+        <Lock className="w-8 h-8 text-gray-400 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-gray-900">No access</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          The <span className="font-medium">{role.name}</span> role cannot view loan applications.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-[1400px]">
@@ -70,24 +137,82 @@ export default function ApplicationDetailPage({
           </div>
           <div className="flex items-center gap-2">
             <StatusBadge status={a.status} />
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700">
-              <MessageCircle className="w-4 h-4 text-gray-500" />
-              Request info
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-md hover:bg-red-50">
-              <XCircle className="w-4 h-4" />
-              Reject
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-md hover:bg-emerald-700 font-medium">
-              <CheckCircle2 className="w-4 h-4" />
-              Approve &amp; disburse
-            </button>
+
+            {mayRequestInfo && (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700">
+                <MessageCircle className="w-4 h-4 text-gray-500" />
+                Request info
+              </button>
+            )}
+
+            {mayReject && (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-md hover:bg-red-50">
+                <XCircle className="w-4 h-4" />
+                Reject
+              </button>
+            )}
+
+            {mayDisburse && (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-md hover:bg-emerald-700 font-medium">
+                <Banknote className="w-4 h-4" />
+                Disburse
+              </button>
+            )}
+
+            {mayApprove && (
+              <button
+                disabled={!mayApproveAmt}
+                title={approveBlockedReason ?? ""}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md font-medium",
+                  mayApproveAmt
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                )}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Approve & route to Cashier
+              </button>
+            )}
+
+            {/* Admin overrides */}
+            {mayReopen && (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-amber-200 text-amber-700 rounded-md hover:bg-amber-50">
+                <RotateCcw className="w-4 h-4" />
+                Reopen
+              </button>
+            )}
+            {mayUnreject && (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-amber-200 text-amber-700 rounded-md hover:bg-amber-50">
+                <RotateCcw className="w-4 h-4" />
+                Reverse disbursement
+              </button>
+            )}
+
+            {/* Stage-locked hint when role can't act on this status */}
+            {!mayRequestInfo && !mayReject && !mayDisburse && !mayApprove && !mayReopen && !mayUnreject && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-500">
+                <Lock className="w-3 h-3" />
+                No action available at this stage
+              </span>
+            )}
           </div>
         </div>
 
+        {/* Workflow banner — current stage + next + role context */}
+        <WorkflowBanner
+          status={a.status}
+          roleName={role.name}
+          isOwnerRole={role.key === "co"}
+          approveBlockedReason={approveBlockedReason}
+          mayApproveAmt={mayApproveAmt}
+          mayApprove={mayApprove}
+          mayDisburse={mayDisburse}
+        />
+
         {/* Tabs */}
         <div className="px-6 border-b border-gray-200 flex gap-1 overflow-x-auto">
-          {TABS.map(t => (
+          {visibleTabs.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
@@ -143,57 +268,191 @@ function Row({
   );
 }
 
+/* ---------- workflow stages (CO → Approval → Cashier) ---------- */
+
+type Stage = "Origination" | "Approval" | "Disbursement";
+
+type StageState = "done" | "active" | "pending" | "failed";
+
+type StageInfo = {
+  key: Stage;
+  label: string;
+  role: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  state: StageState;
+  who?: string;
+  when?: string;
+};
+
+function getStages(status: ApplicationStatus): StageInfo[] {
+  const ORIGINATION: StageInfo = {
+    key: "Origination",
+    label: "Origination",
+    role: "Credit Officer",
+    description: "CO submits the application with KYC + CBC.",
+    icon: ClipboardCheck,
+    state: "done",
+    who: "Laybun N.",
+    when: "Apr 20",
+  };
+  const APPROVAL: StageInfo = {
+    key: "Approval",
+    label: "Approval",
+    role: "Approval / Senior CO / BM",
+    description: "Reviewer approves or rejects within their limit.",
+    icon: UserCheck,
+    state: "pending",
+  };
+  const DISBURSEMENT: StageInfo = {
+    key: "Disbursement",
+    label: "Disbursement",
+    role: "Cashier",
+    description: "Cashier disburses cash to the customer.",
+    icon: Wallet,
+    state: "pending",
+  };
+
+  if (status === "Pending" || status === "Review") {
+    APPROVAL.state = "active";
+  } else if (status === "Approved") {
+    APPROVAL.state = "done";
+    APPROVAL.who = "Sophea K.";
+    APPROVAL.when = "Apr 21";
+    DISBURSEMENT.state = "active";
+  } else if (status === "Disbursed") {
+    APPROVAL.state = "done";
+    APPROVAL.who = "Sophea K.";
+    APPROVAL.when = "Apr 21";
+    DISBURSEMENT.state = "done";
+    DISBURSEMENT.who = "Pisey C.";
+    DISBURSEMENT.when = "Apr 22";
+  } else if (status === "Rejected") {
+    APPROVAL.state = "failed";
+    APPROVAL.who = "Sophea K.";
+    APPROVAL.when = "Apr 21";
+    DISBURSEMENT.state = "pending";
+  }
+  return [ORIGINATION, APPROVAL, DISBURSEMENT];
+}
+
+function currentStage(status: ApplicationStatus): Stage | null {
+  if (status === "Pending" || status === "Review") return "Approval";
+  if (status === "Approved") return "Disbursement";
+  return null; // terminal: Disbursed / Rejected
+}
+
+function nextStage(status: ApplicationStatus): Stage | null {
+  if (status === "Pending" || status === "Review") return "Disbursement";
+  return null;
+}
+
+function WorkflowBanner({
+  status,
+  roleName,
+  isOwnerRole,
+  approveBlockedReason,
+  mayApproveAmt,
+  mayApprove,
+  mayDisburse,
+}: {
+  status: ApplicationStatus;
+  roleName: string;
+  isOwnerRole: boolean;
+  approveBlockedReason: string | null;
+  mayApproveAmt: boolean;
+  mayApprove: boolean;
+  mayDisburse: boolean;
+}) {
+  const cur = currentStage(status);
+  const nxt = nextStage(status);
+  const stageRoles: Record<Stage, string> = {
+    Origination: "Credit Officer",
+    Approval: "Approval / Senior CO",
+    Disbursement: "Cashier",
+  };
+
+  let actionMsg: React.ReactNode;
+  if (status === "Disbursed") {
+    actionMsg = <span className="text-emerald-700 font-medium">Workflow complete — funds disbursed.</span>;
+  } else if (status === "Rejected") {
+    actionMsg = <span className="text-red-700 font-medium">Workflow ended — application rejected.</span>;
+  } else if (mayApprove && mayApproveAmt) {
+    actionMsg = <span className="text-emerald-700">You can <b>approve & route to Cashier</b>.</span>;
+  } else if (mayApprove && !mayApproveAmt && approveBlockedReason) {
+    actionMsg = <span className="text-amber-700">{approveBlockedReason}</span>;
+  } else if (mayDisburse) {
+    actionMsg = <span className="text-emerald-700">Approved — you can <b>disburse</b> now.</span>;
+  } else if (isOwnerRole && (status === "Pending" || status === "Review")) {
+    actionMsg = <span className="text-gray-700">You submitted this; awaiting approval.</span>;
+  } else {
+    actionMsg = <span className="text-gray-500">No action available at this stage.</span>;
+  }
+
+  return (
+    <div className="px-6 py-3 bg-gray-50/80 border-b border-gray-200 flex items-center gap-3 text-xs">
+      <ShieldAlert className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+      {cur ? (
+        <>
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-500">Currently with</span>
+            <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 font-medium">
+              {stageRoles[cur]}
+            </span>
+          </div>
+          {nxt && (
+            <>
+              <ChevronRight className="w-3 h-3 text-gray-300" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-500">Next</span>
+                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
+                  {stageRoles[nxt]}
+                </span>
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        <span className="text-gray-500">Status: <span className="font-medium text-gray-900">{status}</span></span>
+      )}
+      <div className="flex-1" />
+      <div className="flex items-center gap-1.5 text-gray-500">
+        <span>Acting as</span>
+        <span className="font-medium text-gray-900">{roleName}</span>
+        <span>·</span>
+        {actionMsg}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- tab: Loan Status ---------- */
 
 function LoanStatusTab({ a }: { a: Application }) {
-  const steps = ["Submitted", "Under Review", "KYC Verified", "Credit Check", "Approved", "Disbursed"];
-  const currentIdx =
-    a.status === "Pending"   ? 1 :
-    a.status === "Review"    ? 2 :
-    a.status === "Approved"  ? 4 :
-    a.status === "Disbursed" ? 5 :
-    a.status === "Rejected"  ? 1 : 0;
-
+  const stages = getStages(a.status);
   const monthly = Math.round((a.amount * (1 + a.rate / 100)) / a.term);
   const total   = Math.round(a.amount * (1 + a.rate / 100));
 
   return (
     <>
-      <SectionLabel>Application progress</SectionLabel>
-      <div className="flex items-start">
-        {steps.map((s, i) => {
-          const done = i <= currentIdx;
-          return (
-            <div key={s} className={cn("flex items-start", i < steps.length - 1 && "flex-1")}>
-              <div className="flex flex-col items-center">
-                <div
+      <SectionLabel>Workflow — CO → Approval → Cashier</SectionLabel>
+
+      <div className="flex items-stretch gap-3">
+        {stages.map((s, i) => (
+          <div key={s.key} className="flex-1 flex">
+            <StageCard stage={s} index={i + 1} />
+            {i < stages.length - 1 && (
+              <div className="flex items-center px-1">
+                <ChevronRight
                   className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold",
-                    done ? "bg-brand-600 text-white" : "bg-gray-200 text-gray-500"
-                  )}
-                >
-                  {i + 1}
-                </div>
-                <div
-                  className={cn(
-                    "text-[11px] mt-2 whitespace-nowrap",
-                    done ? "text-gray-900 font-medium" : "text-gray-400"
-                  )}
-                >
-                  {s}
-                </div>
-              </div>
-              {i < steps.length - 1 && (
-                <div
-                  className={cn(
-                    "flex-1 h-0.5 mx-2 mt-4",
-                    i < currentIdx ? "bg-brand-600" : "bg-gray-200"
+                    "w-5 h-5",
+                    s.state === "done" ? "text-brand-600" : "text-gray-300"
                   )}
                 />
-              )}
-            </div>
-          );
-        })}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-3 gap-4 mt-8">
@@ -202,6 +461,77 @@ function LoanStatusTab({ a }: { a: Application }) {
         <Box label="Total repayable" value={`$${total.toLocaleString()}`} />
       </div>
     </>
+  );
+}
+
+function StageCard({ stage, index }: { stage: StageInfo; index: number }) {
+  const stateStyles: Record<StageState, { ring: string; pillBg: string; pillText: string; iconBg: string; iconText: string; statusLabel: string; statusCls: string }> = {
+    done: {
+      ring: "border-emerald-200 bg-white",
+      pillBg: "bg-emerald-100",
+      pillText: "text-emerald-800",
+      iconBg: "bg-emerald-100",
+      iconText: "text-emerald-700",
+      statusLabel: "Done",
+      statusCls: "text-emerald-700 bg-emerald-50",
+    },
+    active: {
+      ring: "border-brand-300 bg-brand-50/40 ring-2 ring-brand-100",
+      pillBg: "bg-brand-100",
+      pillText: "text-brand-800",
+      iconBg: "bg-brand-100",
+      iconText: "text-brand-700",
+      statusLabel: "In progress",
+      statusCls: "text-brand-700 bg-brand-50",
+    },
+    pending: {
+      ring: "border-gray-200 bg-white",
+      pillBg: "bg-gray-100",
+      pillText: "text-gray-500",
+      iconBg: "bg-gray-100",
+      iconText: "text-gray-400",
+      statusLabel: "Pending",
+      statusCls: "text-gray-500 bg-gray-100",
+    },
+    failed: {
+      ring: "border-red-200 bg-white",
+      pillBg: "bg-red-100",
+      pillText: "text-red-800",
+      iconBg: "bg-red-100",
+      iconText: "text-red-700",
+      statusLabel: "Rejected",
+      statusCls: "text-red-700 bg-red-50",
+    },
+  };
+  const s = stateStyles[stage.state];
+  const Icon = stage.icon;
+  return (
+    <div className={cn("flex-1 rounded-lg border p-4", s.ring)}>
+      <div className="flex items-center justify-between mb-2">
+        <span className={cn("inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-semibold", s.pillBg, s.pillText)}>
+          {index}
+        </span>
+        <span className={cn("text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded", s.statusCls)}>
+          {s.statusLabel}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 mb-1">
+        <div className={cn("w-7 h-7 rounded-md flex items-center justify-center", s.iconBg)}>
+          <Icon className={cn("w-4 h-4", s.iconText)} />
+        </div>
+        <div className="font-medium text-gray-900 text-sm">{stage.label}</div>
+      </div>
+      <div className="text-[11px] text-gray-500 leading-snug">{stage.description}</div>
+      <div className="mt-2 pt-2 border-t border-gray-100">
+        <div className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">Owner</div>
+        <div className="text-xs text-gray-700">{stage.role}</div>
+        {stage.who && (
+          <div className="text-[11px] text-gray-500 mt-0.5">
+            By {stage.who} · {stage.when}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

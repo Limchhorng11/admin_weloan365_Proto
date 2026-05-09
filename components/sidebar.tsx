@@ -24,11 +24,12 @@ import {
 import { cn } from "@/lib/utils";
 import { LATEST_VERSION } from "./app-version";
 import { SettingsModal } from "./settings-modal";
+import { useRole } from "@/lib/role-context";
 
-type Leaf = { label: string; href: string; icon?: LucideIcon };
+type Leaf = { label: string; href: string; icon?: LucideIcon; permission?: string };
 type NavItem =
-  | { label: string; href: string; icon: LucideIcon; children?: never }
-  | { label: string; icon: LucideIcon; children: Leaf[]; href?: never };
+  | { label: string; href: string; icon: LucideIcon; permission?: string; children?: never }
+  | { label: string; icon: LucideIcon; children: Leaf[]; permission?: string; href?: never };
 
 const NAV: { section: string; items: NavItem[] }[] = [
   {
@@ -41,15 +42,16 @@ const NAV: { section: string; items: NavItem[] }[] = [
       {
         label: "Customer",
         icon: Users,
+        permission: "customer.view",
         children: [
-          { label: "All Accounts", href: "/customer/accounts", icon: UserCircle2 },
-          { label: "Consultations", href: "/customer/consultations", icon: MessageSquareText },
-          { label: "Feedback & Rate", href: "/customer/feedback", icon: Star },
-          { label: "Birthday Notifications", href: "/customer/birthday", icon: CalendarHeart },
+          { label: "All Accounts", href: "/customer/accounts", icon: UserCircle2, permission: "customer.view" },
+          { label: "Consultations", href: "/customer/consultations", icon: MessageSquareText, permission: "customer.view" },
+          { label: "Feedback & Rate", href: "/customer/feedback", icon: Star, permission: "customer.view" },
+          { label: "Birthday Notifications", href: "/customer/birthday", icon: CalendarHeart, permission: "customer.view" },
         ],
       },
-      { label: "Loan Application", href: "/customer/applications", icon: FileText },
-      { label: "Loan Product", href: "/loan-product", icon: Package },
+      { label: "Loan Application", href: "/customer/applications", icon: FileText, permission: "loan.view" },
+      { label: "Loan Product", href: "/loan-product", icon: Package, permission: "loan.view" },
       {
         label: "Blog & Announcement",
         icon: Newspaper,
@@ -64,6 +66,23 @@ const NAV: { section: string; items: NavItem[] }[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { can } = useRole();
+
+  // Filter NAV based on the current role's permissions.
+  const filteredNav = useMemo(() => {
+    return NAV.map(group => ({
+      ...group,
+      items: group.items.flatMap(item => {
+        if ("children" in item && item.children) {
+          const allowedChildren = item.children.filter(c => !c.permission || can(c.permission));
+          if (allowedChildren.length === 0) return [];
+          return [{ ...item, children: allowedChildren }] as NavItem[];
+        }
+        if (item.permission && !can(item.permission)) return [];
+        return [item] as NavItem[];
+      }),
+    })).filter(g => g.items.length > 0);
+  }, [can]);
 
   const defaultExpanded = useMemo(() => {
     const state: Record<string, boolean> = { Customer: true };
@@ -181,7 +200,7 @@ export function Sidebar() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-3 scrollbar-thin">
-          {NAV.map(group => (
+          {filteredNav.map(group => (
             <div key={group.section} className="mb-4">
               <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wider px-2 mb-1.5">
                 {group.section}

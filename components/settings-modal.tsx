@@ -10,7 +10,6 @@ import {
   LayoutGrid,
   Building2,
   MapPin,
-  Gift,
   ShieldCheck,
   LifeBuoy,
   Mail,
@@ -19,8 +18,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppVersion } from "./app-version";
-import { StatusBadge } from "./status-badge";
-import { USERS, BRANCHES } from "@/lib/data";
+import { BRANCHES } from "@/lib/data";
+import { UsersRolesView } from "./users-roles-view";
+import { useRole } from "@/lib/role-context";
 
 type SectionKey =
   | "app"
@@ -28,7 +28,6 @@ type SectionKey =
   | "menu"
   | "company"
   | "branches"
-  | "referral"
   | "policy"
   | "support";
 
@@ -38,23 +37,37 @@ type Section = {
   icon: LucideIcon;
   badge?: string;
   group: "main" | "more";
+  /** permission required to see this section. Undefined = always visible. */
+  permission?: string;
 };
 
 const SECTIONS: Section[] = [
-  { key: "app",      label: "App Setting",      icon: Smartphone,  group: "main", badge: "Admin" },
-  { key: "users",    label: "Users & Roles",    icon: Users,       group: "main" },
-  { key: "menu",     label: "Menu Setting",     icon: LayoutGrid,  group: "main" },
-  { key: "company",  label: "Company Profile",  icon: Building2,   group: "main" },
-  { key: "branches", label: "Branch Locator",   icon: MapPin,      group: "main" },
-  { key: "referral", label: "Referral Program", icon: Gift,        group: "main" },
+  { key: "app",      label: "App Setting",      icon: Smartphone,  group: "main", badge: "Admin", permission: "setting.edit" },
+  { key: "users",    label: "Users & Roles",    icon: Users,       group: "main", permission: "user.view" },
+  { key: "menu",     label: "Menu Setting",     icon: LayoutGrid,  group: "main", permission: "setting.edit" },
+  { key: "company",  label: "Company Profile",  icon: Building2,   group: "main", permission: "setting.edit" },
+  { key: "branches", label: "Branch Locator",   icon: MapPin,      group: "main", permission: "setting.view" },
   { key: "policy",   label: "App Policy",       icon: ShieldCheck, group: "more" },
   { key: "support",  label: "Support",          icon: LifeBuoy,    group: "more" },
 ];
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [history, setHistory] = useState<SectionKey[]>(["app"]);
+  const { can } = useRole();
+  const visibleSections = SECTIONS.filter(s => !s.permission || can(s.permission));
+  const firstAllowed = visibleSections[0]?.key ?? "support";
+
+  const [history, setHistory] = useState<SectionKey[]>([firstAllowed]);
   const [cursor, setCursor] = useState(0);
   const section = history[cursor];
+
+  // If the role changes and the active section is no longer allowed, jump to first allowed.
+  useEffect(() => {
+    if (!visibleSections.some(s => s.key === section)) {
+      setHistory([firstAllowed]);
+      setCursor(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstAllowed]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -85,7 +98,8 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   if (!open) return null;
 
-  const current = SECTIONS.find(s => s.key === section)!;
+  const current = visibleSections.find(s => s.key === section) ?? visibleSections[0];
+  if (!current) return null;
 
   return (
     <div
@@ -103,7 +117,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           </div>
           <nav className="flex-1 overflow-y-auto px-2 pb-4 scrollbar-thin">
             <div className="space-y-0.5">
-              {SECTIONS.filter(s => s.group === "main").map(s => (
+              {visibleSections.filter(s => s.group === "main").map(s => (
                 <SectionButton
                   key={s.key}
                   section={s}
@@ -112,19 +126,23 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                 />
               ))}
             </div>
-            <div className="mt-5 px-2 text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">
-              More
-            </div>
-            <div className="space-y-0.5">
-              {SECTIONS.filter(s => s.group === "more").map(s => (
-                <SectionButton
-                  key={s.key}
-                  section={s}
-                  active={s.key === section}
-                  onClick={() => selectSection(s.key)}
-                />
-              ))}
-            </div>
+            {visibleSections.some(s => s.group === "more") && (
+              <>
+                <div className="mt-5 px-2 text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">
+                  More
+                </div>
+                <div className="space-y-0.5">
+                  {visibleSections.filter(s => s.group === "more").map(s => (
+                    <SectionButton
+                      key={s.key}
+                      section={s}
+                      active={s.key === section}
+                      onClick={() => selectSection(s.key)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </nav>
         </aside>
 
@@ -161,11 +179,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
           <div className="flex-1 overflow-y-auto scrollbar-thin p-6">
             {section === "app"      && <AppSettingView />}
-            {section === "users"    && <UsersView />}
+            {section === "users"    && <UsersRolesView />}
             {section === "menu"     && <MenuView />}
             {section === "company"  && <CompanyView />}
             {section === "branches" && <BranchesView />}
-            {section === "referral" && <ReferralView />}
             {section === "policy"   && <PolicyView />}
             {section === "support"  && <SupportView />}
           </div>
@@ -330,81 +347,12 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function UsersView() {
-  const ROLES: [string, string, number][] = [
-    ["Admin", "Full access", 6],
-    ["Branch Manager", "Branch-level operations", 4],
-    ["Senior Officer", "Approvals ≤ $10K", 8],
-    ["Loan Officer", "Originate & review", 22],
-    ["Compliance", "Audit & reports", 3],
-  ];
-  return (
-    <div className="space-y-5">
-      <div>
-        <H2>Users & Roles</H2>
-        <P>Manage staff access and permissions.</P>
-      </div>
-      <Card>
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-medium text-gray-900">Staff users</div>
-          <button className="px-3 py-1 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
-            Add user
-          </button>
-        </div>
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                {["Name", "Role", "Branch", "Status"].map(h => (
-                  <th key={h} className="text-left px-4 py-2 text-[12px] font-medium text-gray-500">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {USERS.map(u => (
-                <tr key={u.id} className="border-t border-gray-100">
-                  <td className="px-4 py-2.5">
-                    <div className="font-medium text-gray-900">{u.name}</div>
-                    <div className="text-xs text-gray-500">{u.email}</div>
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-700">{u.role}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{u.branch}</td>
-                  <td className="px-4 py-2.5">
-                    <StatusBadge status={u.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-      <Card>
-        <div className="font-medium text-gray-900 mb-3">Roles & permissions</div>
-        <div className="space-y-3 text-sm">
-          {ROLES.map(([r, d, n]) => (
-            <div key={r} className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-gray-900">{r}</div>
-                <div className="text-xs text-gray-500">{d}</div>
-              </div>
-              <div className="text-xs text-gray-400">{n} users</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
 function MenuView() {
   const MENUS = [
     { name: "Home", show: true },
     { name: "My Loans", show: true },
     { name: "Apply for Loan", show: true },
     { name: "Repayment Schedule", show: true },
-    { name: "Referral Program", show: true },
     { name: "Blogs", show: false },
     { name: "Chat Support", show: true },
     { name: "Branches", show: true },
@@ -475,6 +423,7 @@ function CompanyView() {
 }
 
 function BranchesView() {
+  const { can } = useRole();
   return (
     <div className="space-y-5">
       <div>
@@ -484,9 +433,11 @@ function BranchesView() {
       <Card>
         <div className="flex items-center justify-between mb-3">
           <div className="font-medium text-gray-900">All branches</div>
-          <button className="px-3 py-1 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
-            Add branch
-          </button>
+          {can("setting.edit") && (
+            <button className="px-3 py-1 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
+              Add branch
+            </button>
+          )}
         </div>
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
@@ -510,43 +461,6 @@ function BranchesView() {
               ))}
             </tbody>
           </table>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function ReferralView() {
-  const STATS = [
-    ["Active referrers", "184"],
-    ["Referrals this month", "47"],
-    ["Converted", "29"],
-    ["Rewards paid", "$1,450"],
-  ];
-  return (
-    <div className="space-y-5">
-      <div>
-        <H2>Referral Program</H2>
-        <P>Track referrers and reward payouts.</P>
-      </div>
-      <div className="grid grid-cols-4 gap-3">
-        {STATS.map(([l, v]) => (
-          <Card key={l} className="!p-4">
-            <div className="text-xs text-gray-500">{l}</div>
-            <div className="text-lg font-semibold text-gray-900 mt-1">{v}</div>
-          </Card>
-        ))}
-      </div>
-      <Card>
-        <div className="font-medium text-gray-900 mb-3">Program settings</div>
-        <div className="space-y-2.5 text-sm">
-          <Row label="Reward per referral" value="$30" />
-          <Row label="Paid on" value="First payment" />
-          <Row label="Max per customer" value="$600 / year" />
-          <div className="flex items-center justify-between">
-            <span className="text-gray-600">Program status</span>
-            <StatusBadge status="Active" />
-          </div>
         </div>
       </Card>
     </div>

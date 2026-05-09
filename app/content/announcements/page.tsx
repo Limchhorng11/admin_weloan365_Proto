@@ -1,15 +1,20 @@
+"use client";
+
 import { PageHeader } from "@/components/page-header";
 import { TableToolbar } from "@/components/table-toolbar";
 import { StatusBadge } from "@/components/status-badge";
 import { ANNOUNCEMENTS } from "@/lib/data";
+import { useRole } from "@/lib/role-context";
 
 export default function AnnouncementsPage() {
+  const { can } = useRole();
+  const canEdit = can("setting.edit");
   return (
     <div className="space-y-6 max-w-[1400px]">
       <PageHeader title="Announcements" subtitle="Broadcast to customer app" />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
-        <TableToolbar action="New Announcement" />
+        <TableToolbar action={canEdit ? "New Announcement" : undefined} />
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
@@ -28,7 +33,9 @@ export default function AnnouncementsPage() {
                 <td className="px-6 py-3.5"><StatusBadge status={a.status} /></td>
                 <td className="px-6 py-3.5 text-gray-600 text-xs">{a.date}</td>
                 <td className="px-6 py-3.5 text-right">
-                  <button className="text-xs text-brand-600 hover:underline font-medium">Edit</button>
+                  {canEdit && (
+                    <button className="text-xs text-brand-600 hover:underline font-medium">Edit</button>
+                  )}
                 </td>
               </tr>
             ))}

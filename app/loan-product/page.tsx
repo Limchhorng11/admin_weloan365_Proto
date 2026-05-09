@@ -1,9 +1,13 @@
+"use client";
+
 import { PageHeader } from "@/components/page-header";
 import { TableToolbar } from "@/components/table-toolbar";
 import { StatusBadge } from "@/components/status-badge";
 import { PRODUCTS } from "@/lib/data";
+import { useRole } from "@/lib/role-context";
 
 export default function ProductsPage() {
+  const { can } = useRole();
   return (
     <div className="space-y-6 max-w-[1400px]">
       <PageHeader
@@ -12,7 +16,7 @@ export default function ProductsPage() {
       />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
-        <TableToolbar action="Create Product" />
+        <TableToolbar action={can("setting.edit") ? "Create Product" : undefined} />
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">

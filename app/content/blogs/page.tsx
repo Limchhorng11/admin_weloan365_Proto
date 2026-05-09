@@ -1,15 +1,20 @@
+"use client";
+
 import { PageHeader } from "@/components/page-header";
 import { TableToolbar } from "@/components/table-toolbar";
 import { StatusBadge } from "@/components/status-badge";
 import { BLOGS } from "@/lib/data";
+import { useRole } from "@/lib/role-context";
 
 export default function BlogsPage() {
+  const { can } = useRole();
+  const canEdit = can("setting.edit");
   return (
     <div className="space-y-6 max-w-[1400px]">
       <PageHeader title="Blogs" subtitle="Financial education content" />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
-        <TableToolbar action="New Post" />
+        <TableToolbar action={canEdit ? "New Post" : undefined} />
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
@@ -29,7 +34,9 @@ export default function BlogsPage() {
                 <td className="px-6 py-3.5 text-gray-700">{b.views.toLocaleString()}</td>
                 <td className="px-6 py-3.5 text-gray-600 text-xs">{b.date}</td>
                 <td className="px-6 py-3.5 text-right">
-                  <button className="text-xs text-brand-600 hover:underline font-medium">Edit</button>
+                  {canEdit && (
+                    <button className="text-xs text-brand-600 hover:underline font-medium">Edit</button>
+                  )}
                 </td>
               </tr>
             ))}

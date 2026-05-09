@@ -1,11 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { TableToolbar } from "@/components/table-toolbar";
 import { StatusBadge } from "@/components/status-badge";
 import { APPLICATIONS } from "@/lib/data";
 import { ChevronLeft, ChevronRight, ArrowUpDown, Download } from "lucide-react";
+import { useRole } from "@/lib/role-context";
 
 export default function ApplicationsPage() {
+  const { can } = useRole();
   return (
     <div className="space-y-6 max-w-[1400px]">
       <PageHeader
@@ -33,7 +37,7 @@ export default function ApplicationsPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
-        <TableToolbar action="New Application" />
+        <TableToolbar action={can("loan.create") ? "New Application" : undefined} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
