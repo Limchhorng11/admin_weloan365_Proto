@@ -10,11 +10,16 @@ import {
   Lock,
   Check,
   Minus,
-  Pencil,
-  Copy,
   Search,
   Crown,
-  ChevronRight,
+  Trash2,
+  AlertTriangle,
+  RotateCcw,
+  Sparkles,
+  CheckSquare,
+  Square,
+  X,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
@@ -23,28 +28,23 @@ import {
   USERS,
   ROLES,
   PERMISSIONS,
-  APPROVAL_LAYERS,
   type Role,
   type Permission,
   type PermissionCategory,
 } from "@/lib/data";
 
-type Tab = "users" | "roles" | "permissions" | "layers";
+type Tab = "users" | "roles";
 
 type TabDef = {
   key: Tab;
   label: string;
   count?: number;
-  /** All listed permissions must pass; if any single OR-group is given as nested array, that group is OR-checked. */
   needsAny?: string[];
 };
 
 const TABS: TabDef[] = [
-  { key: "users",       label: "Users",          count: USERS.length,         needsAny: ["user.view"] },
-  { key: "roles",       label: "Roles",          count: ROLES.length,         needsAny: ["user.view"] },
-  { key: "permissions", label: "Permissions",    count: PERMISSIONS.length,   needsAny: ["user.view"] },
-  // Approval Layers: relevant to approvers and auditors. CO/Cashier won't see it.
-  { key: "layers",      label: "Approval Layers", count: APPROVAL_LAYERS.length, needsAny: ["loan.approve", "audit.view"] },
+  { key: "users", label: "Users", count: USERS.length, needsAny: ["user.view"] },
+  { key: "roles", label: "Roles", count: ROLES.length, needsAny: ["user.view"] },
 ];
 
 export function UsersRolesView() {
@@ -79,9 +79,9 @@ export function UsersRolesView() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Users & Roles</h2>
+        <h2 className="text-lg font-semibold text-gray-900">User & Role Management</h2>
         <p className="text-sm text-gray-500 mt-0.5">
-          Manage staff access using role-based permissions and tiered approval layers.
+          Manage staff users and the roles that control what each user can do.
         </p>
       </div>
 
@@ -113,10 +113,8 @@ export function UsersRolesView() {
         ))}
       </div>
 
-      {tab === "users"       && <UsersTab />}
-      {tab === "roles"       && <RolesTab />}
-      {tab === "permissions" && <PermissionsTab />}
-      {tab === "layers"      && <LayersTab />}
+      {tab === "users" && <UsersTab />}
+      {tab === "roles" && <RolesTab />}
     </div>
   );
 }
@@ -137,19 +135,60 @@ function fmt$(n: number | null | undefined) {
 
 /* ---------- USERS ---------- */
 
+type StaffUser = (typeof USERS)[number];
+
 function UsersTab() {
   const { can } = useRole();
+  const [users, setUsers] = useState<StaffUser[]>(USERS);
   const [filter, setFilter] = useState("");
-  const filtered = USERS.filter(
+  const [editing, setEditing] = useState<StaffUser | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const filtered = users.filter(
     u =>
       u.name.toLowerCase().includes(filter.toLowerCase()) ||
       u.email.toLowerCase().includes(filter.toLowerCase()) ||
       u.role.toLowerCase().includes(filter.toLowerCase())
   );
+
+  const nextId = useMemo(() => {
+    const maxN = users.reduce((m, u) => {
+      const n = parseInt(u.id.replace(/[^0-9]/g, ""), 10);
+      return Number.isFinite(n) && n > m ? n : m;
+    }, 0);
+    return `U-${String(maxN + 1).padStart(2, "0")}`;
+  }, [users]);
+
+  const toggleStatus = (id: string) => {
+    setUsers(prev =>
+      prev.map(u => (u.id === id ? { ...u, status: u.status === "Active" ? "Inactive" : "Active" } : u))
+    );
+  };
+
+  const handleSave = (input: Omit<StaffUser, "id" | "lastActive"> & { id?: string }) => {
+    if (input.id) {
+      setUsers(prev => prev.map(u => (u.id === input.id ? { ...u, ...input } as StaffUser : u)));
+    } else {
+      const created: StaffUser = {
+        id: nextId,
+        lastActive: "Just now",
+        ...input,
+      };
+      setUsers(prev => [created, ...prev]);
+    }
+    setEditing(null);
+    setCreating(false);
+  };
+
   return (
     <Card className="!p-0">
       <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-        <div className="font-medium text-gray-900">Staff users</div>
+        <div>
+          <div className="font-medium text-gray-900">Staff users</div>
+          <div className="text-[11px] text-gray-500">
+            {users.length} total · {users.filter(u => u.status === "Active").length} active
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
@@ -161,7 +200,10 @@ function UsersTab() {
             />
           </div>
           {can("user.create") && (
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
+            <button
+              onClick={() => setCreating(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+            >
               <Plus className="w-3.5 h-3.5" />
               Add user
             </button>
@@ -185,6 +227,7 @@ function UsersTab() {
           <tbody>
             {filtered.map(u => {
               const role = ROLES.find(r => r.name === u.role);
+              const isActive = u.status === "Active";
               return (
                 <tr key={u.id} className="border-t border-gray-100">
                   <td className="px-5 py-3">
@@ -211,155 +254,925 @@ function UsersTab() {
                   </td>
                   <td className="px-5 py-3 text-right">
                     {can("user.edit") && (
-                      <button className="text-xs text-brand-600 hover:underline font-medium">
-                        Edit
-                      </button>
+                      <div className="inline-flex items-center gap-3">
+                        <button
+                          onClick={() => toggleStatus(u.id)}
+                          className={cn(
+                            "text-xs hover:underline font-medium",
+                            isActive ? "text-rose-600" : "text-emerald-600"
+                          )}
+                          title={isActive ? "Deactivate user" : "Activate user"}
+                        >
+                          {isActive ? "Deactivate" : "Activate"}
+                        </button>
+                        <button
+                          onClick={() => setEditing(u)}
+                          className="text-xs text-brand-600 hover:underline font-medium"
+                        >
+                          Edit
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
               );
             })}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-500">
+                  No users match your search.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+
+      {(creating || editing) && (
+        <UserModal
+          user={editing}
+          nextId={nextId}
+          onCancel={() => {
+            setEditing(null);
+            setCreating(false);
+          }}
+          onSave={handleSave}
+        />
+      )}
     </Card>
+  );
+}
+
+function UserModal({
+  user,
+  nextId,
+  onCancel,
+  onSave,
+}: {
+  user: StaffUser | null;
+  nextId: string;
+  onCancel: () => void;
+  onSave: (input: Omit<StaffUser, "id" | "lastActive"> & { id?: string }) => void;
+}) {
+  const editMode = user !== null;
+  const [name, setName] = useState(user?.name ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
+  const [role, setRole] = useState(user?.role ?? ROLES[0].name);
+  const [branch, setBranch] = useState(user?.branch ?? "Phnom Penh");
+  const [status, setStatus] = useState<StaffUser["status"]>(user?.status ?? "Active");
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return setError("Name is required");
+    if (!email.trim()) return setError("Email is required");
+    onSave({
+      id: user?.id,
+      name: name.trim(),
+      email: email.trim(),
+      role,
+      branch: branch.trim(),
+      status,
+    });
+  };
+
+  const branches = Array.from(new Set(["Phnom Penh", "Siem Reap", "Battambang", "HQ", "Kampong Cham", ...USERS.map(u => u.branch)]));
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="h-14 px-5 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-gray-900">
+              {editMode ? "Edit user" : "Add user"}
+            </div>
+            <div className="text-[11px] text-gray-500">
+              {editMode ? `Updating ${user!.id}` : `New user ID will be ${nextId}`}
+            </div>
+          </div>
+          <button onClick={onCancel} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500" aria-label="Close">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Full name *</label>
+              <input
+                autoFocus
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="e.g. Sokha Chan"
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Email *</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="name@kosign.com.kh"
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600">Role</label>
+              <select
+                value={role}
+                onChange={e => setRole(e.target.value)}
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              >
+                {ROLES.map(r => (
+                  <option key={r.key} value={r.name}>{r.name}</option>
+                ))}
+              </select>
+              <div className="text-[11px] text-gray-500 mt-1">
+                Manage roles in the Roles tab.
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600">Branch</label>
+              <select
+                value={branch}
+                onChange={e => setBranch(e.target.value)}
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              >
+                {branches.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Status</label>
+              <div className="mt-1 flex gap-2">
+                {(["Active", "Inactive"] as const).map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setStatus(s)}
+                    className={cn(
+                      "flex-1 px-3 py-2 text-sm rounded-md border transition",
+                      status === s
+                        ? s === "Active"
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30"
+                          : "border-gray-400 bg-gray-50 text-gray-700 ring-1 ring-gray-400/30"
+                        : "border-gray-200 text-gray-700 hover:border-gray-300"
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+            >
+              {editMode ? "Save changes" : "Add user"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
 /* ---------- ROLES ---------- */
 
+type StageKey = "intake" | "review" | "approve" | "disburse" | "audit" | "general";
+
+const LOAN_STAGES: { key: StageKey; label: string; short: string; desc: string; chip: string; dot: string }[] = [
+  { key: "intake",   label: "Application Intake", short: "Intake",   desc: "Captures and packages loan applications.",  chip: "bg-sky-50 text-sky-700",         dot: "bg-sky-500" },
+  { key: "review",   label: "Credit Review",      short: "Review",   desc: "Reviews documents and credit assessment.",  chip: "bg-violet-50 text-violet-700",   dot: "bg-violet-500" },
+  { key: "approve",  label: "Approval",           short: "Approve",  desc: "Approves or rejects loan applications.",    chip: "bg-amber-50 text-amber-800",     dot: "bg-amber-500" },
+  { key: "disburse", label: "Disbursement",       short: "Disburse", desc: "Releases funds and records repayments.",    chip: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  { key: "audit",    label: "Compliance & Audit", short: "Audit",    desc: "Post-disbursement review and audit.",       chip: "bg-rose-50 text-rose-700",       dot: "bg-rose-500" },
+];
+
+const STAGE_BY_KEY: Record<StageKey, (typeof LOAN_STAGES)[number] | undefined> =
+  Object.fromEntries(LOAN_STAGES.map(s => [s.key, s])) as Record<StageKey, (typeof LOAN_STAGES)[number]>;
+
+type ManagedRole = Role & { stage: StageKey };
+
+type RoleTemplate = {
+  name: string;
+  description: string;
+  stage: StageKey;
+  approvalLimit: number | null;
+  branchScope: "own" | "all";
+  permissions: string[];
+};
+
+const TEMPLATES: RoleTemplate[] = [
+  {
+    name: "Credit Officer",
+    description: "Onboards customers and submits new loan applications.",
+    stage: "intake",
+    approvalLimit: 0,
+    branchScope: "own",
+    permissions: ["customer.view", "customer.create", "customer.edit", "customer.kyc", "loan.view", "loan.create", "report.view"],
+  },
+  {
+    name: "Credit Reviewer",
+    description: "Reviews applications and verifies credit assessment.",
+    stage: "review",
+    approvalLimit: 0,
+    branchScope: "own",
+    permissions: ["customer.view", "loan.view", "loan.review", "report.view"],
+  },
+  {
+    name: "Branch Approver",
+    description: "Approves loans up to the branch limit.",
+    stage: "approve",
+    approvalLimit: 50000,
+    branchScope: "own",
+    permissions: ["customer.view", "loan.view", "loan.review", "loan.approve", "loan.reject", "portfolio.view", "report.view"],
+  },
+  {
+    name: "Senior Approver",
+    description: "Approves higher-tier loans across all branches.",
+    stage: "approve",
+    approvalLimit: 250000,
+    branchScope: "all",
+    permissions: ["customer.view", "loan.view", "loan.review", "loan.approve", "loan.reject", "portfolio.view", "portfolio.restructure", "report.view", "report.export"],
+  },
+  {
+    name: "Cashier",
+    description: "Disburses approved loans and records repayments.",
+    stage: "disburse",
+    approvalLimit: 0,
+    branchScope: "own",
+    permissions: ["customer.view", "loan.view", "disburse.execute", "payment.record", "payment.view"],
+  },
+  {
+    name: "Compliance",
+    description: "Reviews disbursed loans for compliance and audit.",
+    stage: "audit",
+    approvalLimit: 0,
+    branchScope: "all",
+    permissions: ["customer.view", "loan.view", "payment.view", "portfolio.view", "report.view", "audit.view", "audit.export"],
+  },
+];
+
+function slugify(s: string) {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 function RolesTab() {
   const { can } = useRole();
   const canManage = can("role.edit");
-  const [selected, setSelected] = useState<Role>(ROLES[0]);
+  const initialRoles: ManagedRole[] = ROLES.filter(r => r.isSystem).map(r => ({ ...r, stage: "general" }));
+  const [roles, setRoles] = useState<ManagedRole[]>(initialRoles);
+  const [selected, setSelected] = useState<ManagedRole | null>(initialRoles[0] ?? null);
+  const [creating, setCreating] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<ManagedRole | null>(null);
   const totalPerms = PERMISSIONS.length;
-  const grantedCount = (r: Role) =>
+  const grantedCount = (r: ManagedRole) =>
     r.permissions === "*" ? totalPerms : r.permissions.length;
 
+  const customCount = roles.filter(r => !r.isSystem).length;
+
+  const removeRole = (key: string) => {
+    setRoles(prev => {
+      const next = prev.filter(r => r.key !== key);
+      if (selected?.key === key) setSelected(next[0] ?? null);
+      return next;
+    });
+    setConfirmDelete(null);
+  };
+
+  const resetAll = () => {
+    setRoles(initialRoles);
+    setSelected(initialRoles[0] ?? null);
+    setConfirmReset(false);
+  };
+
+  const addRole = (r: ManagedRole) => {
+    setRoles(prev => [...prev, r]);
+    setSelected(r);
+    setCreating(false);
+  };
+
   return (
-    <div className="grid grid-cols-3 gap-4">
-      {/* Roles list */}
-      <Card className="!p-0 col-span-1">
-        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-          <div className="font-medium text-gray-900">All roles</div>
-          {canManage && (
-            <button className="text-brand-600 hover:underline text-xs font-medium inline-flex items-center gap-1">
-              <Plus className="w-3.5 h-3.5" /> New
+    <div className="space-y-4">
+      {/* Header bar */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-gray-900">
+            {roles.length} {roles.length === 1 ? "role" : "roles"}
+            {customCount > 0 && <span className="text-gray-400"> · {customCount} custom</span>}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            Click a role to expand and see its permissions.
+          </div>
+        </div>
+        {canManage && (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {customCount > 0 && (
+              <button
+                onClick={() => setConfirmReset(true)}
+                className="text-xs text-gray-600 hover:text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md font-medium"
+                title="Remove all custom roles"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset
+              </button>
+            )}
+            <button
+              onClick={() => setCreating(true)}
+              className="text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Create role
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Role cards */}
+      {roles.length === 0 ? (
+        <Card className="!p-0">
+          <EmptyRoles canCreate={canManage} onCreate={() => setCreating(true)} />
+        </Card>
+      ) : (
+        <div className="space-y-2.5">
+          {roles.map(r => (
+            <RoleCard
+              key={r.key}
+              role={r}
+              expanded={selected?.key === r.key}
+              onToggle={() => setSelected(selected?.key === r.key ? null : r)}
+              canManage={canManage}
+              onDelete={() => setConfirmDelete(r)}
+              totalPerms={totalPerms}
+              granted={grantedCount(r)}
+            />
+          ))}
+        </div>
+      )}
+
+      {creating && (
+        <CreateRoleModal
+          existingKeys={roles.map(r => r.key)}
+          onCancel={() => setCreating(false)}
+          onSave={addRole}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title={`Delete ${confirmDelete.name}?`}
+          message={`This will remove the ${confirmDelete.name} role. Users currently assigned to it will need a new role. This cannot be undone.`}
+          confirmLabel="Delete role"
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => removeRole(confirmDelete.key)}
+        />
+      )}
+
+      {confirmReset && (
+        <ConfirmDialog
+          title="Reset all roles?"
+          message={`This will remove ${customCount} custom ${customCount === 1 ? "role" : "roles"} and keep only system roles (Admin). This cannot be undone.`}
+          confirmLabel="Reset all"
+          onCancel={() => setConfirmReset(false)}
+          onConfirm={resetAll}
+        />
+      )}
+    </div>
+  );
+}
+
+function RoleCard({
+  role,
+  expanded,
+  onToggle,
+  canManage,
+  onDelete,
+  totalPerms,
+  granted,
+}: {
+  role: ManagedRole;
+  expanded: boolean;
+  onToggle: () => void;
+  canManage: boolean;
+  onDelete: () => void;
+  totalPerms: number;
+  granted: number;
+}) {
+  const stage = STAGE_BY_KEY[role.stage];
+  return (
+    <div
+      className={cn(
+        "bg-white rounded-xl border transition",
+        expanded ? "border-brand-300 ring-1 ring-brand-500/20" : "border-gray-200"
+      )}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={e => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className="px-5 py-3.5 flex items-start gap-3 cursor-pointer rounded-xl hover:bg-gray-50/50"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {role.key === "admin" && <Crown className="w-4 h-4 text-amber-500 flex-shrink-0" />}
+            <div className="text-sm font-semibold text-gray-900">{role.name}</div>
+            {role.isSystem ? (
+              <span className="text-[10px] font-medium bg-gray-100 text-gray-600 rounded px-1.5 py-0.5">
+                System
+              </span>
+            ) : stage && stage.key !== "general" ? (
+              <span className={cn("text-[10px] font-medium rounded px-1.5 py-0.5", stage.chip)}>
+                {stage.label}
+              </span>
+            ) : null}
+          </div>
+          <div className="text-xs text-gray-500 mt-1 line-clamp-1">{role.description}</div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[11px] text-gray-600">
+            <span className="inline-flex items-center gap-1">
+              <CircleDollarSign className="w-3 h-3 text-gray-400" />
+              {fmt$(role.approvalLimit)}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Building2 className="w-3 h-3 text-gray-400" />
+              {role.branchScope === "all" ? "All branches" : "Own branch"}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Users className="w-3 h-3 text-gray-400" />
+              {role.userCount} {role.userCount === 1 ? "user" : "users"}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Lock className="w-3 h-3 text-gray-400" />
+              {granted}/{totalPerms} permissions
+            </span>
+          </div>
+        </div>
+        <div
+          className="flex items-center gap-0.5 flex-shrink-0"
+          onClick={e => e.stopPropagation()}
+        >
+          {canManage && !role.isSystem && (
+            <button
+              onClick={onDelete}
+              className="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50"
+              aria-label={`Delete ${role.name}`}
+              title="Delete role"
+            >
+              <Trash2 className="w-4 h-4" />
             </button>
           )}
-        </div>
-        <div className="divide-y divide-gray-100">
-          {ROLES.map(r => {
-            const active = r.key === selected.key;
-            return (
-              <button
-                key={r.key}
-                onClick={() => setSelected(r)}
-                className={cn(
-                  "w-full text-left px-5 py-3 hover:bg-gray-50 flex items-start gap-2",
-                  active && "bg-brand-50/60"
-                )}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    {r.key === "admin" && <Crown className="w-3.5 h-3.5 text-amber-500" />}
-                    <div
-                      className={cn(
-                        "text-sm font-medium",
-                        active ? "text-brand-700" : "text-gray-900"
-                      )}
-                    >
-                      {r.name}
-                    </div>
-                    {r.isSystem && (
-                      <span className="text-[10px] font-medium bg-gray-100 text-gray-500 rounded px-1.5 py-0.5">
-                        System
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{r.description}</div>
-                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-500">
-                    <span className="inline-flex items-center gap-1">
-                      <Users className="w-3 h-3" />
-                      {r.userCount}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Lock className="w-3 h-3" />
-                      {grantedCount(r)} / {totalPerms}
-                    </span>
-                  </div>
-                </div>
-                <ChevronRight
-                  className={cn(
-                    "w-4 h-4 text-gray-400 mt-1 flex-shrink-0",
-                    active && "text-brand-600"
-                  )}
-                />
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Role detail */}
-      <div className="col-span-2 space-y-4">
-        <Card>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="text-lg font-semibold text-gray-900">{selected.name}</div>
-                {selected.isSystem && (
-                  <span className="text-[10px] font-medium bg-gray-100 text-gray-500 rounded px-1.5 py-0.5">
-                    System role
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-600 mt-1">{selected.description}</p>
-            </div>
-            <div className="flex gap-1">
-              {canManage ? (
-                <>
-                  <button className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500" title="Duplicate">
-                    <Copy className="w-4 h-4" />
-                  </button>
-                  <button className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500" title="Edit">
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                </>
-              ) : (
-                <span className="text-[10px] font-medium bg-gray-100 text-gray-500 rounded px-2 py-1 inline-flex items-center gap-1">
-                  <Lock className="w-3 h-3" />
-                  Read-only
-                </span>
+          <button
+            onClick={onToggle}
+            className="p-1.5 rounded-md text-gray-400 hover:bg-gray-100"
+            aria-label={expanded ? "Collapse" : "Expand"}
+          >
+            <ChevronDown
+              className={cn(
+                "w-4 h-4 transition-transform",
+                expanded && "rotate-180 text-brand-600"
               )}
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3 mt-4">
-            <Stat
-              icon={CircleDollarSign}
-              label="Approval limit"
-              value={fmt$(selected.approvalLimit)}
             />
-            <Stat
-              icon={Building2}
-              label="Branch scope"
-              value={selected.branchScope === "all" ? "All branches" : "Own branch only"}
-            />
-            <Stat icon={Users} label="Assigned users" value={`${selected.userCount}`} />
-          </div>
-        </Card>
+          </button>
+        </div>
+      </div>
 
-        <Card className="!p-0">
-          <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-            <div className="font-medium text-gray-900">Permissions</div>
-            <div className="text-xs text-gray-500">
-              {grantedCount(selected)} of {totalPerms} granted
+      {expanded && (
+        <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/40 rounded-b-xl">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Permissions
+            </div>
+            <div className="text-[11px] text-gray-500">
+              {granted} of {totalPerms} granted
             </div>
           </div>
-          <div className="px-5 py-3 max-h-[280px] overflow-y-auto scrollbar-thin">
-            <PermissionList role={selected} />
+          <PermissionList role={role} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmptyRoles({ canCreate, onCreate }: { canCreate: boolean; onCreate: () => void }) {
+  return (
+    <div className="p-10 text-center">
+      <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-3">
+        <Users className="w-6 h-6" />
+      </div>
+      <div className="text-sm font-medium text-gray-900">No roles yet</div>
+      <div className="text-xs text-gray-500 mt-1 max-w-[220px] mx-auto">
+        Create one role per step of your loan process — intake, review, approval, disbursement, audit.
+      </div>
+      {canCreate && (
+        <button
+          onClick={onCreate}
+          className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Create your first role
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Create role modal ---------- */
+
+function CreateRoleModal({
+  existingKeys,
+  onCancel,
+  onSave,
+}: {
+  existingKeys: string[];
+  onCancel: () => void;
+  onSave: (role: ManagedRole) => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [stage, setStage] = useState<StageKey>("intake");
+  const [approvalLimitStr, setApprovalLimitStr] = useState("0");
+  const [unlimited, setUnlimited] = useState(false);
+  const [branchScope, setBranchScope] = useState<"own" | "all">("own");
+  const [perms, setPerms] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  const grouped = useMemo(() => groupBy(PERMISSIONS, p => p.category), []);
+
+  const applyTemplate = (t: RoleTemplate) => {
+    setName(t.name);
+    setDescription(t.description);
+    setStage(t.stage);
+    setBranchScope(t.branchScope);
+    if (t.approvalLimit === null) {
+      setUnlimited(true);
+      setApprovalLimitStr("0");
+    } else {
+      setUnlimited(false);
+      setApprovalLimitStr(String(t.approvalLimit));
+    }
+    setPerms(new Set(t.permissions));
+    setError(null);
+  };
+
+  const togglePerm = (key: string) => {
+    setPerms(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleCategory = (cat: string, list: Permission[]) => {
+    const allGranted = list.every(p => perms.has(p.key));
+    setPerms(prev => {
+      const next = new Set(prev);
+      list.forEach(p => {
+        if (allGranted) next.delete(p.key);
+        else next.add(p.key);
+      });
+      return next;
+    });
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return setError("Role name is required");
+    let key = slugify(trimmed);
+    if (!key) return setError("Role name must contain letters or numbers");
+    if (existingKeys.includes(key)) {
+      let n = 2;
+      while (existingKeys.includes(`${key}-${n}`)) n += 1;
+      key = `${key}-${n}`;
+    }
+    const limit = unlimited ? null : Math.max(0, parseInt(approvalLimitStr || "0", 10));
+    const role: ManagedRole = {
+      key,
+      name: trimmed,
+      description: description.trim() || "—",
+      stage,
+      approvalLimit: limit,
+      branchScope,
+      permissions: Array.from(perms),
+      userCount: 0,
+      isSystem: false,
+    };
+    onSave(role);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-3xl max-h-[88vh] shadow-2xl overflow-hidden flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="h-14 px-5 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+          <div>
+            <div className="text-sm font-semibold text-gray-900">Create new role</div>
+            <div className="text-[11px] text-gray-500">Define a sub-user level for one step of the loan process.</div>
           </div>
-        </Card>
+          <button
+            onClick={onCancel}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-5">
+          {/* Templates */}
+          <div>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-brand-600" />
+              Start from a template
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {TEMPLATES.map(t => (
+                <button
+                  type="button"
+                  key={t.name}
+                  onClick={() => applyTemplate(t)}
+                  className="text-xs px-2.5 py-1 rounded-full border border-gray-200 hover:border-brand-500 hover:bg-brand-50 text-gray-700 hover:text-brand-700"
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Basics */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Role name *</label>
+              <input
+                autoFocus
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="e.g. Senior Credit Reviewer"
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Description</label>
+              <textarea
+                rows={2}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="What this role does in the loan workflow"
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+            </div>
+          </div>
+
+          {/* Stage selector */}
+          <div>
+            <label className="text-xs font-medium text-gray-600">Stage in loan process</label>
+            <div className="mt-1.5 grid grid-cols-5 gap-1.5">
+              {LOAN_STAGES.filter(s => s.key !== "general").map((s, idx) => {
+                const active = stage === s.key;
+                return (
+                  <button
+                    type="button"
+                    key={s.key}
+                    onClick={() => setStage(s.key)}
+                    className={cn(
+                      "border rounded-md p-2 text-left transition",
+                      active
+                        ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500/30"
+                        : "border-gray-200 hover:border-gray-300"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                      <span className={cn("w-1.5 h-1.5 rounded-full", s.dot)} />
+                      Step {idx + 1}
+                    </div>
+                    <div className={cn("text-xs font-medium mt-0.5", active ? "text-brand-700" : "text-gray-900")}>
+                      {s.short}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Approval + branch scope */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600">Approval limit (USD)</label>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="100"
+                  disabled={unlimited}
+                  value={approvalLimitStr}
+                  onChange={e => setApprovalLimitStr(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+                <label className="text-xs text-gray-600 inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={unlimited}
+                    onChange={e => setUnlimited(e.target.checked)}
+                  />
+                  Unlimited
+                </label>
+              </div>
+              <div className="text-[11px] text-gray-500 mt-1">
+                0 = cannot approve. Used for the Approval stage.
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600">Branch scope</label>
+              <div className="mt-1 flex gap-2">
+                {(["own", "all"] as const).map(v => (
+                  <button
+                    type="button"
+                    key={v}
+                    onClick={() => setBranchScope(v)}
+                    className={cn(
+                      "flex-1 px-3 py-2 text-sm rounded-md border transition",
+                      branchScope === v
+                        ? "border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500/30"
+                        : "border-gray-200 text-gray-700 hover:border-gray-300"
+                    )}
+                  >
+                    {v === "own" ? "Own branch only" : "All branches"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Permissions */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-gray-600">Permissions</label>
+              <div className="text-[11px] text-gray-500">{perms.size} selected</div>
+            </div>
+            <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+              {(Object.entries(grouped) as [PermissionCategory, Permission[]][]).map(([cat, list]) => {
+                const allGranted = list.every(p => perms.has(p.key));
+                const someGranted = list.some(p => perms.has(p.key));
+                return (
+                  <div key={cat} className="p-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleCategory(cat, list)}
+                      className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-900"
+                    >
+                      {allGranted ? (
+                        <CheckSquare className="w-3.5 h-3.5 text-brand-600" />
+                      ) : someGranted ? (
+                        <Minus className="w-3.5 h-3.5 text-brand-600" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5 text-gray-400" />
+                      )}
+                      {cat}
+                    </button>
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                      {list.map(p => {
+                        const granted = perms.has(p.key);
+                        return (
+                          <label
+                            key={p.key}
+                            className="flex items-center gap-2 text-sm cursor-pointer py-0.5"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={granted}
+                              onChange={() => togglePerm(p.key)}
+                              className="rounded text-brand-600 focus:ring-brand-500/30"
+                            />
+                            <span className={cn("flex-1", granted ? "text-gray-900" : "text-gray-600")}>
+                              {p.label}
+                            </span>
+                            {p.sensitive && (
+                              <span className="text-[10px] font-medium bg-amber-50 text-amber-700 rounded px-1.5 py-0.5">
+                                Sensitive
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {error && (
+            <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-3 py-2">
+              {error}
+            </div>
+          )}
+        </form>
+
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            onClick={submit}
+            className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+          >
+            Create role
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-5">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-gray-900">{title}</div>
+              <div className="text-xs text-gray-600 mt-1">{message}</div>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-3 py-1.5 text-sm bg-rose-600 text-white rounded-md hover:bg-rose-700 font-medium"
+          >
+            {confirmLabel}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -440,179 +1253,3 @@ function groupBy<T, K extends string>(arr: T[], keyFn: (t: T) => K): Record<K, T
   }, {} as Record<K, T[]>);
 }
 
-/* ---------- PERMISSIONS MATRIX ---------- */
-
-function PermissionsTab() {
-  const grouped = groupBy(PERMISSIONS, p => p.category);
-  const has = (role: Role, key: string) =>
-    role.permissions === "*" || role.permissions.includes(key);
-
-  return (
-    <Card className="!p-0">
-      <div className="px-5 py-3 border-b border-gray-200">
-        <div className="font-medium text-gray-900">Permissions matrix</div>
-        <div className="text-xs text-gray-500 mt-0.5">
-          Quick comparison of what each role can do.
-        </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
-          <thead className="bg-gray-50 sticky top-0">
-            <tr>
-              <th className="text-left px-4 py-2.5 text-[12px] font-medium text-gray-500 sticky left-0 bg-gray-50 z-10 min-w-[260px]">
-                Permission
-              </th>
-              {ROLES.map(r => (
-                <th
-                  key={r.key}
-                  className="text-center px-3 py-2.5 text-[11px] font-medium text-gray-500 whitespace-nowrap"
-                  title={r.description}
-                >
-                  {r.name}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {(Object.entries(grouped) as [PermissionCategory, Permission[]][]).map(
-              ([cat, list]) => (
-                <RowGroup key={cat} cat={cat} list={list} has={has} />
-              )
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
-}
-
-function RowGroup({
-  cat,
-  list,
-  has,
-}: {
-  cat: PermissionCategory;
-  list: Permission[];
-  has: (role: Role, key: string) => boolean;
-}) {
-  return (
-    <>
-      <tr className="bg-gray-50/60">
-        <td
-          colSpan={ROLES.length + 1}
-          className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500"
-        >
-          {cat}
-        </td>
-      </tr>
-      {list.map(p => (
-        <tr key={p.key} className="border-t border-gray-100">
-          <td className="px-4 py-2 sticky left-0 bg-white z-10">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-900">{p.label}</span>
-              {p.sensitive && (
-                <span className="text-[10px] font-medium bg-amber-50 text-amber-700 rounded px-1.5 py-0.5 inline-flex items-center gap-0.5">
-                  <ShieldCheck className="w-2.5 h-2.5" />
-                  Sensitive
-                </span>
-              )}
-            </div>
-            <div className="text-[10px] font-mono text-gray-400">{p.key}</div>
-          </td>
-          {ROLES.map(r => {
-            const granted = has(r, p.key);
-            return (
-              <td
-                key={r.key}
-                className={cn(
-                  "text-center px-3 py-2",
-                  granted ? "text-emerald-600" : "text-gray-300"
-                )}
-              >
-                {granted ? <Check className="w-4 h-4 inline" /> : <Minus className="w-4 h-4 inline" />}
-              </td>
-            );
-          })}
-        </tr>
-      ))}
-    </>
-  );
-}
-
-/* ---------- APPROVAL LAYERS ---------- */
-
-function LayersTab() {
-  return (
-    <div className="space-y-4">
-      <Card>
-        <div className="font-medium text-gray-900">How loan approvals route</div>
-        <p className="text-sm text-gray-500 mt-1">
-          Each loan moves through every layer below in sequence — but only the layers whose
-          threshold is reached become required. Higher-tier approvers cannot disburse, and the
-          originating Credit Officer cannot approve their own application
-          <span className="text-gray-700 font-medium"> (separation of duties)</span>.
-        </p>
-      </Card>
-
-      <div className="space-y-3">
-        {APPROVAL_LAYERS.map((layer, idx) => {
-          const isLast = idx === APPROVAL_LAYERS.length - 1;
-          return (
-            <div key={layer.level}>
-              <Card className="!p-0">
-                <div className="flex items-stretch">
-                  <div className="w-16 bg-brand-50 flex flex-col items-center justify-center text-brand-700">
-                    <div className="text-[10px] font-medium uppercase">Layer</div>
-                    <div className="text-2xl font-bold">{layer.level}</div>
-                  </div>
-                  <div className="flex-1 px-5 py-4 flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="font-medium text-gray-900">{layer.name}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">{layer.description}</div>
-                      <div className="mt-2 flex items-center gap-2 text-xs">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                          <Users className="w-3 h-3" />
-                          {layer.role}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right text-xs space-y-1">
-                      <div>
-                        <span className="text-gray-500">Activates above </span>
-                        <span className="font-medium text-gray-900">{fmt$(layer.min)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Approves up to </span>
-                        <span className="font-medium text-gray-900">{fmt$(layer.max)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-              {!isLast && (
-                <div className="flex justify-center py-1">
-                  <div className="w-px h-4 bg-gray-300" />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <Card>
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center flex-shrink-0">
-            <ShieldCheck className="w-4 h-4" />
-          </div>
-          <div className="text-sm">
-            <div className="font-medium text-gray-900">Maker–checker enforced</div>
-            <div className="text-gray-600 mt-0.5">
-              The user who creates / reviews an application cannot also approve or disburse it.
-              Disbursement is restricted to the Cashier role.
-            </div>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-}

@@ -16,7 +16,9 @@ import {
   Phone,
   Gift,
   Copy,
-  TrendingUp,
+  Eye,
+  FileText,
+  History,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -47,7 +49,7 @@ type Section = {
 
 const SECTIONS: Section[] = [
   { key: "app",      label: "App Setting",      icon: Smartphone,  group: "main", badge: "Admin", permission: "setting.edit" },
-  { key: "users",    label: "Users & Roles",    icon: Users,       group: "main", permission: "user.view" },
+  { key: "users",    label: "User & Role",      icon: Users,       group: "main", permission: "user.view" },
   { key: "menu",     label: "Menu Setting",     icon: LayoutGrid,  group: "main", permission: "setting.edit" },
   { key: "company",  label: "Company Profile",  icon: Building2,   group: "main", permission: "setting.edit" },
   { key: "branches", label: "Branch Locator",   icon: MapPin,      group: "main", permission: "setting.view" },
@@ -496,14 +498,6 @@ function ReferralView() {
     { code: "10502", name: "Mengsrun H.", role: "Approval Committee",    branch: "HQ",         referrals:  0, applications:  0, disbursed:  0, status: "Disabled" },
   ];
 
-  const RECENT: { customer: string; cid: string; code: string; officer: string; when: string; state: string }[] = [
-    { customer: "Sokha Chan", cid: "C-0421", code: "10247", officer: "Laybun N.",  when: "2026-05-16 14:22", state: "Application submitted" },
-    { customer: "Dara Meas",  cid: "C-0422", code: "10248", officer: "Sophea K.",  when: "2026-05-16 11:05", state: "Disbursed" },
-    { customer: "Vichet Lim", cid: "C-0423", code: "10247", officer: "Laybun N.",  when: "2026-05-15 16:40", state: "KYC verified" },
-    { customer: "Pisey Ros",  cid: "C-0424", code: "10248", officer: "Sophea K.",  when: "2026-05-15 09:11", state: "Disbursed" },
-    { customer: "Bopha Sok",  cid: "C-0426", code: "10312", officer: "Ratanak L.", when: "2026-05-14 13:30", state: "Application submitted" },
-  ];
-
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4">
@@ -518,60 +512,11 @@ function ReferralView() {
       </div>
 
       {/* KPI strip */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <StatTile label="Active codes" value="14" delta="+2" />
         <StatTile label="Customers referred" value="287" delta="+24" />
         <StatTile label="Applications" value="173" delta="+18" />
-        <StatTile label="Disbursed conversion" value="42.1%" delta="+1.8%" />
       </div>
-
-      {/* Code policy */}
-      <Card>
-        <div className="font-medium text-gray-900 mb-3">Code policy</div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-medium text-gray-600">Code length</label>
-            <input
-              readOnly
-              defaultValue="5 digits"
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-700"
-            />
-            <div className="text-[11px] text-gray-500 mt-1">Numeric only · range 10000–99999</div>
-          </div>
-          <Field label="Eligible roles" defaultValue="Credit Officer, Senior CO, Branch Manager" />
-        </div>
-        <div className="mt-4 space-y-1 text-sm">
-          {[
-            ["Referral code required at signup", false, "Customer must enter a CO code to create an account"],
-            ["Allow entry on first application",  true, "Customer can add the code on their first loan application instead of signup"],
-            ["Lock code after first use",         true, "Prevent customers from changing the code once a referral is counted"],
-            ["Auto-issue code for new officers",  true, "Generate a unique 5-digit code when an eligible CO user is created"],
-          ].map(([n, v, d]) => (
-            <div
-              key={n as string}
-              className="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0"
-            >
-              <div className="min-w-0">
-                <div className="font-medium text-gray-900">{n}</div>
-                <div className="text-xs text-gray-500">{d}</div>
-              </div>
-              <Toggle checked={v as boolean} />
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Officer commission */}
-      <Card>
-        <div className="font-medium text-gray-900 mb-1">Officer commission</div>
-        <div className="text-xs text-gray-500 mb-3">
-          Reward paid to the officer when a referred customer&apos;s loan is disbursed.
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Commission per disbursed loan (USD)" defaultValue="10" />
-          <Field label="Max commission / officer / month (USD)" defaultValue="500" />
-        </div>
-      </Card>
 
       {/* CO codes table */}
       <Card>
@@ -645,44 +590,6 @@ function ReferralView() {
         </div>
       </Card>
 
-      {/* Recent activity */}
-      <Card>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-brand-600" />
-            <div className="font-medium text-gray-900">Recent code redemptions</div>
-          </div>
-          <button className="text-xs text-brand-600 hover:underline font-medium">View all</button>
-        </div>
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                {["Customer", "Code used", "Officer", "When", "Latest state"].map(h => (
-                  <th key={h} className="text-left px-4 py-2 text-[12px] font-medium text-gray-500">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {RECENT.map(r => (
-                <tr key={r.cid + r.when} className="border-t border-gray-100">
-                  <td className="px-4 py-2.5">
-                    <div className="font-medium text-gray-900">{r.customer}</div>
-                    <div className="text-xs text-gray-500">{r.cid}</div>
-                  </td>
-                  <td className="px-4 py-2.5 font-mono text-gray-900">{r.code}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{r.officer}</td>
-                  <td className="px-4 py-2.5 text-gray-600 text-xs">{r.when}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{r.state}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
       {!readOnly && (
         <div className="flex justify-end">
           <button className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
@@ -721,41 +628,359 @@ function StatTile({
   );
 }
 
+type PolicyDoc = {
+  id: "terms" | "privacy" | "compliance";
+  title: string;
+  description: string;
+  version: string;
+  updated: string;
+  status: "Published" | "Draft";
+  body: string;
+};
+
+const POLICY_SEED: PolicyDoc[] = [
+  {
+    id: "terms",
+    title: "Terms & Conditions",
+    description: "Customer-facing terms shown at signup.",
+    version: "v2.4",
+    updated: "2026-01-15",
+    status: "Published",
+    body:
+`# Terms & Conditions
+
+_Last updated: January 15, 2026_
+
+## 1. Acceptance of Terms
+By creating an account or using WeLoan365, you agree to these Terms.
+
+## 2. Eligibility
+You must be at least 18 years old and a resident of Cambodia.
+
+## 3. Loan Process
+Applications are subject to credit assessment and approval.
+
+## 4. Repayment
+Loans must be repaid according to the agreed schedule.
+
+## 5. Fees & Interest
+See the Interest & Fees Disclosure shown at application time.
+
+## 6. Contact
+support@loanops.kh`,
+  },
+  {
+    id: "privacy",
+    title: "Privacy Policy",
+    description: "How customer data is collected, stored, and shared.",
+    version: "v1.8",
+    updated: "2025-11-02",
+    status: "Published",
+    body:
+`# Privacy Policy
+
+_Last updated: November 2, 2025_
+
+## 1. Information We Collect
+- Personal information (name, phone, national ID)
+- Financial information (income, employment)
+- App usage data
+
+## 2. How We Use It
+To assess loan eligibility, manage your account, and meet legal obligations.
+
+## 3. Sharing
+We may share with the National Bank of Cambodia and credit bureaus as required.
+
+## 4. Your Rights
+You can request access, correction, or deletion of your data at any time.`,
+  },
+  {
+    id: "compliance",
+    title: "Compliance Notices",
+    description: "Regulatory disclosures shown in the customer app.",
+    version: "v3.1",
+    updated: "2026-02-20",
+    status: "Published",
+    body:
+`# Compliance Notices
+
+WeLoan365 operates in accordance with Cambodian financial regulations.
+
+## NBC License
+Operating under license NBC-MFI-00123.
+
+## CBC Reporting
+All loan data is reported to the Credit Bureau of Cambodia.
+
+## AML / KYC
+We comply with anti-money-laundering and know-your-customer requirements.
+
+## Consumer Protection
+You have the right to a fair grievance process. See the Customer Complaint Process for details.`,
+  },
+];
+
 function PolicyView() {
-  const POLICIES: [string, string, string][] = [
-    ["Terms & Conditions", "v2.4", "2026-01-15"],
-    ["Privacy Policy", "v1.8", "2025-11-02"],
-    ["Compliance Laws", "v3.1", "2026-02-20"],
-    ["Cookie Policy", "v1.2", "2025-08-30"],
-    ["Interest & Fees Disclosure", "v2.0", "2026-03-01"],
-    ["Customer Complaint Process", "v1.5", "2025-09-12"],
-  ];
+  const { can } = useRole();
+  const canEdit = can("setting.edit");
+  const [policies, setPolicies] = useState<PolicyDoc[]>(POLICY_SEED);
+  const [editingId, setEditingId] = useState<PolicyDoc["id"] | null>(null);
+
+  const editing = editingId ? policies.find(p => p.id === editingId) ?? null : null;
+
+  if (editing) {
+    return (
+      <PolicyEditor
+        policy={editing}
+        readOnly={!canEdit}
+        onCancel={() => setEditingId(null)}
+        onSave={updated => {
+          setPolicies(prev => prev.map(p => (p.id === updated.id ? updated : p)));
+          setEditingId(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div>
         <H2>App Policy</H2>
-        <P>Update T&amp;Cs and compliance documents.</P>
+        <P>Update the customer-facing legal and compliance content.</P>
       </div>
-      <Card>
+      <Card className="!p-0">
         <div className="divide-y divide-gray-100">
-          {POLICIES.map(([t, v, d]) => (
-            <div key={t} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center">
-                  <ShieldCheck className="w-4 h-4" />
+          {policies.map(p => (
+            <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-4 h-4" />
                 </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-900">{t}</div>
-                  <div className="text-xs text-gray-500">
-                    {v} · Updated {d}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-sm font-medium text-gray-900">{p.title}</div>
+                    <span
+                      className={cn(
+                        "text-[10px] font-medium rounded px-1.5 py-0.5",
+                        p.status === "Published"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-700"
+                      )}
+                    >
+                      {p.status}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{p.description}</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">
+                    {p.version} · Updated {p.updated}
                   </div>
                 </div>
               </div>
-              <button className="text-xs text-brand-600 hover:underline font-medium">Edit</button>
+              <button
+                onClick={() => setEditingId(p.id)}
+                className="text-xs text-brand-600 hover:bg-brand-50 font-medium inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md flex-shrink-0"
+              >
+                {canEdit ? "Edit" : "View"}
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           ))}
         </div>
       </Card>
+    </div>
+  );
+}
+
+function PolicyEditor({
+  policy,
+  readOnly,
+  onCancel,
+  onSave,
+}: {
+  policy: PolicyDoc;
+  readOnly: boolean;
+  onCancel: () => void;
+  onSave: (p: PolicyDoc) => void;
+}) {
+  const [title, setTitle] = useState(policy.title);
+  const [version, setVersion] = useState(policy.version);
+  const [body, setBody] = useState(policy.body);
+  const [status, setStatus] = useState<PolicyDoc["status"]>(policy.status);
+  const [preview, setPreview] = useState(false);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const changed =
+    title !== policy.title ||
+    version !== policy.version ||
+    body !== policy.body ||
+    status !== policy.status;
+
+  const save = () => {
+    onSave({ ...policy, title: title.trim() || policy.title, version: version.trim() || policy.version, body, status, updated: today });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Top nav */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={onCancel}
+          className="text-xs text-gray-600 hover:text-gray-900 inline-flex items-center gap-1 font-medium"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back to App Policy
+        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setPreview(p => !p)}
+            className={cn(
+              "text-xs font-medium inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border",
+              preview
+                ? "bg-brand-50 text-brand-700 border-brand-200"
+                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+            )}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            {preview ? "Editing" : "Preview"}
+          </button>
+          {!readOnly && (
+            <>
+              <button
+                onClick={onCancel}
+                className="text-xs font-medium px-2.5 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={save}
+                disabled={!changed}
+                className="text-xs font-medium px-3 py-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save changes
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Header */}
+      <div>
+        <H2>{readOnly ? "View" : "Edit"} {policy.title}</H2>
+        <P>
+          Customer-facing content. Changes apply to the app once you publish.
+        </P>
+      </div>
+
+      {/* Meta */}
+      <Card>
+        <div className="font-medium text-gray-900 mb-3">Document settings</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="text-xs font-medium text-gray-600">Title</label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              readOnly={readOnly}
+              className={cn(
+                "mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+                readOnly && "bg-gray-50 text-gray-700"
+              )}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600">Version</label>
+            <input
+              value={version}
+              onChange={e => setVersion(e.target.value)}
+              readOnly={readOnly}
+              placeholder="e.g. v2.5"
+              className={cn(
+                "mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+                readOnly && "bg-gray-50 text-gray-700"
+              )}
+            />
+            <div className="text-[11px] text-gray-500 mt-1 inline-flex items-center gap-1">
+              <History className="w-3 h-3" />
+              Previously {policy.version} · {policy.updated}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600">Status</label>
+            <div className="mt-1 flex gap-2">
+              {(["Draft", "Published"] as const).map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => setStatus(s)}
+                  className={cn(
+                    "flex-1 px-3 py-2 text-sm rounded-md border transition disabled:opacity-60 disabled:cursor-not-allowed",
+                    status === s
+                      ? s === "Published"
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30"
+                        : "border-amber-500 bg-amber-50 text-amber-700 ring-1 ring-amber-500/30"
+                      : "border-gray-200 text-gray-700 hover:border-gray-300"
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Content editor / preview */}
+      <Card className="!p-0">
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+          <div className="font-medium text-gray-900">Content</div>
+          <div className="text-[11px] text-gray-500">
+            Markdown-style · {body.length} characters
+          </div>
+        </div>
+        {preview ? (
+          <div className="px-5 py-4 prose prose-sm max-w-none text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">
+            {body}
+          </div>
+        ) : (
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            readOnly={readOnly}
+            spellCheck
+            className={cn(
+              "w-full px-5 py-4 text-sm font-mono leading-relaxed focus:outline-none resize-none rounded-b-xl min-h-[280px]",
+              readOnly && "bg-gray-50 text-gray-700"
+            )}
+            rows={14}
+          />
+        )}
+      </Card>
+
+      {/* Footer save */}
+      {!readOnly && (
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="text-xs text-gray-500">
+            {changed ? "You have unsaved changes." : "All changes saved."}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onCancel}
+              className="text-xs font-medium px-2.5 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={!changed}
+              className="text-xs font-medium px-3 py-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save changes
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

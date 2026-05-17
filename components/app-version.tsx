@@ -47,7 +47,7 @@ export function AppVersion() {
                 <Download className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium text-gray-900">Update available</div>
+                <div className="text-[13px] font-medium text-gray-900">Please alert customer to update the mobile app</div>
                 <div className="text-[11px] text-gray-600 mt-0.5 leading-snug">
                   v{CURRENT_VERSION} → <span className="font-medium">v{LATEST_VERSION}</span> · Bug fixes and performance improvements
                 </div>
@@ -70,7 +70,7 @@ export function AppVersion() {
                 ) : (
                   <>
                     <Download className="w-3.5 h-3.5" />
-                    Update now
+                    Alert now
                   </>
                 )}
               </button>
