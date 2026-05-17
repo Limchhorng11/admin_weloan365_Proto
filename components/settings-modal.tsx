@@ -14,6 +14,9 @@ import {
   LifeBuoy,
   Mail,
   Phone,
+  Gift,
+  Copy,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +31,7 @@ type SectionKey =
   | "menu"
   | "company"
   | "branches"
+  | "referral"
   | "policy"
   | "support";
 
@@ -47,6 +51,7 @@ const SECTIONS: Section[] = [
   { key: "menu",     label: "Menu Setting",     icon: LayoutGrid,  group: "main", permission: "setting.edit" },
   { key: "company",  label: "Company Profile",  icon: Building2,   group: "main", permission: "setting.edit" },
   { key: "branches", label: "Branch Locator",   icon: MapPin,      group: "main", permission: "setting.view" },
+  { key: "referral", label: "Referral Program", icon: Gift,        group: "main", badge: "New", permission: "setting.edit" },
   { key: "policy",   label: "App Policy",       icon: ShieldCheck, group: "more" },
   { key: "support",  label: "Support",          icon: LifeBuoy,    group: "more" },
 ];
@@ -183,6 +188,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             {section === "menu"     && <MenuView />}
             {section === "company"  && <CompanyView />}
             {section === "branches" && <BranchesView />}
+            {section === "referral" && <ReferralView />}
             {section === "policy"   && <PolicyView />}
             {section === "support"  && <SupportView />}
           </div>
@@ -463,6 +469,254 @@ function BranchesView() {
           </table>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function ReferralView() {
+  const { can } = useRole();
+  const readOnly = !can("setting.edit");
+
+  type CodeRow = {
+    code: string;
+    name: string;
+    role: string;
+    branch: string;
+    referrals: number;
+    applications: number;
+    disbursed: number;
+    status: "Active" | "Disabled";
+  };
+
+  const CO_CODES: CodeRow[] = [
+    { code: "10247", name: "Laybun N.",   role: "Credit Officer",        branch: "Phnom Penh", referrals: 28, applications: 19, disbursed: 11, status: "Active"   },
+    { code: "10248", name: "Sophea K.",   role: "Senior Credit Officer", branch: "Siem Reap",  referrals: 41, applications: 32, disbursed: 21, status: "Active"   },
+    { code: "10312", name: "Ratanak L.",  role: "Branch Manager",        branch: "Battambang", referrals: 14, applications:  9, disbursed:  5, status: "Active"   },
+    { code: "10401", name: "Pisey C.",    role: "Cashier",               branch: "Phnom Penh", referrals:  6, applications:  3, disbursed:  1, status: "Active"   },
+    { code: "10502", name: "Mengsrun H.", role: "Approval Committee",    branch: "HQ",         referrals:  0, applications:  0, disbursed:  0, status: "Disabled" },
+  ];
+
+  const RECENT: { customer: string; cid: string; code: string; officer: string; when: string; state: string }[] = [
+    { customer: "Sokha Chan", cid: "C-0421", code: "10247", officer: "Laybun N.",  when: "2026-05-16 14:22", state: "Application submitted" },
+    { customer: "Dara Meas",  cid: "C-0422", code: "10248", officer: "Sophea K.",  when: "2026-05-16 11:05", state: "Disbursed" },
+    { customer: "Vichet Lim", cid: "C-0423", code: "10247", officer: "Laybun N.",  when: "2026-05-15 16:40", state: "KYC verified" },
+    { customer: "Pisey Ros",  cid: "C-0424", code: "10248", officer: "Sophea K.",  when: "2026-05-15 09:11", state: "Disbursed" },
+    { customer: "Bopha Sok",  cid: "C-0426", code: "10312", officer: "Ratanak L.", when: "2026-05-14 13:30", state: "Application submitted" },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <H2>Referral Program</H2>
+          <P>Customers enter a 5-digit Credit Officer code at signup. Track conversions per officer.</P>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-xs text-gray-500">Program status</span>
+          <Toggle checked />
+        </div>
+      </div>
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-4 gap-3">
+        <StatTile label="Active codes" value="14" delta="+2" />
+        <StatTile label="Customers referred" value="287" delta="+24" />
+        <StatTile label="Applications" value="173" delta="+18" />
+        <StatTile label="Disbursed conversion" value="42.1%" delta="+1.8%" />
+      </div>
+
+      {/* Code policy */}
+      <Card>
+        <div className="font-medium text-gray-900 mb-3">Code policy</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600">Code length</label>
+            <input
+              readOnly
+              defaultValue="5 digits"
+              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-700"
+            />
+            <div className="text-[11px] text-gray-500 mt-1">Numeric only · range 10000–99999</div>
+          </div>
+          <Field label="Eligible roles" defaultValue="Credit Officer, Senior CO, Branch Manager" />
+        </div>
+        <div className="mt-4 space-y-1 text-sm">
+          {[
+            ["Referral code required at signup", false, "Customer must enter a CO code to create an account"],
+            ["Allow entry on first application",  true, "Customer can add the code on their first loan application instead of signup"],
+            ["Lock code after first use",         true, "Prevent customers from changing the code once a referral is counted"],
+            ["Auto-issue code for new officers",  true, "Generate a unique 5-digit code when an eligible CO user is created"],
+          ].map(([n, v, d]) => (
+            <div
+              key={n as string}
+              className="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0"
+            >
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900">{n}</div>
+                <div className="text-xs text-gray-500">{d}</div>
+              </div>
+              <Toggle checked={v as boolean} />
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Officer commission */}
+      <Card>
+        <div className="font-medium text-gray-900 mb-1">Officer commission</div>
+        <div className="text-xs text-gray-500 mb-3">
+          Reward paid to the officer when a referred customer&apos;s loan is disbursed.
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Commission per disbursed loan (USD)" defaultValue="10" />
+          <Field label="Max commission / officer / month (USD)" defaultValue="500" />
+        </div>
+      </Card>
+
+      {/* CO codes table */}
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="font-medium text-gray-900">Credit Officer codes</div>
+            <div className="text-xs text-gray-500 mt-0.5">One unique 5-digit code per officer.</div>
+          </div>
+          {!readOnly && (
+            <button className="px-3 py-1 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
+              Issue new code
+            </button>
+          )}
+        </div>
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                {["Code", "Officer", "Branch", "Referrals", "Apps", "Disbursed", "Status", ""].map(h => (
+                  <th key={h} className="text-left px-4 py-2 text-[12px] font-medium text-gray-500">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {CO_CODES.map(r => (
+                <tr key={r.code} className="border-t border-gray-100">
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-medium text-gray-900 tracking-wider">{r.code}</span>
+                      <button
+                        className="text-gray-400 hover:text-gray-700"
+                        aria-label={`Copy code ${r.code}`}
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium text-gray-900">{r.name}</div>
+                    <div className="text-xs text-gray-500">{r.role}</div>
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-600">{r.branch}</td>
+                  <td className="px-4 py-2.5 text-gray-600">{r.referrals}</td>
+                  <td className="px-4 py-2.5 text-gray-600">{r.applications}</td>
+                  <td className="px-4 py-2.5 font-medium text-gray-900">{r.disbursed}</td>
+                  <td className="px-4 py-2.5">
+                    <span
+                      className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium",
+                        r.status === "Active"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-gray-100 text-gray-600"
+                      )}
+                    >
+                      {r.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    {!readOnly && (
+                      <button className="text-xs text-brand-600 hover:underline font-medium">
+                        Regenerate
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Recent activity */}
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-brand-600" />
+            <div className="font-medium text-gray-900">Recent code redemptions</div>
+          </div>
+          <button className="text-xs text-brand-600 hover:underline font-medium">View all</button>
+        </div>
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                {["Customer", "Code used", "Officer", "When", "Latest state"].map(h => (
+                  <th key={h} className="text-left px-4 py-2 text-[12px] font-medium text-gray-500">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {RECENT.map(r => (
+                <tr key={r.cid + r.when} className="border-t border-gray-100">
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium text-gray-900">{r.customer}</div>
+                    <div className="text-xs text-gray-500">{r.cid}</div>
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-gray-900">{r.code}</td>
+                  <td className="px-4 py-2.5 text-gray-600">{r.officer}</td>
+                  <td className="px-4 py-2.5 text-gray-600 text-xs">{r.when}</td>
+                  <td className="px-4 py-2.5 text-gray-600">{r.state}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {!readOnly && (
+        <div className="flex justify-end">
+          <button className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
+            Save changes
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  delta,
+  negative,
+}: {
+  label: string;
+  value: string;
+  delta: string;
+  negative?: boolean;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="text-xs text-gray-500">{label}</div>
+      <div className="mt-1 text-xl font-semibold text-gray-900">{value}</div>
+      <div
+        className={cn(
+          "mt-1 text-[11px] font-medium",
+          negative ? "text-rose-600" : "text-emerald-600"
+        )}
+      >
+        {delta} vs. prev. period
+      </div>
     </div>
   );
 }
