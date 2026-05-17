@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   Mail,
-  KeyRound,
   Lock,
   Eye,
   EyeOff,
@@ -19,7 +18,6 @@ import {
 import { cn } from "@/lib/utils";
 
 type Step = 1 | 2 | 3 | 4;
-type Method = "email" | "otp";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: 1, label: "Identify" },
@@ -34,7 +32,6 @@ export default function ForgotPasswordPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [email, setEmail] = useState("");
-  const [method, setMethod] = useState<Method>("otp");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,20 +61,13 @@ export default function ForgotPasswordPage() {
     setLoading(false);
     setCooldown(RESEND_COOLDOWN);
     setStep(2);
-    if (method === "otp") setTimeout(() => otpRefs.current[0]?.focus(), 50);
+    setTimeout(() => otpRefs.current[0]?.focus(), 50);
   };
 
   const verifyOtp = async () => {
     const code = otp.join("");
     if (code.length !== 6) return setError("Enter all 6 digits");
     setError(null);
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 700));
-    setLoading(false);
-    setStep(3);
-  };
-
-  const verifyEmailLink = async () => {
     setLoading(true);
     await new Promise(r => setTimeout(r, 700));
     setLoading(false);
@@ -208,14 +198,12 @@ export default function ForgotPasswordPage() {
             <StepIdentify
               email={email}
               setEmail={setEmail}
-              method={method}
-              setMethod={setMethod}
               onSubmit={submitIdentify}
               loading={loading}
               error={error}
             />
           )}
-          {step === 2 && method === "otp" && (
+          {step === 2 && (
             <StepOtp
               email={email}
               otp={otp}
@@ -227,15 +215,6 @@ export default function ForgotPasswordPage() {
               cooldown={cooldown}
               loading={loading}
               error={error}
-            />
-          )}
-          {step === 2 && method === "email" && (
-            <StepEmail
-              email={email}
-              onContinue={verifyEmailLink}
-              onResend={resend}
-              cooldown={cooldown}
-              loading={loading}
             />
           )}
           {step === 3 && (
@@ -272,16 +251,12 @@ export default function ForgotPasswordPage() {
 function StepIdentify({
   email,
   setEmail,
-  method,
-  setMethod,
   onSubmit,
   loading,
   error,
 }: {
   email: string;
   setEmail: (v: string) => void;
-  method: Method;
-  setMethod: (v: Method) => void;
   onSubmit: (e: React.FormEvent) => void;
   loading: boolean;
   error: string | null;
@@ -292,7 +267,7 @@ function StepIdentify({
         Forgot your password?
       </h1>
       <p className="text-sm text-gray-500 mt-1">
-        Enter your admin email and choose how to receive a verification.
+        Enter your admin email and we&apos;ll send you a 6-digit code to reset it.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -311,28 +286,6 @@ function StepIdentify({
               autoComplete="email"
               required
               className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1.5">
-            How should we verify it&apos;s you?
-          </label>
-          <div className="space-y-2">
-            <MethodOption
-              checked={method === "otp"}
-              onSelect={() => setMethod("otp")}
-              icon={KeyRound}
-              title="One-time code"
-              description="Send a 6-digit code to your email"
-            />
-            <MethodOption
-              checked={method === "email"}
-              onSelect={() => setMethod("email")}
-              icon={Mail}
-              title="Reset link"
-              description="Email a secure link to set a new password"
             />
           </div>
         </div>
@@ -356,7 +309,7 @@ function StepIdentify({
             </>
           ) : (
             <>
-              Send {method === "otp" ? "code" : "link"}
+              Send code
               <ArrowRight className="w-4 h-4" />
             </>
           )}
@@ -455,79 +408,6 @@ function StepOtp({
             </>
           )}
         </button>
-      </div>
-    </>
-  );
-}
-
-function StepEmail({
-  email,
-  onContinue,
-  onResend,
-  cooldown,
-  loading,
-}: {
-  email: string;
-  onContinue: () => void;
-  onResend: () => void;
-  cooldown: number;
-  loading: boolean;
-}) {
-  return (
-    <>
-      <h1 className="mt-6 text-2xl font-semibold tracking-tight text-gray-900">
-        Check your inbox
-      </h1>
-      <p className="text-sm text-gray-500 mt-1">
-        We emailed a reset link to{" "}
-        <span className="font-medium text-gray-800">{maskEmail(email)}</span>. Open the link to
-        continue.
-      </p>
-
-      <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 flex items-start gap-3">
-        <div className="w-9 h-9 rounded-md bg-brand-100 text-brand-700 flex items-center justify-center flex-shrink-0">
-          <Mail className="w-4 h-4" />
-        </div>
-        <div className="text-xs text-gray-600 leading-relaxed">
-          The link is valid for <span className="font-medium text-gray-900">10 minutes</span>.
-          Check spam if you don&apos;t see it.
-        </div>
-      </div>
-
-      <div className="mt-4 text-xs text-gray-500">
-        Didn&apos;t get it?{" "}
-        {cooldown > 0 ? (
-          <span>Resend in {cooldown}s</span>
-        ) : (
-          <button
-            onClick={onResend}
-            className="text-brand-600 hover:underline font-medium inline-flex items-center gap-1"
-          >
-            <RefreshCw className="w-3 h-3" />
-            Resend link
-          </button>
-        )}
-      </div>
-
-      <button
-        onClick={onContinue}
-        disabled={loading}
-        className={cn(
-          "mt-6 w-full flex items-center justify-center gap-2 py-2.5 rounded-md font-medium text-sm border border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
-          loading && "cursor-wait"
-        )}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Opening link...
-          </>
-        ) : (
-          <>I&apos;ve clicked the link</>
-        )}
-      </button>
-      <div className="mt-2 text-[11px] text-gray-400 text-center">
-        Demo step — simulates the link landing back here.
       </div>
     </>
   );
@@ -717,54 +597,6 @@ function Stepper({ currentStep }: { currentStep: Step }) {
         );
       })}
     </div>
-  );
-}
-
-function MethodOption({
-  checked,
-  onSelect,
-  icon: Icon,
-  title,
-  description,
-}: {
-  checked: boolean;
-  onSelect: () => void;
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-md border transition",
-        checked
-          ? "border-brand-500 bg-brand-50/60 ring-1 ring-brand-500/30"
-          : "border-gray-200 hover:border-gray-300"
-      )}
-    >
-      <div
-        className={cn(
-          "w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0",
-          checked ? "bg-brand-100 text-brand-700" : "bg-gray-100 text-gray-500"
-        )}
-      >
-        <Icon className="w-4 h-4" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className={cn("text-sm font-medium", checked ? "text-brand-700" : "text-gray-900")}>
-          {title}
-        </div>
-        <div className="text-xs text-gray-500 mt-0.5">{description}</div>
-      </div>
-      <div
-        className={cn(
-          "mt-1 w-4 h-4 rounded-full border flex-shrink-0",
-          checked ? "border-brand-600 bg-brand-600 ring-2 ring-white" : "border-gray-300"
-        )}
-      />
-    </button>
   );
 }
 
