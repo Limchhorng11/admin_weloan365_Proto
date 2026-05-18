@@ -904,7 +904,7 @@ function CreateRoleModal({
         <div className="h-14 px-5 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
           <div>
             <div className="text-sm font-semibold text-gray-900">Create new role</div>
-            <div className="text-[11px] text-gray-500">Define a sub-user level for one step of the loan process.</div>
+            <div className="text-[11px] text-gray-500">Define a sub-user level with the permissions you want to grant.</div>
           </div>
           <button
             onClick={onCancel}
@@ -960,83 +960,25 @@ function CreateRoleModal({
             </div>
           </div>
 
-          {/* Stage selector */}
+          {/* Branch scope */}
           <div>
-            <label className="text-xs font-medium text-gray-600">Stage in loan process</label>
-            <div className="mt-1.5 grid grid-cols-5 gap-1.5">
-              {LOAN_STAGES.filter(s => s.key !== "general").map((s, idx) => {
-                const active = stage === s.key;
-                return (
-                  <button
-                    type="button"
-                    key={s.key}
-                    onClick={() => setStage(s.key)}
-                    className={cn(
-                      "border rounded-md p-2 text-left transition",
-                      active
-                        ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500/30"
-                        : "border-gray-200 hover:border-gray-300"
-                    )}
-                  >
-                    <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                      <span className={cn("w-1.5 h-1.5 rounded-full", s.dot)} />
-                      Step {idx + 1}
-                    </div>
-                    <div className={cn("text-xs font-medium mt-0.5", active ? "text-brand-700" : "text-gray-900")}>
-                      {s.short}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Approval + branch scope */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-gray-600">Approval limit (USD)</label>
-              <div className="mt-1 flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="100"
-                  disabled={unlimited}
-                  value={approvalLimitStr}
-                  onChange={e => setApprovalLimitStr(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400"
-                />
-                <label className="text-xs text-gray-600 inline-flex items-center gap-1.5 whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={unlimited}
-                    onChange={e => setUnlimited(e.target.checked)}
-                  />
-                  Unlimited
-                </label>
-              </div>
-              <div className="text-[11px] text-gray-500 mt-1">
-                0 = cannot approve. Used for the Approval stage.
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600">Branch scope</label>
-              <div className="mt-1 flex gap-2">
-                {(["own", "all"] as const).map(v => (
-                  <button
-                    type="button"
-                    key={v}
-                    onClick={() => setBranchScope(v)}
-                    className={cn(
-                      "flex-1 px-3 py-2 text-sm rounded-md border transition",
-                      branchScope === v
-                        ? "border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500/30"
-                        : "border-gray-200 text-gray-700 hover:border-gray-300"
-                    )}
-                  >
-                    {v === "own" ? "Own branch only" : "All branches"}
-                  </button>
-                ))}
-              </div>
+            <label className="text-xs font-medium text-gray-600">Branch scope</label>
+            <div className="mt-1 flex gap-2">
+              {(["own", "all"] as const).map(v => (
+                <button
+                  type="button"
+                  key={v}
+                  onClick={() => setBranchScope(v)}
+                  className={cn(
+                    "flex-1 px-3 py-2 text-sm rounded-md border transition",
+                    branchScope === v
+                      ? "border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500/30"
+                      : "border-gray-200 text-gray-700 hover:border-gray-300"
+                  )}
+                >
+                  {v === "own" ? "Own branch only" : "All branches"}
+                </button>
+              ))}
             </div>
           </div>
 

@@ -1,27 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
   XCircle,
+  X,
   MessageCircle,
   FileCheck2,
-  RefreshCw,
   Plus,
   Download,
   Banknote,
   Lock,
-  ShieldAlert,
+  ChevronLeft,
   ChevronRight,
   RotateCcw,
   ClipboardCheck,
-  Wallet,
+  FileSearch,
+  ShieldCheck,
   UserCheck,
+  Search,
 } from "lucide-react";
-import { APPLICATIONS, type Application, type ApplicationStatus } from "@/lib/data";
+import { APPLICATIONS, USERS, type Application, type ApplicationStatus } from "@/lib/data";
 import { StatusBadge } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/lib/role-context";
@@ -171,7 +173,7 @@ export default function ApplicationDetailPage({
                 )}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                Approve & route to Cashier
+                Accept
               </button>
             )}
 
@@ -199,17 +201,6 @@ export default function ApplicationDetailPage({
           </div>
         </div>
 
-        {/* Workflow banner — current stage + next + role context */}
-        <WorkflowBanner
-          status={a.status}
-          roleName={role.name}
-          isOwnerRole={role.key === "co"}
-          approveBlockedReason={approveBlockedReason}
-          mayApproveAmt={mayApproveAmt}
-          mayApprove={mayApprove}
-          mayDisburse={mayDisburse}
-        />
-
         {/* Tabs */}
         <div className="px-6 border-b border-gray-200 flex gap-1 overflow-x-auto">
           {visibleTabs.map(t => (
@@ -233,7 +224,7 @@ export default function ApplicationDetailPage({
           {tab === "status"    && <LoanStatusTab a={a} />}
           {tab === "kyc"       && <KycTab a={a} />}
           {tab === "repayment" && <RepaymentTab a={a} />}
-          {tab === "reminders" && <RemindersTab />}
+          {tab === "reminders" && <RemindersTab a={a} />}
           {tab === "audit"     && <AuditTab a={a} />}
           {tab === "reports"   && <ReportsTab />}
           {tab === "officer"   && <OfficerTab a={a} />}
@@ -268,9 +259,9 @@ function Row({
   );
 }
 
-/* ---------- workflow stages (CO → Approval → Cashier) ---------- */
+/* ---------- workflow stages (Submission → Document Review → Credit Check → Approval) ---------- */
 
-type Stage = "Origination" | "Approval" | "Disbursement";
+type Stage = "Submission" | "Review" | "CreditCheck" | "Approval";
 
 type StageState = "done" | "active" | "pending" | "failed";
 
@@ -286,173 +277,165 @@ type StageInfo = {
 };
 
 function getStages(status: ApplicationStatus): StageInfo[] {
-  const ORIGINATION: StageInfo = {
-    key: "Origination",
-    label: "Origination",
+  // Stage 1 — Submission (always done if the app exists)
+  const SUBMISSION: StageInfo = {
+    key: "Submission",
+    label: "Submission",
     role: "Credit Officer",
-    description: "CO submits the application with KYC + CBC.",
+    description: "CO submits the application on behalf of the customer.",
     icon: ClipboardCheck,
     state: "done",
     who: "Laybun N.",
     when: "Apr 20",
   };
+  // Stage 2 — Document Review (KYC + uploaded docs)
+  const REVIEW: StageInfo = {
+    key: "Review",
+    label: "Document Review",
+    role: "Credit Officer",
+    description: "Verify KYC, national ID, and supporting documents.",
+    icon: FileSearch,
+    state: "pending",
+  };
+  // Stage 3 — Credit Check (CBC pull, risk scoring)
+  const CREDIT_CHECK: StageInfo = {
+    key: "CreditCheck",
+    label: "Credit Check",
+    role: "Senior Credit Officer",
+    description: "Pull CBC report, score risk, evaluate debt-to-income.",
+    icon: ShieldCheck,
+    state: "pending",
+  };
+  // Stage 4 — Approval (final approval decision)
   const APPROVAL: StageInfo = {
     key: "Approval",
     label: "Approval",
-    role: "Approval / Senior CO / BM",
-    description: "Reviewer approves or rejects within their limit.",
+    role: "Approval Committee / BM",
+    description: "Final approval decision, within the role's limit.",
     icon: UserCheck,
     state: "pending",
   };
-  const DISBURSEMENT: StageInfo = {
-    key: "Disbursement",
-    label: "Disbursement",
-    role: "Cashier",
-    description: "Cashier disburses cash to the customer.",
-    icon: Wallet,
-    state: "pending",
-  };
 
-  if (status === "Pending" || status === "Review") {
-    APPROVAL.state = "active";
-  } else if (status === "Approved") {
+  if (status === "Pending") {
+    REVIEW.state = "active";
+  } else if (status === "Review") {
+    REVIEW.state = "done";
+    REVIEW.who = "Laybun N.";
+    REVIEW.when = "Apr 20";
+    CREDIT_CHECK.state = "active";
+  } else if (status === "Approved" || status === "Disbursed") {
+    REVIEW.state = "done";
+    REVIEW.who = "Laybun N.";
+    REVIEW.when = "Apr 20";
+    CREDIT_CHECK.state = "done";
+    CREDIT_CHECK.who = "System / Sophea K.";
+    CREDIT_CHECK.when = "Apr 21";
     APPROVAL.state = "done";
     APPROVAL.who = "Sophea K.";
     APPROVAL.when = "Apr 21";
-    DISBURSEMENT.state = "active";
-  } else if (status === "Disbursed") {
-    APPROVAL.state = "done";
-    APPROVAL.who = "Sophea K.";
-    APPROVAL.when = "Apr 21";
-    DISBURSEMENT.state = "done";
-    DISBURSEMENT.who = "Pisey C.";
-    DISBURSEMENT.when = "Apr 22";
   } else if (status === "Rejected") {
+    // For demo: assume rejected after credit check
+    REVIEW.state = "done";
+    REVIEW.who = "Laybun N.";
+    REVIEW.when = "Apr 20";
+    CREDIT_CHECK.state = "done";
+    CREDIT_CHECK.who = "System / Sophea K.";
+    CREDIT_CHECK.when = "Apr 21";
     APPROVAL.state = "failed";
     APPROVAL.who = "Sophea K.";
     APPROVAL.when = "Apr 21";
-    DISBURSEMENT.state = "pending";
   }
-  return [ORIGINATION, APPROVAL, DISBURSEMENT];
-}
-
-function currentStage(status: ApplicationStatus): Stage | null {
-  if (status === "Pending" || status === "Review") return "Approval";
-  if (status === "Approved") return "Disbursement";
-  return null; // terminal: Disbursed / Rejected
-}
-
-function nextStage(status: ApplicationStatus): Stage | null {
-  if (status === "Pending" || status === "Review") return "Disbursement";
-  return null;
-}
-
-function WorkflowBanner({
-  status,
-  roleName,
-  isOwnerRole,
-  approveBlockedReason,
-  mayApproveAmt,
-  mayApprove,
-  mayDisburse,
-}: {
-  status: ApplicationStatus;
-  roleName: string;
-  isOwnerRole: boolean;
-  approveBlockedReason: string | null;
-  mayApproveAmt: boolean;
-  mayApprove: boolean;
-  mayDisburse: boolean;
-}) {
-  const cur = currentStage(status);
-  const nxt = nextStage(status);
-  const stageRoles: Record<Stage, string> = {
-    Origination: "Credit Officer",
-    Approval: "Approval / Senior CO",
-    Disbursement: "Cashier",
-  };
-
-  let actionMsg: React.ReactNode;
-  if (status === "Disbursed") {
-    actionMsg = <span className="text-emerald-700 font-medium">Workflow complete — funds disbursed.</span>;
-  } else if (status === "Rejected") {
-    actionMsg = <span className="text-red-700 font-medium">Workflow ended — application rejected.</span>;
-  } else if (mayApprove && mayApproveAmt) {
-    actionMsg = <span className="text-emerald-700">You can <b>approve & route to Cashier</b>.</span>;
-  } else if (mayApprove && !mayApproveAmt && approveBlockedReason) {
-    actionMsg = <span className="text-amber-700">{approveBlockedReason}</span>;
-  } else if (mayDisburse) {
-    actionMsg = <span className="text-emerald-700">Approved — you can <b>disburse</b> now.</span>;
-  } else if (isOwnerRole && (status === "Pending" || status === "Review")) {
-    actionMsg = <span className="text-gray-700">You submitted this; awaiting approval.</span>;
-  } else {
-    actionMsg = <span className="text-gray-500">No action available at this stage.</span>;
-  }
-
-  return (
-    <div className="px-6 py-3 bg-gray-50/80 border-b border-gray-200 flex items-center gap-3 text-xs">
-      <ShieldAlert className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-      {cur ? (
-        <>
-          <div className="flex items-center gap-1.5">
-            <span className="text-gray-500">Currently with</span>
-            <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 font-medium">
-              {stageRoles[cur]}
-            </span>
-          </div>
-          {nxt && (
-            <>
-              <ChevronRight className="w-3 h-3 text-gray-300" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-500">Next</span>
-                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
-                  {stageRoles[nxt]}
-                </span>
-              </div>
-            </>
-          )}
-        </>
-      ) : (
-        <span className="text-gray-500">Status: <span className="font-medium text-gray-900">{status}</span></span>
-      )}
-      <div className="flex-1" />
-      <div className="flex items-center gap-1.5 text-gray-500">
-        <span>Acting as</span>
-        <span className="font-medium text-gray-900">{roleName}</span>
-        <span>·</span>
-        {actionMsg}
-      </div>
-    </div>
-  );
+  return [SUBMISSION, REVIEW, CREDIT_CHECK, APPROVAL];
 }
 
 /* ---------- tab: Loan Status ---------- */
 
 function LoanStatusTab({ a }: { a: Application }) {
-  const stages = getStages(a.status);
+  const stages = useMemo(() => getStages(a.status), [a.status]);
   const monthly = Math.round((a.amount * (1 + a.rate / 100)) / a.term);
   const total   = Math.round(a.amount * (1 + a.rate / 100));
 
+  // ----- Carousel (3 visible, 1 hidden) -----
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft]   = useState(false);
+  const [canRight, setCanRight] = useState(true);
+
+  const updateButtons = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 4);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    updateButtons();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateButtons, { passive: true });
+    window.addEventListener("resize", updateButtons);
+    return () => {
+      el.removeEventListener("scroll", updateButtons);
+      window.removeEventListener("resize", updateButtons);
+    };
+  }, []);
+
+  const cardStep = () => {
+    const el = scrollRef.current;
+    if (!el) return 0;
+    return el.scrollWidth / stages.length;
+  };
+
+  const scroll = (dir: "left" | "right") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({
+      left: dir === "left" ? -cardStep() : cardStep(),
+      behavior: "smooth",
+    });
+  };
+
   return (
     <>
-      <SectionLabel>Workflow — CO → Approval → Cashier</SectionLabel>
+      <div className="flex items-center justify-between mb-3">
+        <SectionLabel>
+          Approval workflow — Submission → Approval (4 steps)
+        </SectionLabel>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => scroll("left")}
+            disabled={!canLeft}
+            className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => scroll("right")}
+            disabled={!canRight}
+            className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-      <div className="flex items-stretch gap-3">
-        {stages.map((s, i) => (
-          <div key={s.key} className="flex-1 flex">
-            <StageCard stage={s} index={i + 1} />
-            {i < stages.length - 1 && (
-              <div className="flex items-center px-1">
-                <ChevronRight
-                  className={cn(
-                    "w-5 h-5",
-                    s.state === "done" ? "text-brand-600" : "text-gray-300"
-                  )}
-                />
-              </div>
-            )}
-          </div>
-        ))}
+      {/* Carousel — 3 cards visible, 1 hidden. Scrollable horizontally. */}
+      <div
+        ref={scrollRef}
+        className="overflow-x-auto scrollbar-thin scroll-smooth pb-1"
+      >
+        <div
+          className="grid gap-3"
+          style={{
+            gridAutoFlow: "column",
+            gridAutoColumns: "calc((100% - 24px) / 3)",
+          }}
+        >
+          {stages.map((s, i) => (
+            <StageCard key={s.key} stage={s} index={i + 1} />
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mt-8">
@@ -593,17 +576,6 @@ function KycTab({ a }: { a: Application }) {
                 />
               </div>
             </div>
-            <div className="divide-y divide-gray-100">
-              <Row label="Debt-to-income" value="32%" />
-              <Row label="Active loans (other banks)" value="1" />
-              <Row label="Closed loans" value="2" />
-              <Row label="Defaults / write-offs" value={<span className="text-emerald-600">0</span>} />
-              <Row label="Last CBC pull" value={<span className="text-gray-400">{a.sent}</span>} />
-            </div>
-            <button className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline font-medium">
-              <RefreshCw className="w-3.5 h-3.5" />
-              Refresh CBC report
-            </button>
           </div>
         </div>
       </div>
@@ -666,15 +638,13 @@ function RepaymentTab({ a }: { a: Application }) {
 
   const paid = monthly * 2;
   const outstanding = a.amount - paid;
-  const remaining = a.term - 2;
 
   return (
     <>
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         <Box label="Paid to date" value={`$${Math.round(paid).toLocaleString()}`} tone="green" />
         <Box label="Outstanding" value={`$${Math.round(outstanding).toLocaleString()}`} />
         <Box label="Next due" value="May 1" tone="amber" />
-        <Box label="Remaining installments" value={`${remaining}`} />
       </div>
 
       <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -709,13 +679,10 @@ function RepaymentTab({ a }: { a: Application }) {
         </table>
       </div>
 
-      <div className="flex justify-end gap-2 mt-4">
+      <div className="flex justify-end mt-4">
         <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700">
           <Download className="w-4 h-4 text-gray-500" />
           Download schedule
-        </button>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
-          Record payment
         </button>
       </div>
     </>
@@ -724,26 +691,40 @@ function RepaymentTab({ a }: { a: Application }) {
 
 /* ---------- tab: Reminders ---------- */
 
-function RemindersTab() {
-  const list = [
-    { date: "2026-04-25", channel: "SMS",   msg: "Payment reminder — 6 days before due", status: "Scheduled" },
-    { date: "2026-04-30", channel: "Push",  msg: "Payment due tomorrow",                 status: "Scheduled" },
-    { date: "2026-05-02", channel: "SMS",   msg: "Payment overdue — gentle reminder",    status: "Draft"     },
-    { date: "2026-04-15", channel: "Email", msg: "Application received confirmation",    status: "Posted"    },
-  ];
-  const toneFor = (t: string) =>
-    t === "SMS"
-      ? "bg-sky-50 text-sky-700"
-      : t === "Push"
-      ? "bg-violet-50 text-violet-700"
-      : "bg-gray-100 text-gray-600";
+type Reminder = { date: string; msg: string; status: string };
+
+const SEED_REMINDERS: Reminder[] = [
+  { date: "2026-04-25", msg: "Payment reminder — 6 days before due", status: "Scheduled" },
+  { date: "2026-04-30", msg: "Payment due tomorrow",                 status: "Scheduled" },
+  { date: "2026-05-02", msg: "Payment overdue — gentle reminder",    status: "Draft"     },
+  { date: "2026-04-15", msg: "Application received confirmation",    status: "Posted"    },
+];
+
+function RemindersTab({ a }: { a: Application }) {
+  // All reminders are delivered as in-app push notifications on the customer's mobile app.
+  const [list, setList] = useState<Reminder[]>(SEED_REMINDERS);
+  const [postOpen, setPostOpen] = useState(false);
+
+  const addReminder = (r: Reminder) => {
+    setList(prev => [r, ...prev]);
+    setPostOpen(false);
+  };
+
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium">
-          Scheduled notifications
+        <div>
+          <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium">
+            Scheduled notifications
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            Delivered as push notifications to the customer&apos;s mobile app.
+          </div>
         </div>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
+        <button
+          onClick={() => setPostOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+        >
           <Plus className="w-4 h-4" />
           Post reminder
         </button>
@@ -752,7 +733,7 @@ function RemindersTab() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              {["Date", "Channel", "Message", "Status"].map(h => (
+              {["Date", "Message", "Status"].map(h => (
                 <th key={h} className="text-left px-4 py-2.5 text-[12px] font-medium text-gray-500">
                   {h}
                 </th>
@@ -763,16 +744,6 @@ function RemindersTab() {
             {list.map((r, i) => (
               <tr key={i} className="border-t border-gray-100">
                 <td className="px-4 py-3 text-gray-600">{r.date}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={cn(
-                      "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium",
-                      toneFor(r.channel)
-                    )}
-                  >
-                    {r.channel}
-                  </span>
-                </td>
                 <td className="px-4 py-3 text-gray-700">{r.msg}</td>
                 <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
               </tr>
@@ -780,7 +751,225 @@ function RemindersTab() {
           </tbody>
         </table>
       </div>
+
+      <PostReminderModal
+        open={postOpen}
+        customerName={a.name}
+        onClose={() => setPostOpen(false)}
+        onSubmit={addReminder}
+      />
     </>
+  );
+}
+
+function PostReminderModal({
+  open,
+  customerName,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  customerName: string;
+  onClose: () => void;
+  onSubmit: (r: Reminder) => void;
+}) {
+  // Default: tomorrow
+  const tomorrowIso = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const [date, setDate] = useState("");
+  const [msg, setMsg]   = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setDate(tomorrowIso());
+      setMsg("");
+      setError(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const MAX = 140;
+  const trimmedLen = msg.trim().length;
+  const canSubmit = !!date && trimmedLen > 0 && trimmedLen <= MAX;
+
+  const submit = (status: "Scheduled" | "Draft") => {
+    if (status === "Scheduled") {
+      if (!date) return setError("Pick a send date.");
+      if (trimmedLen === 0) return setError("Message can't be empty.");
+      if (trimmedLen > MAX) return setError(`Message must be ${MAX} characters or less.`);
+    } else {
+      // draft only needs a message
+      if (trimmedLen === 0) return setError("Message can't be empty.");
+    }
+    onSubmit({ date, msg: msg.trim(), status });
+  };
+
+  const previewMsg = msg.trim() || "Your reminder message will appear here.";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 flex items-start justify-between">
+          <div>
+            <div className="text-base font-semibold text-gray-900">Post reminder</div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              Schedule a push notification to{" "}
+              <span className="font-medium text-gray-700">{customerName}</span>&apos;s mobile app.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 flex-shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body — form + preview */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-6 grid grid-cols-2 gap-6">
+          {/* Form */}
+          <div className="space-y-4">
+            {error && (
+              <div className="px-3 py-2 rounded-md bg-red-50 border border-red-100 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-medium text-gray-700">Send date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+              <div className="text-[11px] text-gray-400 mt-1">
+                Sent automatically at 9:00 AM local time.
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-gray-700">Message</label>
+                <span className={cn(
+                  "text-[11px]",
+                  trimmedLen > MAX ? "text-red-600" : "text-gray-400"
+                )}>
+                  {trimmedLen} / {MAX}
+                </span>
+              </div>
+              <textarea
+                value={msg}
+                onChange={e => setMsg(e.target.value)}
+                rows={5}
+                placeholder="e.g. Your loan payment is due in 3 days. Tap to view details."
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+              <div className="text-[11px] text-gray-400 mt-1">
+                Keep it short and clear. Push notifications truncate beyond ~140 chars.
+              </div>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div>
+            <div className="text-xs font-medium text-gray-700">Preview</div>
+            <div className="mt-1">
+              {/* Phone notification mockup */}
+              <div className="rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 p-4">
+                <div className="bg-white/95 backdrop-blur-sm rounded-xl px-3 py-2.5 shadow-md">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-md bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      W
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">
+                          WeLoan365
+                        </span>
+                        <span className="text-[10px] text-gray-500">now</span>
+                      </div>
+                      <div className="text-[13px] font-semibold text-gray-900 mt-0.5">
+                        Payment reminder
+                      </div>
+                      <div className="text-[12px] text-gray-700 mt-0.5 leading-snug">
+                        {previewMsg}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[10px] text-gray-500 text-center mt-2">
+                  Lock screen preview
+                </div>
+              </div>
+            </div>
+            <div className="text-[11px] text-gray-500 mt-2">
+              Recipient: <span className="font-medium text-gray-700">{customerName}</span>{" "}
+              · channel: <span className="font-medium text-gray-700">Mobile app push</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            Cancel
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => submit("Draft")}
+              disabled={trimmedLen === 0}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-md border",
+                trimmedLen > 0
+                  ? "border-gray-200 text-gray-700 hover:bg-white"
+                  : "border-gray-100 text-gray-400 cursor-not-allowed"
+              )}
+            >
+              Save as draft
+            </button>
+            <button
+              onClick={() => submit("Scheduled")}
+              disabled={!canSubmit}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-md inline-flex items-center gap-1.5",
+                canSubmit
+                  ? "bg-brand-600 text-white hover:bg-brand-700"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              )}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Schedule reminder
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -816,32 +1005,14 @@ function AuditTab({ a }: { a: Application }) {
 /* ---------- tab: Reports & Analytics ---------- */
 
 function ReportsTab() {
-  const reports = [
-    { t: "Application summary", d: "PDF • 1-click" },
-    { t: "Risk assessment",     d: "PDF • 1-click" },
-    { t: "Customer profile",    d: "PDF • 1-click" },
-    { t: "Repayment forecast",  d: "PDF • 1-click" },
-    { t: "Document bundle",     d: "ZIP • all docs" },
-    { t: "Full audit",          d: "PDF • timeline" },
-  ];
   return (
     <>
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <Box label="Time to approval" value="2.3 days" />
-        <Box label="Risk rating" value="Medium-Low" />
-        <Box label="Projected yield" value="$362.50" tone="green" />
-      </div>
-      <SectionLabel>Generate report</SectionLabel>
-      <div className="grid grid-cols-3 gap-3">
-        {reports.map(r => (
-          <button
-            key={r.t}
-            className="text-left border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
-          >
-            <div className="text-sm font-medium text-gray-900">{r.t}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{r.d}</div>
-          </button>
-        ))}
+      <SectionLabel>Application analytics</SectionLabel>
+      <div className="grid grid-cols-4 gap-3">
+        <Box label="Time to approval"    value="2.3 days" />
+        <Box label="Risk rating"         value="Medium-Low" />
+        <Box label="Default probability" value="4.2%" tone="green" />
+        <Box label="Recommended action"  value="Approve" tone="green" />
       </div>
     </>
   );
@@ -850,22 +1021,42 @@ function ReportsTab() {
 /* ---------- tab: Person in Charge ---------- */
 
 function OfficerTab({ a }: { a: Application }) {
-  const initials = a.officer === "Unassigned" ? "?" : a.officer.split(" ").map(s => s[0]).join("");
+  // Local state so the user can preview reassignment without persisting across navigation.
+  const [officerName, setOfficerName] = useState(a.officer);
+  const [reassignOpen, setReassignOpen] = useState(false);
+
+  const officerRecord = USERS.find(u => u.name === officerName);
+  const initials =
+    officerName === "Unassigned" ? "?" : officerName.split(" ").map(s => s[0]).join("");
+
   return (
     <div className="grid grid-cols-2 gap-8">
       <div>
         <SectionLabel>Person in charge</SectionLabel>
         <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
-          <div className="w-14 h-14 rounded-full bg-brand-600 text-white flex items-center justify-center text-base font-semibold">
+          <div
+            className={cn(
+              "w-14 h-14 rounded-full text-white flex items-center justify-center text-base font-semibold",
+              officerName === "Unassigned" ? "bg-gray-300" : "bg-brand-600"
+            )}
+          >
             {initials}
           </div>
-          <div>
-            <div className="font-semibold text-gray-900">{a.officer}</div>
-            <div className="text-xs text-gray-500">Loan Officer • {a.branch}</div>
-            <div className="text-xs text-gray-500 mt-1">laybunnavitou@kosign.com.kh</div>
+          <div className="min-w-0">
+            <div className="font-semibold text-gray-900">{officerName}</div>
+            <div className="text-xs text-gray-500">
+              {officerRecord ? `${officerRecord.role} • ${officerRecord.branch}` : `Officer • ${a.branch}`}
+            </div>
+            {officerRecord && (
+              <div className="text-xs text-gray-500 mt-1 truncate">{officerRecord.email}</div>
+            )}
           </div>
         </div>
-        <button className="mt-3 text-xs text-brand-600 hover:underline font-medium">
+        <button
+          onClick={() => setReassignOpen(true)}
+          className="mt-3 inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline font-medium"
+        >
+          <RotateCcw className="w-3 h-3" />
           Reassign officer
         </button>
       </div>
@@ -892,6 +1083,227 @@ function OfficerTab({ a }: { a: Application }) {
             </li>
           ))}
         </ul>
+      </div>
+
+      <ReassignOfficerModal
+        open={reassignOpen}
+        currentOfficer={officerName}
+        customerName={a.name}
+        onClose={() => setReassignOpen(false)}
+        onPick={name => {
+          setOfficerName(name);
+          setReassignOpen(false);
+        }}
+      />
+    </div>
+  );
+}
+
+function ReassignOfficerModal({
+  open,
+  currentOfficer,
+  customerName,
+  onClose,
+  onPick,
+}: {
+  open: boolean;
+  currentOfficer: string;
+  customerName: string;
+  onClose: () => void;
+  onPick: (name: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  // Pending selection — committed only when the user clicks Save.
+  const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setQuery("");
+      setSelected(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  // Roles that can own a loan application
+  const ELIGIBLE_ROLES = new Set([
+    "Credit Officer",
+    "Senior Credit Officer",
+    "Branch Manager",
+    "Admin",
+  ]);
+  const officers = USERS.filter(
+    u => u.status === "Active" && ELIGIBLE_ROLES.has(u.role)
+  );
+
+  const q = query.trim().toLowerCase();
+  const filtered = officers.filter(
+    o =>
+      !q ||
+      o.name.toLowerCase().includes(q) ||
+      o.role.toLowerCase().includes(q) ||
+      o.branch.toLowerCase().includes(q)
+  );
+
+  const save = () => {
+    if (!selected || selected === currentOfficer) return;
+    onPick(selected);
+  };
+  const canSave = !!selected && selected !== currentOfficer;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
+          <div className="min-w-0">
+            <div className="text-base font-semibold text-gray-900">Reassign officer</div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              Pick a new person in charge for{" "}
+              <span className="font-medium text-gray-800">{customerName}</span>&apos;s application.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 flex-shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-5 py-3 border-b border-gray-200">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
+            <input
+              autoFocus
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search by name, role, branch…"
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
+          {filtered.length === 0 ? (
+            <div className="px-5 py-12 text-center text-sm text-gray-500">
+              No officers match your search.
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {filtered.map(o => {
+                const isCurrent  = o.name === currentOfficer;
+                const isSelected = o.name === selected;
+                return (
+                  <li key={o.id}>
+                    <button
+                      onClick={() => !isCurrent && setSelected(o.name)}
+                      disabled={isCurrent}
+                      className={cn(
+                        "w-full px-5 py-3 flex items-center gap-3 text-left border-l-2",
+                        isCurrent
+                          ? "bg-emerald-50/40 cursor-default border-transparent"
+                          : isSelected
+                          ? "bg-brand-50 border-brand-500"
+                          : "hover:bg-gray-50 border-transparent"
+                      )}
+                    >
+                      {/* Radio indicator */}
+                      <div
+                        className={cn(
+                          "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                          isCurrent
+                            ? "border-emerald-500 bg-emerald-500"
+                            : isSelected
+                            ? "border-brand-600 bg-brand-600"
+                            : "border-gray-300 bg-white"
+                        )}
+                      >
+                        {(isCurrent || isSelected) && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                        )}
+                      </div>
+
+                      <div className="w-9 h-9 rounded-full bg-gray-200 text-gray-700 text-xs font-semibold flex items-center justify-center flex-shrink-0">
+                        {o.name.split(" ").map(s => s[0]).join("")}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 flex items-center gap-1.5 flex-wrap">
+                          {o.name}
+                          {isCurrent && (
+                            <span className="text-[10px] font-medium bg-emerald-50 text-emerald-700 rounded-full px-1.5 py-0.5 inline-flex items-center gap-0.5">
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                              Currently assigned
+                            </span>
+                          )}
+                          {isSelected && !isCurrent && (
+                            <span className="text-[10px] font-medium bg-brand-100 text-brand-700 rounded-full px-1.5 py-0.5">
+                              Selected
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-gray-500 truncate">
+                          {o.role} · {o.branch}
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between gap-3">
+          <div className="text-xs text-gray-500 flex-1 min-w-0 truncate">
+            {selected ? (
+              <>
+                <span className="text-gray-500">Reassigning to </span>
+                <span className="font-medium text-gray-900">{selected}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-gray-500">Current: </span>
+                <span className="font-medium text-gray-800">{currentOfficer}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={!canSave}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md inline-flex items-center gap-1.5",
+                canSave
+                  ? "bg-brand-600 text-white hover:bg-brand-700"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              )}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Save
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

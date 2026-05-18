@@ -17,8 +17,6 @@ import {
   CalendarHeart,
   Star,
   UserCircle2,
-  Megaphone,
-  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -52,14 +50,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       },
       { label: "Loan Application", href: "/customer/applications", icon: FileText, permission: "loan.view" },
       { label: "Loan Product", href: "/loan-product", icon: Package, permission: "loan.view" },
-      {
-        label: "Blog & Announcement",
-        icon: Newspaper,
-        children: [
-          { label: "Blogs", href: "/content/blogs", icon: BookOpen },
-          { label: "Announcements", href: "/content/announcements", icon: Megaphone },
-        ],
-      },
+      { label: "Blog Posts", href: "/content/posts", icon: Newspaper },
     ],
   },
 ];

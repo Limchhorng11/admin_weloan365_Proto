@@ -19,11 +19,18 @@ import {
   Eye,
   FileText,
   History,
+  Download,
+  RefreshCw,
+  CheckCircle2,
+  List,
+  Map as MapIcon,
+  Pencil,
+  Trash2,
+  Plus,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AppVersion } from "./app-version";
-import { BRANCHES } from "@/lib/data";
+import { BRANCHES, type Branch } from "@/lib/data";
 import { UsersRolesView } from "./users-roles-view";
 import { useRole } from "@/lib/role-context";
 
@@ -289,15 +296,19 @@ function AppSettingView() {
   return (
     <div className="space-y-5">
       <div>
-        <H2>App Setting</H2>
-        <P>Version, features, and platform configuration.</P>
+        <H2>Customer App Version</H2>
+        <P>Manage the customer mobile app's release, minimum supported version, and security policies.</P>
       </div>
       <Card>
         <div className="font-medium text-gray-900 mb-3">Admin console version</div>
-        <AppVersion />
+        <div className="space-y-2.5 text-sm">
+          <Row label="Current version" value="v0.2.0" />
+          <Row label="Latest version"  value="v0.3.1" />
+          <Row label="Release channel" value="Stable" />
+        </div>
       </Card>
       <Card>
-        <div className="font-medium text-gray-900 mb-3">Customer app versions</div>
+        <div className="font-medium text-gray-900 mb-3">Customer app version</div>
         <div className="space-y-2.5 text-sm">
           <Row label="Current version (iOS)" value="2.1.4" />
           <Row label="Current version (Android)" value="2.1.3" />
@@ -310,34 +321,14 @@ function AppSettingView() {
             <Toggle checked />
           </div>
         </div>
-      </Card>
-      <Card>
-        <div className="font-medium text-gray-900 mb-3">Feature flags</div>
-        <div className="space-y-1 text-sm">
-          {[
-            ["Biometric login", true],
-            ["Push notifications", true],
-            ["In-app chat", true],
-            ["ABA Pay integration", true],
-            ["Wing integration", true],
-            ["Dark mode", false],
-            ["Multi-account", false],
-          ].map(([n, v]) => (
-            <div
-              key={n as string}
-              className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
-            >
-              <div>{n}</div>
-              <Toggle checked={v as boolean} />
-            </div>
-          ))}
-        </div>
+
+        {/* Customer-update alert */}
+        <CustomerUpdateAlert />
       </Card>
       <Card>
         <div className="font-medium text-gray-900 mb-3">Security</div>
         <div className="space-y-2.5 text-sm">
           <Row label="Session timeout" value="30 minutes" />
-          <Row label="2FA for staff" value="Required" />
           <Row label="Password policy" value="Strong" />
           <Row label="Failed attempts lockout" value="5 attempts" />
         </div>
@@ -432,45 +423,612 @@ function CompanyView() {
 
 function BranchesView() {
   const { can } = useRole();
+  const canEdit = can("setting.edit");
+
+  const [tab, setTab] = useState<"list" | "map">("list");
+  const [list, setList] = useState<Branch[]>(BRANCHES);
+  const [editing, setEditing] = useState<Branch | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const nextId = (): string => {
+    const maxN = list.reduce((m, b) => {
+      const n = parseInt(b.id.replace(/[^0-9]/g, ""), 10);
+      return Number.isFinite(n) && n > m ? n : m;
+    }, 0);
+    return `BR-${String(maxN + 1).padStart(2, "0")}`;
+  };
+
+  const handleSave = (b: Branch) => {
+    setList(prev => {
+      const exists = prev.find(x => x.id === b.id);
+      return exists ? prev.map(x => (x.id === b.id ? b : x)) : [...prev, b];
+    });
+    setEditing(null);
+    setCreating(false);
+  };
+
+  const handleDelete = (id: string) => {
+    setList(prev => prev.filter(b => b.id !== id));
+  };
+
   return (
     <div className="space-y-5">
-      <div>
-        <H2>Branch Locator</H2>
-        <P>{BRANCHES.length} branches across Cambodia.</P>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <H2>Branch Locator</H2>
+          <P>Manage list of all branches and show them on a map in the customer app.</P>
+        </div>
+        {canEdit && (
+          <button
+            onClick={() => setCreating(true)}
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add branch
+          </button>
+        )}
       </div>
-      <Card>
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-medium text-gray-900">All branches</div>
-          {can("setting.edit") && (
-            <button className="px-3 py-1 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
-              Add branch
-            </button>
-          )}
+
+      {/* Sub-tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        <SubTab icon={List}    label="Branch List" active={tab === "list"} onClick={() => setTab("list")} />
+        <SubTab icon={MapIcon} label="Branch Map"  active={tab === "map"}  onClick={() => setTab("map")} />
+      </div>
+
+      {tab === "list" ? (
+        <BranchListPanel
+          list={list}
+          canEdit={canEdit}
+          onEdit={setEditing}
+          onDelete={handleDelete}
+        />
+      ) : (
+        <BranchMapPanel list={list} canEdit={canEdit} onEdit={setEditing} />
+      )}
+
+      {(creating || editing) && (
+        <BranchEditorModal
+          initial={editing}
+          nextId={nextId()}
+          onClose={() => {
+            setCreating(false);
+            setEditing(null);
+          }}
+          onSave={handleSave}
+        />
+      )}
+    </div>
+  );
+}
+
+function SubTab({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-2 text-sm border-b-2 -mb-px",
+        active
+          ? "border-brand-600 text-brand-700 font-medium"
+          : "border-transparent text-gray-600 hover:text-gray-900"
+      )}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+    </button>
+  );
+}
+
+/* ---------- Branch list panel ---------- */
+
+function BranchListPanel({
+  list,
+  canEdit,
+  onEdit,
+  onDelete,
+}: {
+  list: Branch[];
+  canEdit: boolean;
+  onEdit: (b: Branch) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <Card className="!p-0">
+      <div className="px-5 py-3 border-b border-gray-200">
+        <div className="font-medium text-gray-900">All branches</div>
+        <div className="text-xs text-gray-500 mt-0.5">
+          {list.length} {list.length === 1 ? "branch" : "branches"} · name, address, contact
         </div>
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                {["Branch", "Address", "Phone", "Hours"].map(h => (
-                  <th key={h} className="text-left px-4 py-2 text-[12px] font-medium text-gray-500">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {BRANCHES.map(b => (
-                <tr key={b.id} className="border-t border-gray-100">
-                  <td className="px-4 py-2.5 font-medium text-gray-900">{b.name}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{b.address}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{b.phone}</td>
-                  <td className="px-4 py-2.5 text-gray-600 text-xs">{b.open}</td>
-                </tr>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              {["Branch", "Address", "Phone"].map(h => (
+                <th
+                  key={h}
+                  className="text-left px-4 py-2 text-[12px] font-medium text-gray-500"
+                >
+                  {h}
+                </th>
               ))}
-            </tbody>
-          </table>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {list.map(b => (
+              <tr key={b.id} className="border-t border-gray-100">
+                <td className="px-4 py-2.5">
+                  <div className="font-medium text-gray-900">{b.name}</div>
+                  <div className="text-[11px] font-mono text-gray-400">{b.id}</div>
+                </td>
+                <td className="px-4 py-2.5 text-gray-600">{b.address}</td>
+                <td className="px-4 py-2.5 text-gray-600">{b.phone}</td>
+                <td className="px-4 py-2.5 text-right">
+                  {canEdit && (
+                    <div className="inline-flex items-center gap-3">
+                      <button
+                        onClick={() => onEdit(b)}
+                        className="text-xs text-brand-600 hover:underline font-medium inline-flex items-center gap-1"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => onDelete(b.id)}
+                        className="text-xs text-red-600 hover:underline font-medium inline-flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/* ---------- Branch map panel ---------- */
+
+// Cambodia bounding box (approx). Map pins position from lat/lng.
+const MAP_BOUNDS = { latMin: 10.4, latMax: 14.7, lngMin: 102.4, lngMax: 107.7 };
+
+function projectPin(lat: number, lng: number) {
+  const left = ((lng - MAP_BOUNDS.lngMin) / (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin)) * 100;
+  const top  = ((MAP_BOUNDS.latMax - lat) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)) * 100;
+  return { left, top };
+}
+
+function BranchMapPanel({
+  list,
+  canEdit,
+  onEdit,
+}: {
+  list: Branch[];
+  canEdit: boolean;
+  onEdit: (b: Branch) => void;
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(list[0]?.id ?? null);
+  const selected = list.find(b => b.id === selectedId) ?? null;
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      {/* Map */}
+      <div className="col-span-2">
+        <Card className="!p-0 overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+            <div className="text-xs font-medium text-gray-700 inline-flex items-center gap-1.5">
+              <MapIcon className="w-3.5 h-3.5 text-gray-500" />
+              Geolocation preview — customer app
+            </div>
+            <div className="text-[11px] text-gray-400">
+              {list.length} pin{list.length === 1 ? "" : "s"} · Cambodia
+            </div>
+          </div>
+
+          {/* Stylised map canvas */}
+          <div
+            className="relative h-[360px] bg-gradient-to-br from-sky-50 via-emerald-50/60 to-amber-50/30"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px)",
+              backgroundSize: "40px 40px",
+            }}
+          >
+            {/* Compass + scale */}
+            <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-white/80 backdrop-blur-sm text-[10px] font-mono text-gray-600 shadow-sm border border-gray-200">
+              N ↑
+            </div>
+            <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-white/80 backdrop-blur-sm text-[10px] text-gray-600 shadow-sm border border-gray-200">
+              ~ 100 km
+            </div>
+
+            {/* Pins */}
+            {list.map(b => {
+              const pos = projectPin(b.lat, b.lng);
+              const active = b.id === selectedId;
+              return (
+                <button
+                  key={b.id}
+                  onClick={() => setSelectedId(b.id)}
+                  className="absolute -translate-x-1/2 -translate-y-full focus:outline-none group"
+                  style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
+                  title={b.name}
+                >
+                  <div
+                    className={cn(
+                      "relative flex items-center justify-center transition-transform",
+                      active ? "scale-125" : "group-hover:scale-110"
+                    )}
+                  >
+                    {/* Pin teardrop */}
+                    <svg
+                      width="22"
+                      height="28"
+                      viewBox="0 0 22 28"
+                      className="drop-shadow"
+                    >
+                      <path
+                        d="M11 0c6.075 0 11 4.925 11 11 0 5.225-6.111 12.722-10.34 16.97a1 1 0 0 1-1.32 0C6.111 23.722 0 16.225 0 11 0 4.925 4.925 0 11 0Z"
+                        className={cn(
+                          active ? "fill-brand-600" : "fill-rose-500"
+                        )}
+                      />
+                      <circle cx="11" cy="11" r="4" fill="white" />
+                    </svg>
+                  </div>
+                  {/* Label on hover/active */}
+                  <div
+                    className={cn(
+                      "absolute left-1/2 top-full -translate-x-1/2 mt-1 px-2 py-0.5 rounded-md bg-white/95 border border-gray-200 shadow-sm text-[10px] font-medium text-gray-900 whitespace-nowrap transition",
+                      active
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                    )}
+                  >
+                    {b.name}
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Empty state */}
+            {list.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
+                No branches with geolocation yet.
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Side panel */}
+      <div>
+        <Card className="!p-0">
+          <div className="px-4 py-3 border-b border-gray-200">
+            <div className="text-xs font-medium text-gray-700">Branches</div>
+          </div>
+          <ul className="divide-y divide-gray-100 max-h-[316px] overflow-y-auto scrollbar-thin">
+            {list.map(b => {
+              const active = b.id === selectedId;
+              return (
+                <li key={b.id}>
+                  <button
+                    onClick={() => setSelectedId(b.id)}
+                    className={cn(
+                      "w-full text-left px-4 py-2.5 flex items-center gap-2.5 transition",
+                      active ? "bg-brand-50/60 border-l-2 border-brand-500" : "hover:bg-gray-50 border-l-2 border-transparent"
+                    )}
+                  >
+                    <MapPin
+                      className={cn(
+                        "w-3.5 h-3.5 flex-shrink-0",
+                        active ? "text-brand-600" : "text-rose-500"
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className={cn(
+                        "text-sm truncate",
+                        active ? "font-medium text-brand-700" : "text-gray-900"
+                      )}>
+                        {b.name}
+                      </div>
+                      <div className="text-[10px] text-gray-500 font-mono truncate">
+                        {b.lat.toFixed(4)}, {b.lng.toFixed(4)}
+                      </div>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+
+        {selected && (
+          <Card className="mt-3">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 mb-2">
+              Selected branch
+            </div>
+            <div className="text-sm font-semibold text-gray-900">{selected.name}</div>
+            <div className="text-xs text-gray-600 mt-2 space-y-1.5">
+              <div className="flex items-start gap-1.5">
+                <MapPin className="w-3 h-3 mt-0.5 text-gray-400 flex-shrink-0" />
+                <span>{selected.address}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Phone className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                <span>{selected.phone}</span>
+              </div>
+            </div>
+            {canEdit && (
+              <button
+                onClick={() => onEdit(selected)}
+                className="mt-3 inline-flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium"
+              >
+                <Pencil className="w-3 h-3" />
+                Edit branch
+              </button>
+            )}
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Branch editor modal ---------- */
+
+function BranchEditorModal({
+  initial,
+  nextId,
+  onClose,
+  onSave,
+}: {
+  initial: Branch | null;
+  nextId: string;
+  onClose: () => void;
+  onSave: (b: Branch) => void;
+}) {
+  const isEdit = !!initial;
+
+  const [name, setName]       = useState(initial?.name ?? "");
+  const [address, setAddress] = useState(initial?.address ?? "");
+  const [phone, setPhone]     = useState(initial?.phone ?? "+855 ");
+  // Picked location (null until the user clicks on the map for a new branch).
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(
+    initial ? { lat: initial.lat, lng: initial.lng } : null
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Other branches shown as light reference pins.
+  const otherBranches = BRANCHES.filter(b => b.id !== initial?.id);
+
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const newLng =
+      MAP_BOUNDS.lngMin + (x / rect.width) * (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin);
+    const newLat =
+      MAP_BOUNDS.latMax - (y / rect.height) * (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin);
+    setPin({ lat: newLat, lng: newLng });
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return setError("Branch name is required.");
+    if (!address.trim()) return setError("Address is required.");
+    if (!phone.trim()) return setError("Phone is required.");
+    if (!pin) return setError("Click on the map to set the branch location.");
+
+    const b: Branch = {
+      id: initial?.id ?? nextId,
+      name: name.trim(),
+      address: address.trim(),
+      phone: phone.trim(),
+      lat: pin.lat,
+      lng: pin.lng,
+    };
+    onSave(b);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
+          <div>
+            <div className="text-base font-semibold text-gray-900">
+              {isEdit ? "Edit branch" : "Add branch"}
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {isEdit ? `Updating ${initial?.id}` : "Create a new branch record."}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      </Card>
+
+        <form onSubmit={submit} className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-4">
+          {error && (
+            <div className="px-3 py-2 rounded-md bg-red-50 border border-red-100 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-medium text-gray-700">Branch name *</label>
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Phnom Penh — Central"
+              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-700">Address *</label>
+            <input
+              value={address}
+              onChange={e => setAddress(e.target.value)}
+              placeholder="#123, St. 271, Sangkat BKK1"
+              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-700">Phone *</label>
+            <input
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+855 23 900 000"
+              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            />
+          </div>
+
+          {/* Location picker — replaces operating hours + lat/lng inputs */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-medium text-gray-700">Location on map *</label>
+              {pin && (
+                <button
+                  type="button"
+                  onClick={() => setPin(null)}
+                  className="text-[11px] text-gray-500 hover:text-gray-900 font-medium"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={handleMapClick}
+              className="relative h-[230px] rounded-lg border border-gray-200 overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-50 cursor-crosshair"
+              style={{
+                backgroundImage:
+                  "linear-gradient(to right, rgba(99,102,241,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(99,102,241,0.12) 1px, transparent 1px)",
+                backgroundSize: "20px 20px",
+              }}
+            >
+              {/* Reference pins for other branches (subtle) */}
+              {otherBranches.map(b => {
+                const pos = projectPin(b.lat, b.lng);
+                return (
+                  <div
+                    key={b.id}
+                    className="absolute -translate-x-1/2 -translate-y-full pointer-events-none"
+                    style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
+                    title={b.name}
+                  >
+                    <svg width="16" height="20" viewBox="0 0 22 28" className="opacity-50">
+                      <path
+                        d="M11 0c6.075 0 11 4.925 11 11 0 5.225-6.111 12.722-10.34 16.97a1 1 0 0 1-1.32 0C6.111 23.722 0 16.225 0 11 0 4.925 4.925 0 11 0Z"
+                        className="fill-brand-400"
+                      />
+                      <circle cx="11" cy="11" r="3.5" fill="white" />
+                    </svg>
+                  </div>
+                );
+              })}
+
+              {/* This branch's pin (brand-blue, big) */}
+              {pin && (
+                <div
+                  className="absolute -translate-x-1/2 -translate-y-full pointer-events-none"
+                  style={{
+                    left: `${projectPin(pin.lat, pin.lng).left}%`,
+                    top:  `${projectPin(pin.lat, pin.lng).top}%`,
+                  }}
+                >
+                  <svg width="26" height="33" viewBox="0 0 22 28" className="drop-shadow-md">
+                    <path
+                      d="M11 0c6.075 0 11 4.925 11 11 0 5.225-6.111 12.722-10.34 16.97a1 1 0 0 1-1.32 0C6.111 23.722 0 16.225 0 11 0 4.925 4.925 0 11 0Z"
+                      className="fill-brand-600"
+                    />
+                    <circle cx="11" cy="11" r="4" fill="white" />
+                  </svg>
+                </div>
+              )}
+
+              {/* Empty state hint */}
+              {!pin && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="px-3 py-1.5 rounded-md bg-white/85 backdrop-blur-sm border border-gray-200 text-xs text-gray-600 shadow-sm inline-flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-brand-600" />
+                    Click anywhere on the map to drop a pin
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="text-[11px] text-gray-500 mt-1.5 flex items-center justify-between">
+              <span>Click on the map to set the branch location. Light pins are existing branches.</span>
+              {pin && (
+                <span className="font-mono text-gray-600">
+                  {pin.lat.toFixed(4)}°, {pin.lng.toFixed(4)}°
+                </span>
+              )}
+            </div>
+          </div>
+        </form>
+
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
+          <div className="text-[11px] text-gray-500">
+            {isEdit ? "" : `Will be created as `}
+            <span className="font-mono text-gray-700">{initial?.id ?? nextId}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              className="px-3 py-1.5 text-sm font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700"
+            >
+              {isEdit ? "Save changes" : "Create branch"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1046,6 +1604,84 @@ function SupportView() {
           </li>
         </ul>
       </Card>
+    </div>
+  );
+}
+
+/* ---------- Customer update alert block (lives in Customer app version card) ---------- */
+
+function CustomerUpdateAlert() {
+  const CURRENT = "2.0.0";
+  const LATEST  = "2.1.4";
+  const [sent, setSent]       = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const alertCustomers = () => {
+    if (sending || sent) return;
+    setSending(true);
+    setTimeout(() => {
+      setSending(false);
+      setSent(true);
+      // Auto-reset so the demo can be re-triggered
+      setTimeout(() => setSent(false), 2800);
+    }, 1100);
+  };
+
+  if (sent) {
+    return (
+      <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+        <div className="flex items-start gap-2.5">
+          <div className="w-9 h-9 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-medium text-gray-900">Alert sent to customers</div>
+            <div className="text-[11px] text-gray-600 mt-0.5">
+              A push notification was queued for users running v{CURRENT} and older.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+      <div className="flex items-start gap-2.5">
+        <div className="w-9 h-9 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+          <Download className="w-4 h-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-medium text-gray-900">
+            Please alert customer to update the mobile app
+          </div>
+          <div className="text-[11px] text-gray-600 mt-0.5 leading-snug">
+            v{CURRENT} → <span className="font-medium">v{LATEST}</span> · Bug fixes and performance improvements
+          </div>
+        </div>
+        <button
+          onClick={alertCustomers}
+          disabled={sending}
+          className={cn(
+            "flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-md font-medium whitespace-nowrap",
+            sending
+              ? "bg-amber-200 text-amber-800 cursor-wait"
+              : "bg-amber-600 text-white hover:bg-amber-700"
+          )}
+        >
+          {sending ? (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              Alerting…
+            </>
+          ) : (
+            <>
+              <Download className="w-3.5 h-3.5" />
+              Alert now
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

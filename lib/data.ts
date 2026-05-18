@@ -68,12 +68,134 @@ export const CUSTOMERS: Customer[] = [
   { id: "C-0428", name: "Chenda Oum",   phone: "+855 86 772 554", email: "chenda@mail.com", kyc: "rejected", loans: 0, joined: "2026-04-17", branch: "Phnom Penh — Central" },
 ];
 
-export const PRODUCTS = [
-  { id: "LP-01", name: "Personal Loan",   min: 500,  max: 5000,  rateMin: 13.0, rateMax: 15.5, termMin: 6,  termMax: 24, status: "active", loans: 412 },
-  { id: "LP-02", name: "SME Micro Loan",  min: 2000, max: 25000, rateMin: 15.0, rateMax: 17.0, termMin: 6,  termMax: 36, status: "active", loans: 198 },
-  { id: "LP-03", name: "Auto Loan",       min: 5000, max: 40000, rateMin: 10.5, rateMax: 12.5, termMin: 12, termMax: 60, status: "active", loans: 67  },
-  { id: "LP-04", name: "Agri Loan",       min: 1000, max: 8000,  rateMin: 14.0, rateMax: 16.0, termMin: 6,  termMax: 18, status: "active", loans: 89  },
-  { id: "LP-05", name: "Education Loan",  min: 1500, max: 12000, rateMin: 9.5,  rateMax: 11.0, termMin: 12, termMax: 48, status: "draft",  loans: 0   },
+export type LoanProduct = {
+  id: string;
+  name: string;
+  min: number;
+  max: number;
+  rateMin: number;
+  rateMax: number;
+  termMin: number;
+  termMax: number;
+  status: "active" | "draft";
+  loans: number;
+  /** Public-facing description (CMS body). Markdown-ish plain text. */
+  description: string;
+  /** Customer eligibility criteria (one per line). */
+  eligibility: string;
+  /** Documents the customer needs to provide (one per line). */
+  requiredDocs: string;
+  processingFee: number;   // % of disbursed amount
+  latePenalty: number;     // % per month on overdue
+  earlyPayoff: boolean;    // is early payoff allowed
+};
+
+export const PRODUCTS: LoanProduct[] = [
+  {
+    id: "LP-01",
+    name: "Personal Loan",
+    min: 500, max: 5000,
+    rateMin: 13.0, rateMax: 15.5,
+    termMin: 6, termMax: 24,
+    status: "active", loans: 412,
+    description:
+      "A flexible unsecured loan for personal needs — emergencies, education, " +
+      "home improvement, or family events. No collateral required for qualified " +
+      "applicants.",
+    eligibility:
+      "• Cambodian citizen or permanent resident\n" +
+      "• Age between 21 and 60\n" +
+      "• Minimum 6 months at current employer\n" +
+      "• Monthly income at least $300",
+    requiredDocs:
+      "National ID\nPayslip (last 3 months)\nBank statement (last 6 months)\nUtility bill",
+    processingFee: 1.5,
+    latePenalty: 2.0,
+    earlyPayoff: true,
+  },
+  {
+    id: "LP-02",
+    name: "SME Micro Loan",
+    min: 2000, max: 25000,
+    rateMin: 15.0, rateMax: 17.0,
+    termMin: 6, termMax: 36,
+    status: "active", loans: 198,
+    description:
+      "Working-capital and growth financing for small and medium enterprises. " +
+      "Designed for businesses needing inventory, equipment, or short-term " +
+      "operating funds.",
+    eligibility:
+      "• Business operating for at least 12 months\n" +
+      "• Valid business license\n" +
+      "• Monthly revenue at least $1,500\n" +
+      "• Owner age between 25 and 65",
+    requiredDocs:
+      "National ID\nBusiness License\nBank statement (last 12 months)\nIncome tax filing",
+    processingFee: 2.0,
+    latePenalty: 2.5,
+    earlyPayoff: true,
+  },
+  {
+    id: "LP-03",
+    name: "Auto Loan",
+    min: 5000, max: 40000,
+    rateMin: 10.5, rateMax: 12.5,
+    termMin: 12, termMax: 60,
+    status: "active", loans: 67,
+    description:
+      "Vehicle financing for new or pre-owned cars and motorcycles. " +
+      "The vehicle title serves as collateral until the loan is fully repaid.",
+    eligibility:
+      "• Age 21 to 65\n" +
+      "• Stable employment, minimum 1 year\n" +
+      "• Down payment: at least 20% of vehicle price\n" +
+      "• Valid driver's license",
+    requiredDocs:
+      "National ID\nDriver's license\nVehicle invoice/proforma\nPayslip (last 3 months)",
+    processingFee: 1.0,
+    latePenalty: 2.0,
+    earlyPayoff: true,
+  },
+  {
+    id: "LP-04",
+    name: "Agri Loan",
+    min: 1000, max: 8000,
+    rateMin: 14.0, rateMax: 16.0,
+    termMin: 6, termMax: 18,
+    status: "active", loans: 89,
+    description:
+      "Seasonal financing for farmers — seeds, fertiliser, livestock, or " +
+      "equipment. Flexible repayment aligned with harvest cycles.",
+    eligibility:
+      "• Active farmer or agricultural worker\n" +
+      "• Proof of land ownership or lease\n" +
+      "• Minimum 1 year of farming experience",
+    requiredDocs:
+      "National ID\nLand title or lease agreement\nFarming activity proof",
+    processingFee: 1.5,
+    latePenalty: 1.5,
+    earlyPayoff: true,
+  },
+  {
+    id: "LP-05",
+    name: "Education Loan",
+    min: 1500, max: 12000,
+    rateMin: 9.5, rateMax: 11.0,
+    termMin: 12, termMax: 48,
+    status: "draft", loans: 0,
+    description:
+      "Affordable financing for tuition, textbooks, and living expenses. " +
+      "Subsidised rate for students with strong academic standing.",
+    eligibility:
+      "• Enrolled in an accredited institution\n" +
+      "• Co-signer required (parent or guardian)\n" +
+      "• GPA 2.5 or higher",
+    requiredDocs:
+      "National ID\nProof of enrollment\nCo-signer documents\nAcademic transcript",
+    processingFee: 0.5,
+    latePenalty: 1.0,
+    earlyPayoff: true,
+  },
 ];
 
 export const CONSULTATIONS = [
@@ -84,10 +206,30 @@ export const CONSULTATIONS = [
 ];
 
 export const FEEDBACK = [
-  { id: "FB-012", customer: "Pisey Ros",   rating: 5, text: "Fast approval, friendly officer.",     date: "2026-04-20" },
-  { id: "FB-011", customer: "Sokha Chan",  rating: 4, text: "Good experience overall.",             date: "2026-04-19" },
-  { id: "FB-010", customer: "Narith Kim",  rating: 2, text: "Rejection reason was not clear.",      date: "2026-04-18" },
-  { id: "FB-009", customer: "Bopha Sok",   rating: 5, text: "App is easy to use, payments smooth.", date: "2026-04-17" },
+  { id: "FB-028", customer: "Sokha Chan",  rating: 5, text: "Outstanding service, will recommend to family.",  date: "2026-04-21" },
+  { id: "FB-027", customer: "Pisey Ros",   rating: 5, text: "Fast approval, friendly officer.",                date: "2026-04-20" },
+  { id: "FB-026", customer: "Dara Meas",   rating: 4, text: "Process was clear but took a few extra days.",    date: "2026-04-19" },
+  { id: "FB-025", customer: "Vichet Lim",  rating: 5, text: "Loved the new app — very easy to track payments.",date: "2026-04-19" },
+  { id: "FB-024", customer: "Sokha Chan",  rating: 4, text: "Good experience overall.",                        date: "2026-04-18" },
+  { id: "FB-023", customer: "Narith Kim",  rating: 2, text: "Rejection reason was not clear.",                 date: "2026-04-18" },
+  { id: "FB-022", customer: "Bopha Sok",   rating: 5, text: "App is easy to use, payments smooth.",            date: "2026-04-17" },
+  { id: "FB-021", customer: "Rithy Pen",   rating: 4, text: "Helpful staff, smooth disbursement.",             date: "2026-04-16" },
+  { id: "FB-020", customer: "Chenda Oum",  rating: 3, text: "Average. Hoped for a faster response on chat.",   date: "2026-04-15" },
+  { id: "FB-019", customer: "Pisey Ros",   rating: 5, text: "Excellent customer support.",                     date: "2026-04-12" },
+  { id: "FB-018", customer: "Sokha Chan",  rating: 4, text: "Documents upload could be simpler.",              date: "2026-04-10" },
+  { id: "FB-017", customer: "Vichet Lim",  rating: 5, text: "Quick KYC verification.",                         date: "2026-04-08" },
+  { id: "FB-016", customer: "Dara Meas",   rating: 3, text: "Interest rate slightly higher than competitors.", date: "2026-04-05" },
+  { id: "FB-015", customer: "Bopha Sok",   rating: 5, text: "Birthday discount was a nice touch!",             date: "2026-04-02" },
+  { id: "FB-014", customer: "Narith Kim",  rating: 1, text: "Long wait time for review.",                      date: "2026-03-28" },
+  { id: "FB-013", customer: "Rithy Pen",   rating: 4, text: "Smooth onboarding, branch staff were polite.",    date: "2026-03-25" },
+  { id: "FB-012", customer: "Pisey Ros",   rating: 5, text: "ABA Pay integration works great.",                date: "2026-03-22" },
+  { id: "FB-011", customer: "Vichet Lim",  rating: 4, text: "Push notifications are helpful reminders.",       date: "2026-03-18" },
+  { id: "FB-010", customer: "Chenda Oum",  rating: 2, text: "App crashed twice while uploading documents.",    date: "2026-03-14" },
+  { id: "FB-009", customer: "Sokha Chan",  rating: 5, text: "Best loan experience so far.",                    date: "2026-03-10" },
+  { id: "FB-008", customer: "Dara Meas",   rating: 4, text: "Branch locator would be more useful with map.",   date: "2026-03-05" },
+  { id: "FB-007", customer: "Bopha Sok",   rating: 3, text: "Statement download could include CSV format.",    date: "2026-02-28" },
+  { id: "FB-006", customer: "Rithy Pen",   rating: 5, text: "Renewal was painless.",                           date: "2026-02-22" },
+  { id: "FB-005", customer: "Pisey Ros",   rating: 4, text: "Khmer translation could be more natural.",        date: "2026-02-15" },
 ];
 
 export const CHATS = [
@@ -97,17 +239,131 @@ export const CHATS = [
   { id: "CH-85", customer: "Dara Meas",  last: "Can we reschedule next installment?",  unread: 0, at: "Mon" },
 ];
 
-export const ANNOUNCEMENTS = [
-  { id: "AN-08", title: "Khmer New Year holiday schedule",   audience: "All customers",  status: "Published", date: "2026-04-10" },
-  { id: "AN-07", title: "New Education Loan launching soon", audience: "Segment: Youth", status: "Scheduled", date: "2026-04-25" },
-  { id: "AN-06", title: "Branch hours update — Siem Reap",   audience: "Siem Reap",      status: "Published", date: "2026-04-02" },
-  { id: "AN-05", title: "Maintenance window — app v2.1",     audience: "All customers",  status: "Draft",     date: "—" },
-];
+/* ====================================================================
+   Blog Posts (CMS)
+   All customer-app posts — categorised. Single editor handles everything.
+   ==================================================================== */
 
-export const BLOGS = [
-  { id: "BL-14", title: "5 tips before taking your first loan",  author: "Sophea K.", status: "Published", date: "2026-04-15", views: 1240 },
-  { id: "BL-13", title: "Understanding APR vs flat rate",        author: "Laybun N.", status: "Published", date: "2026-04-08", views: 890  },
-  { id: "BL-12", title: "How to improve your credit score",      author: "Sophea K.", status: "Draft",     date: "—",          views: 0    },
+export const POST_CATEGORIES = [
+  { id: "blog",         label: "Blog",         tone: "blue"   },
+  { id: "news",         label: "News",         tone: "violet" },
+  { id: "announcement", label: "Announcement", tone: "amber"  },
+  { id: "tips",         label: "Tips",         tone: "emerald"},
+  { id: "promotion",    label: "Promotion",    tone: "rose"   },
+] as const;
+
+export type PostCategoryId = (typeof POST_CATEGORIES)[number]["id"];
+export type PostStatus = "Published" | "Scheduled" | "Draft";
+
+export type Post = {
+  id: string;
+  title: string;
+  category: PostCategoryId;
+  /** Body uses lightweight markdown (## headings, **bold**, *italic*, - lists). */
+  body: string;
+  /** Short summary shown in feed cards. */
+  excerpt: string;
+  /** Image URL or data: URL placeholder for the post's thumbnail. */
+  thumbnail: string;
+  author: string;
+  status: PostStatus;
+  /** Display date for the list (or "—" when not yet published / no schedule). */
+  date: string;
+  views: number;
+};
+
+export const POSTS: Post[] = [
+  {
+    id: "P-014",
+    title: "5 tips before taking your first loan",
+    category: "tips",
+    excerpt: "Plan ahead, know your numbers, and pick the right product.",
+    body:
+      "## Plan ahead\nUnderstanding your monthly budget before applying makes the entire process smoother.\n\n## Know your numbers\nCheck your **debt-to-income ratio** — lenders look for under 40%.\n\n- Calculate your total monthly debt\n- Divide by your gross monthly income\n- Multiply by 100 to get the percentage\n\n## Pick the right product\nMatch the loan to the purpose — short term for emergencies, longer term for assets.",
+    thumbnail: "",
+    author: "Sophea K.",
+    status: "Published",
+    date: "2026-04-15",
+    views: 1240,
+  },
+  {
+    id: "P-013",
+    title: "Khmer New Year holiday schedule",
+    category: "announcement",
+    excerpt: "All branches will be closed Apr 13–15. Mobile app remains available.",
+    body:
+      "All WeLoan365 branches will be **closed for Khmer New Year** from Apr 13 to Apr 15, 2026.\n\n- The mobile app remains fully available\n- Loan payments processed automatically continue\n- In-app chat will be staffed at reduced capacity\n\nWe wish all our customers a happy and prosperous new year!",
+    thumbnail: "",
+    author: "Admin",
+    status: "Published",
+    date: "2026-04-10",
+    views: 3120,
+  },
+  {
+    id: "P-012",
+    title: "Understanding APR vs flat rate",
+    category: "blog",
+    excerpt: "What's the difference, and which is better for you?",
+    body:
+      "APR (Annual Percentage Rate) is the **true cost** of a loan, expressed as a yearly rate.\n\nFlat rate looks simpler but can be deceiving — the actual cost is usually higher than the headline number.\n\n## Quick comparison\n- *Flat 10% × 1 year* ≈ APR of ~18%\n- Always compare loans using APR\n\nAsk your loan officer to walk through both numbers before you sign.",
+    thumbnail: "",
+    author: "Laybun N.",
+    status: "Published",
+    date: "2026-04-08",
+    views: 890,
+  },
+  {
+    id: "P-011",
+    title: "New Education Loan launching soon",
+    category: "news",
+    excerpt: "Subsidised rate for university and vocational students. Launching May 1.",
+    body:
+      "We're launching the **Education Loan** product on May 1, 2026.\n\nKey features:\n- Rate from **9.5% APR**\n- Term up to 48 months\n- Co-signer required\n\nVisit any branch from May 1 to apply.",
+    thumbnail: "",
+    author: "Admin",
+    status: "Scheduled",
+    date: "2026-04-25",
+    views: 0,
+  },
+  {
+    id: "P-010",
+    title: "Branch hours update — Siem Reap",
+    category: "announcement",
+    excerpt: "Extended Saturday hours starting April.",
+    body:
+      "The Siem Reap branch will now be open on **Saturdays** from 8:00 AM to 1:00 PM, in addition to weekday hours.\n\nNo appointment required — walk-ins welcome.",
+    thumbnail: "",
+    author: "Ratanak L.",
+    status: "Published",
+    date: "2026-04-02",
+    views: 542,
+  },
+  {
+    id: "P-009",
+    title: "Birthday rate discount — limited time",
+    category: "promotion",
+    excerpt: "Customers get 0.5% off on new loans during their birthday month.",
+    body:
+      "🎂 Celebrate your birthday with us — get **0.5% off** your APR on any new loan, valid for the entire month of your birthday.\n\n- Available on Personal, SME Micro, and Auto loans\n- Stack with referral rewards\n- Apply in-app or at any branch",
+    thumbnail: "",
+    author: "Sophea K.",
+    status: "Draft",
+    date: "—",
+    views: 0,
+  },
+  {
+    id: "P-008",
+    title: "How to improve your credit score",
+    category: "tips",
+    excerpt: "Small habits that move your score in the right direction.",
+    body:
+      "Improving your credit score takes time, but a few habits compound quickly:\n\n## Pay on time\nThis is the single biggest factor.\n\n## Keep utilisation low\nUse less than 30% of available credit on any line.\n\n## Avoid opening too many accounts at once\nEach hard inquiry costs you a few points.",
+    thumbnail: "",
+    author: "Sophea K.",
+    status: "Draft",
+    date: "—",
+    views: 0,
+  },
 ];
 
 export const USERS = [
@@ -326,10 +582,19 @@ export const APPROVAL_LAYERS: ApprovalLayer[] = [
   { level: 4, name: "Loan Committee Approval",   role: "Approval Committee",    min: 50000, max: null,   description: "Required for loans above $50,000." },
 ];
 
-export const BRANCHES = [
-  { id: "BR-01", name: "Phnom Penh — Central",   address: "#123, St. 271, Sangkat BKK1", phone: "+855 23 900 001", open: "Mon–Fri 8:00–17:00" },
-  { id: "BR-02", name: "Phnom Penh — Toul Kork", address: "#56, St. 289, Toul Kork",      phone: "+855 23 900 002", open: "Mon–Fri 8:00–17:00" },
-  { id: "BR-03", name: "Siem Reap",              address: "#12, Wat Bo Road",             phone: "+855 63 900 003", open: "Mon–Sat 8:00–17:00" },
-  { id: "BR-04", name: "Battambang",             address: "#78, St. 3, Svay Por",         phone: "+855 53 900 004", open: "Mon–Fri 8:00–17:00" },
-  { id: "BR-05", name: "Kampong Cham",           address: "#10, Preah Monivong Blvd",     phone: "+855 42 900 005", open: "Mon–Fri 8:00–17:00" },
+export type Branch = {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  lat: number;
+  lng: number;
+};
+
+export const BRANCHES: Branch[] = [
+  { id: "BR-01", name: "Phnom Penh — Central",   address: "#123, St. 271, Sangkat BKK1", phone: "+855 23 900 001", lat: 11.5564, lng: 104.9282 },
+  { id: "BR-02", name: "Phnom Penh — Toul Kork", address: "#56, St. 289, Toul Kork",     phone: "+855 23 900 002", lat: 11.5701, lng: 104.8910 },
+  { id: "BR-03", name: "Siem Reap",              address: "#12, Wat Bo Road",            phone: "+855 63 900 003", lat: 13.3633, lng: 103.8564 },
+  { id: "BR-04", name: "Battambang",             address: "#78, St. 3, Svay Por",        phone: "+855 53 900 004", lat: 13.0950, lng: 103.2025 },
+  { id: "BR-05", name: "Kampong Cham",           address: "#10, Preah Monivong Blvd",    phone: "+855 42 900 005", lat: 11.9971, lng: 105.4595 },
 ];
