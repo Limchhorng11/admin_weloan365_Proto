@@ -11,7 +11,6 @@ import {
   CUSTOMERS,
   PRODUCTS,
   type Application,
-  type ApplicationStatus,
   type LoanProduct,
 } from "@/lib/data";
 import { useRole } from "@/lib/role-context";
@@ -57,11 +56,6 @@ function formatToday(): string {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-type StatusTab = "All" | ApplicationStatus;
-const STATUS_TABS: StatusTab[] = [
-  "All", "Pending", "Review", "Approved", "Disbursed", "Rejected",
-];
-
 type Filters = {
   branches:  string[];
   products:  string[];
@@ -84,7 +78,6 @@ export default function ApplicationsPage() {
   const { can, user } = useRole();
 
   const [list, setList]       = useState<Application[]>(APPLICATIONS);
-  const [tab, setTab]         = useState<StatusTab>("All");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [query, setQuery]     = useState("");
   const [page, setPage]       = useState(1);
@@ -92,20 +85,10 @@ export default function ApplicationsPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
-  // ---- counts per status tab (always vs full list, ignoring other filters) ----
-  const counts = useMemo(() => {
-    const c: Record<StatusTab, number> = {
-      All: list.length, Pending: 0, Review: 0, Approved: 0, Disbursed: 0, Rejected: 0,
-    };
-    list.forEach(a => { c[a.status] = (c[a.status] ?? 0) + 1; });
-    return c;
-  }, [list]);
-
   // ---- filtered list ----
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return list.filter(a => {
-      if (tab !== "All" && a.status !== tab) return false;
       if (q && !`${a.id} ${a.name} ${a.product} ${a.officer}`.toLowerCase().includes(q))
         return false;
       if (filters.branches.length && !filters.branches.includes(a.branch)) return false;
@@ -122,10 +105,10 @@ export default function ApplicationsPage() {
       }
       return true;
     });
-  }, [list, tab, query, filters]);
+  }, [list, query, filters]);
 
   // Reset to page 1 when anything filter-y changes
-  useEffect(() => setPage(1), [tab, query, filters]);
+  useEffect(() => setPage(1), [query, filters]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   useEffect(() => {
@@ -170,42 +153,11 @@ export default function ApplicationsPage() {
         }
       />
 
-      {/* Status tabs */}
-      <div className="flex gap-1 text-sm">
-        {STATUS_TABS.map(t => {
-          const active = tab === t;
-          return (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={cn(
-                "px-3 py-1.5 rounded-md inline-flex items-center gap-1.5",
-                active
-                  ? "bg-brand-600 text-white"
-                  : "text-gray-600 hover:bg-white border border-transparent hover:border-gray-200"
-              )}
-            >
-              {t}
-              <span
-                className={cn(
-                  "text-[10px] font-medium rounded-full px-1.5 py-0.5",
-                  active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
-                )}
-              >
-                {counts[t]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         {/* Toolbar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">
-              {tab === "All" ? "All applications" : `${tab} applications`}
-            </h2>
+            <h2 className="text-base font-semibold text-gray-900">All applications</h2>
             <div className="text-xs text-gray-500 mt-0.5">
               {filtered.length === 0
                 ? "No applications"
@@ -291,14 +243,13 @@ export default function ApplicationsPage() {
           <div className="px-6 py-16 text-center">
             <div className="text-sm font-medium text-gray-900">No applications match</div>
             <div className="text-xs text-gray-500 mt-1">
-              Try adjusting search, filters or status.
+              Try adjusting search or filters.
             </div>
-            {(query || activeFilterCount > 0 || tab !== "All") && (
+            {(query || activeFilterCount > 0) && (
               <button
                 onClick={() => {
                   setQuery("");
                   setFilters(EMPTY_FILTERS);
-                  setTab("All");
                 }}
                 className="mt-3 px-3 py-1.5 text-xs font-medium text-brand-600 border border-brand-200 rounded-md hover:bg-brand-50"
               >
