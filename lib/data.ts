@@ -88,6 +88,22 @@ export const CUSTOMERS: Customer[] = [
   { id: "C-0428", name: "Chenda Oum",   phone: "+855 86 772 554", email: "chenda@mail.com", kyc: "rejected", loans: 0, joined: "2026-04-17", branch: "Phnom Penh — Central" },
 ];
 
+/**
+ * Product kind:
+ *   "non-mwl"    — standard retail loan (Personal, SME, Auto, Agri, Edu…)
+ *   "mwl-parent" — Migrant Worker Loan family; not directly applied for
+ *   "mwl-sub"    — country-specific variant under an MWL parent (KR/JP/SG)
+ */
+export type ProductKind = "non-mwl" | "mwl-parent" | "mwl-sub";
+
+export type MwlCountry = "KR" | "JP" | "SG";
+
+export const MWL_COUNTRIES: { code: MwlCountry; name: string; flag: string }[] = [
+  { code: "KR", name: "Korea",     flag: "🇰🇷" },
+  { code: "JP", name: "Japan",     flag: "🇯🇵" },
+  { code: "SG", name: "Singapore", flag: "🇸🇬" },
+];
+
 export type LoanProduct = {
   id: string;
   name: string;
@@ -108,6 +124,12 @@ export type LoanProduct = {
   processingFee: number;   // % of disbursed amount
   latePenalty: number;     // % per month on overdue
   earlyPayoff: boolean;    // is early payoff allowed
+  /** Product kind — defaults to "non-mwl" in legacy records. */
+  kind?: ProductKind;
+  /** For mwl-sub: which destination country this variant targets. */
+  country?: MwlCountry;
+  /** For mwl-sub: the parent's product id. */
+  parentId?: string;
 };
 
 export const PRODUCTS: LoanProduct[] = [
@@ -215,6 +237,103 @@ export const PRODUCTS: LoanProduct[] = [
     processingFee: 0.5,
     latePenalty: 1.0,
     earlyPayoff: true,
+  },
+
+  /* ───────── MWL family — parent + country sub-products ───────── */
+  {
+    id: "LP-06",
+    name: "Migrant Worker Loan",
+    min: 500, max: 8000,
+    rateMin: 12.0, rateMax: 14.0,
+    termMin: 6, termMax: 36,
+    status: "active", loans: 0,
+    description:
+      "Pre-departure financing for Cambodian workers heading overseas — " +
+      "covers placement fees, visa, flight, training and settle-in costs. " +
+      "Country-specific terms live as sub-products under this family.",
+    eligibility:
+      "• Cambodian citizen aged 18–55\n" +
+      "• Signed overseas employment contract / MOU\n" +
+      "• Valid passport (12+ months to expiry)\n" +
+      "• Co-borrower or family guarantor in Cambodia",
+    requiredDocs:
+      "National ID\nPassport\nEmployment contract / MOU\nWork permit or visa\nMedical certificate",
+    processingFee: 1.5,
+    latePenalty: 2.0,
+    earlyPayoff: true,
+    kind: "mwl-parent",
+  },
+  {
+    id: "LP-06-KR",
+    name: "MWL — Korea (EPS)",
+    min: 1000, max: 8000,
+    rateMin: 12.0, rateMax: 13.5,
+    termMin: 12, termMax: 36,
+    status: "active", loans: 38,
+    description:
+      "MWL variant for workers placed under the Korean Employment Permit " +
+      "System (EPS). Repayment aligned with the post-arrival KRW salary " +
+      "cycle. Disbursement timed with departure.",
+    eligibility:
+      "• EPS placement or letter of selection\n" +
+      "• Passed Korean language test (TOPIK / EPS-TOPIK)\n" +
+      "• Co-borrower in Cambodia",
+    requiredDocs:
+      "National ID\nPassport\nEPS placement letter\nKorean language certificate\nMedical certificate",
+    processingFee: 1.5,
+    latePenalty: 2.0,
+    earlyPayoff: true,
+    kind: "mwl-sub",
+    country: "KR",
+    parentId: "LP-06",
+  },
+  {
+    id: "LP-06-JP",
+    name: "MWL — Japan (TITP / SSW)",
+    min: 800, max: 7000,
+    rateMin: 12.5, rateMax: 14.0,
+    termMin: 12, termMax: 36,
+    status: "active", loans: 21,
+    description:
+      "MWL variant for workers on Technical Intern Training (TITP) or " +
+      "Specified Skilled Worker (SSW) visas. Covers JLPT certification, " +
+      "placement fees, and pre-departure training.",
+    eligibility:
+      "• TITP / SSW placement letter\n" +
+      "• JLPT N4 or higher (or SSW skill test pass)\n" +
+      "• Co-borrower in Cambodia",
+    requiredDocs:
+      "National ID\nPassport\nTITP / SSW placement letter\nJLPT certificate\nMedical certificate",
+    processingFee: 1.5,
+    latePenalty: 2.0,
+    earlyPayoff: true,
+    kind: "mwl-sub",
+    country: "JP",
+    parentId: "LP-06",
+  },
+  {
+    id: "LP-06-SG",
+    name: "MWL — Singapore (WP)",
+    min: 500, max: 5000,
+    rateMin: 13.0, rateMax: 14.0,
+    termMin: 6, termMax: 24,
+    status: "draft", loans: 0,
+    description:
+      "MWL variant for workers on a Singapore Work Permit (WP). Smaller " +
+      "ticket sizes reflect the shorter typical contract length and lower " +
+      "placement-fee structure.",
+    eligibility:
+      "• In-Principle Approval (IPA) letter from MOM\n" +
+      "• Confirmed employer & sector (construction / marine / process)\n" +
+      "• Co-borrower in Cambodia",
+    requiredDocs:
+      "National ID\nPassport\nIPA letter\nEmployment offer\nMedical certificate",
+    processingFee: 1.5,
+    latePenalty: 2.0,
+    earlyPayoff: true,
+    kind: "mwl-sub",
+    country: "SG",
+    parentId: "LP-06",
   },
 ];
 
