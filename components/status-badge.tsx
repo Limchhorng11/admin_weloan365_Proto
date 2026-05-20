@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 const TONES: Record<string, string> = {
   Signed:                 "bg-emerald-50 text-emerald-700",
   "Waiting for Signature":"bg-amber-50 text-amber-700",
+  Progress:               "bg-amber-50 text-amber-700",
   Approved:               "bg-emerald-50 text-emerald-700",
   Disbursed:              "bg-violet-50 text-violet-700",
   Pending:                "bg-amber-50 text-amber-700",

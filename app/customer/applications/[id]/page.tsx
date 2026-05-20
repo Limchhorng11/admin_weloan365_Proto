@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   UserCheck,
   Search,
+  Phone,
 } from "lucide-react";
 import { APPLICATIONS, USERS, type Application, type ApplicationStatus } from "@/lib/data";
 import { StatusBadge } from "@/components/status-badge";
@@ -65,6 +66,7 @@ export default function ApplicationDetailPage({
   );
 
   const [tab, setTab] = useState<TabKey>("status");
+  const [rejectOpen, setRejectOpen] = useState(false);
   // Keep the active tab valid when the role changes.
   useEffect(() => {
     if (!visibleTabs.some(t => t.key === tab)) {
@@ -73,19 +75,16 @@ export default function ApplicationDetailPage({
   }, [visibleTabs, tab]);
 
   // ----- Workflow stage helpers -----
-  // Workflow: CO  →  Approval  →  Cashier
-  const inApprovalStage    = a.status === "Pending" || a.status === "Review";
-  const inDisbursementStage = a.status === "Approved";
-  const isTerminal         = a.status === "Disbursed" || a.status === "Rejected";
+  const inProgressStage = a.status === "Progress";
 
   // ----- Action button gates: combine permission + workflow status -----
-  const mayRequestInfo = can("loan.review")     && inApprovalStage;
-  const mayReject      = can("loan.reject")     && inApprovalStage;
-  const mayApprove     = can("loan.approve")    && inApprovalStage;
+  const mayRequestInfo = can("loan.review")  && inProgressStage;
+  const mayReject      = can("loan.reject")  && inProgressStage;
+  const mayApprove     = can("loan.approve") && inProgressStage;
   const mayApproveAmt  = canApprove(a.amount); // amount within approval limit
-  const mayDisburse    = can("disburse.execute") && inDisbursementStage;
-  const mayReopen      = role.key === "admin"   && a.status === "Rejected"; // admin override
-  const mayUnreject    = role.key === "admin"   && a.status === "Disbursed"; // admin reverse
+  const mayDisburse    = false;                // disbursement removed from workflow
+  const mayReopen      = role.key === "admin" && a.status === "Rejected"; // admin override
+  const mayUnreject    = false;                // no Disbursed status to reverse
 
   // Tell the user *why* approve is blocked (no perm vs amount over limit)
   const approveBlockedReason =
@@ -148,7 +147,10 @@ export default function ApplicationDetailPage({
             )}
 
             {mayReject && (
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-md hover:bg-red-50">
+              <button
+                onClick={() => setRejectOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-md hover:bg-red-50"
+              >
                 <XCircle className="w-4 h-4" />
                 Reject
               </button>
@@ -230,6 +232,17 @@ export default function ApplicationDetailPage({
           {tab === "officer"   && <OfficerTab a={a} />}
         </div>
       </div>
+
+      <RejectReasonModal
+        open={rejectOpen}
+        customerName={a.name}
+        onClose={() => setRejectOpen(false)}
+        onSubmit={reason => {
+          // Mock send — real app would call an API to reject + notify.
+          console.log("Reject:", a.id, { reason });
+          setRejectOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -316,14 +329,12 @@ function getStages(status: ApplicationStatus): StageInfo[] {
     state: "pending",
   };
 
-  if (status === "Pending") {
-    REVIEW.state = "active";
-  } else if (status === "Review") {
+  if (status === "Progress") {
     REVIEW.state = "done";
     REVIEW.who = "Laybun N.";
     REVIEW.when = "Apr 20";
     CREDIT_CHECK.state = "active";
-  } else if (status === "Approved" || status === "Disbursed") {
+  } else if (status === "Approved") {
     REVIEW.state = "done";
     REVIEW.who = "Laybun N.";
     REVIEW.when = "Apr 20";
@@ -542,6 +553,17 @@ function KycTab({ a }: { a: Application }) {
     { name: "Business License", status: "pending"  as const },
     { name: "Utility Bill",     status: "verified" as const },
   ];
+
+  // Mock guarantor — would come from the application record in production.
+  const guarantor = {
+    name: "Sophea Meas",
+    phone: "+855 12 998 221",
+    score: 736,
+  };
+
+  // Mock referral code — 5 digits as per Credit Officer code convention.
+  const referralCode = "10247";
+
   return (
     <>
       <div className="grid grid-cols-2 gap-8">
@@ -555,25 +577,85 @@ function KycTab({ a }: { a: Application }) {
             <Row label="Address" value="Phnom Penh, Cambodia" />
             <Row label="Occupation" value="Retail supervisor" />
             <Row label="Monthly income" value="$850" />
+            <Row
+              label="Bank account"
+              value={<span className="font-mono text-xs">ABA •••• 1284</span>}
+            />
+            <Row
+              label="Referral"
+              value={
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="font-mono text-xs tracking-wider">{referralCode}</span>
+                  <span className="text-[10px] text-gray-400">CO code</span>
+                </span>
+              }
+            />
             <Row label="KYC status" value={<StatusBadge status="Verified" />} />
           </dl>
         </div>
-        <div>
-          <SectionLabel>Credit Bureau (CBC) report</SectionLabel>
-          <div className="space-y-4 text-sm">
-            <div>
-              <div className="flex justify-between mb-1.5">
-                <span className="text-gray-500">Credit score</span>
-                <span className="font-medium text-gray-900">{a.score} / 850</span>
+        <div className="space-y-6">
+          <div>
+            <SectionLabel>Credit Bureau (CBC) report</SectionLabel>
+            <div className="space-y-4 text-sm">
+              <div>
+                <div className="flex justify-between mb-1.5">
+                  <span className="text-gray-500">Credit score</span>
+                  <span className="font-medium text-gray-900">{a.score} / 850</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full",
+                      a.score >= 720 ? "bg-emerald-500" : a.score >= 680 ? "bg-amber-500" : "bg-red-500"
+                    )}
+                    style={{ width: `${(a.score / 850) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={cn(
-                    "h-full",
-                    a.score >= 720 ? "bg-emerald-500" : a.score >= 680 ? "bg-amber-500" : "bg-red-500"
-                  )}
-                  style={{ width: `${(a.score / 850) * 100}%` }}
-                />
+            </div>
+          </div>
+
+          {/* Guarantor */}
+          <div>
+            <SectionLabel>Guarantor information</SectionLabel>
+
+            <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+              {/* Overview */}
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-gray-200 text-gray-700 text-xs font-semibold flex items-center justify-center flex-shrink-0">
+                  {guarantor.name.split(" ").map(s => s[0]).join("")}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-gray-900">{guarantor.name}</div>
+                  <div className="text-[11px] text-gray-500 inline-flex items-center gap-1">
+                    <Phone className="w-3 h-3" />
+                    {guarantor.phone}
+                  </div>
+                </div>
+              </div>
+
+              {/* Guarantor CBC */}
+              <div className="pt-3 border-t border-gray-100">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400 mb-1.5">
+                  Guarantor CBC
+                </div>
+                <div className="flex justify-between mb-1.5 text-sm">
+                  <span className="text-gray-500">Credit score</span>
+                  <span className="font-medium text-gray-900">{guarantor.score} / 850</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full",
+                      guarantor.score >= 720
+                        ? "bg-emerald-500"
+                        : guarantor.score >= 680
+                        ? "bg-amber-500"
+                        : "bg-red-500"
+                    )}
+                    style={{ width: `${(guarantor.score / 850) * 100}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1303,6 +1385,225 @@ function ReassignOfficerModal({
               Save
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Reject reason modal ---------- */
+
+const REJECT_REASONS = [
+  { id: "credit",      label: "Credit score below threshold" },
+  { id: "income",      label: "Insufficient or unstable income" },
+  { id: "dti",         label: "Debt-to-income ratio too high" },
+  { id: "docs",        label: "Incomplete or invalid documents" },
+  { id: "employment",  label: "Employment history insufficient" },
+  { id: "collateral",  label: "Collateral does not meet requirements" },
+  { id: "fraud",       label: "Suspected fraud or identity mismatch" },
+  { id: "other",       label: "Other (write below)" },
+] as const;
+
+function RejectReasonModal({
+  open,
+  customerName,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  customerName: string;
+  onClose: () => void;
+  onSubmit: (reason: string) => void;
+}) {
+  const [reasonId, setReasonId] = useState<typeof REJECT_REASONS[number]["id"]>("credit");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setReasonId("credit");
+      setNote("");
+      setError(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const selectedLabel =
+    REJECT_REASONS.find(r => r.id === reasonId)?.label ?? "Other";
+  const needsNote = reasonId === "other";
+  const noteLen = note.trim().length;
+  const canSend =
+    (!needsNote || noteLen > 0) && noteLen <= 280;
+
+  // Composed message that will be sent to the customer
+  const composedMessage =
+    reasonId === "other"
+      ? note.trim()
+      : note.trim()
+      ? `${selectedLabel}. ${note.trim()}`
+      : selectedLabel;
+
+  const submit = () => {
+    if (needsNote && noteLen === 0) {
+      return setError("Please write the reason when 'Other' is selected.");
+    }
+    if (noteLen > 280) {
+      return setError("Additional notes must be 280 characters or less.");
+    }
+    onSubmit(composedMessage);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-md bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+              <XCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-base font-semibold text-gray-900">Reject application</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                The reason will be sent to{" "}
+                <span className="font-medium text-gray-700">{customerName}</span>{" "}
+                directly through the mobile app.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-5">
+          {error && (
+            <div className="px-3 py-2 rounded-md bg-red-50 border border-red-100 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* Reason — radio list */}
+          <div>
+            <label className="text-xs font-medium text-gray-700">
+              Reason for rejection *
+            </label>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {REJECT_REASONS.map(r => {
+                const active = reasonId === r.id;
+                return (
+                  <button
+                    type="button"
+                    key={r.id}
+                    onClick={() => setReasonId(r.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 border rounded-md text-left text-sm transition",
+                      active
+                        ? "border-red-300 bg-red-50/60 text-red-800"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                        active ? "border-red-600 bg-red-600" : "border-gray-300"
+                      )}
+                    >
+                      {active && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </span>
+                    <span className="text-xs leading-snug">{r.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Free-text note */}
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-gray-700">
+                {needsNote ? "Reason details *" : "Additional notes (optional)"}
+              </label>
+              <span className={cn(
+                "text-[11px]",
+                noteLen > 280 ? "text-red-600" : "text-gray-400"
+              )}>
+                {noteLen} / 280
+              </span>
+            </div>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              rows={4}
+              maxLength={280}
+              placeholder={needsNote
+                ? "Explain the reason so the customer knows what happened."
+                : "Add context the customer should know (optional)…"}
+              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            />
+          </div>
+
+          {/* Preview */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+            <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400 mb-1.5">
+              Customer will receive
+            </div>
+            <div className="bg-white rounded-md border border-gray-200 p-3">
+              <div className="text-sm font-semibold text-gray-900">
+                Loan application update
+              </div>
+              <div className="text-xs text-gray-700 mt-1 leading-relaxed">
+                Hi {customerName.split(" ")[0]}, your loan application has been{" "}
+                <span className="font-medium text-red-700">declined</span>. Reason:{" "}
+                {composedMessage || (
+                  <span className="text-gray-400 italic">your reason will appear here</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!canSend}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md",
+              canSend
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+            )}
+          >
+            <XCircle className="w-4 h-4" />
+            Reject &amp; notify customer
+          </button>
         </div>
       </div>
     </div>

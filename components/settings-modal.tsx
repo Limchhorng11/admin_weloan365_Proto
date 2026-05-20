@@ -21,17 +21,21 @@ import {
   History,
   Download,
   RefreshCw,
+  RotateCcw,
   CheckCircle2,
   List,
   Map as MapIcon,
   Pencil,
   Trash2,
   Plus,
+  Cake,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BRANCHES, type Branch } from "@/lib/data";
 import { UsersRolesView } from "./users-roles-view";
+import { StatusBadge } from "./status-badge";
 import { useRole } from "@/lib/role-context";
 
 type SectionKey =
@@ -41,6 +45,7 @@ type SectionKey =
   | "company"
   | "branches"
   | "referral"
+  | "birthday"
   | "policy"
   | "support";
 
@@ -57,10 +62,11 @@ type Section = {
 const SECTIONS: Section[] = [
   { key: "app",      label: "App Setting",      icon: Smartphone,  group: "main", badge: "Admin", permission: "setting.edit" },
   { key: "users",    label: "User & Role",      icon: Users,       group: "main", permission: "user.view" },
-  { key: "menu",     label: "Menu Setting",     icon: LayoutGrid,  group: "main", permission: "setting.edit" },
+  { key: "menu",     label: "Apply Loan Setting", icon: LayoutGrid,  group: "main", permission: "setting.edit" },
   { key: "company",  label: "Company Profile",  icon: Building2,   group: "main", permission: "setting.edit" },
   { key: "branches", label: "Branch Locator",   icon: MapPin,      group: "main", permission: "setting.view" },
   { key: "referral", label: "Referral Program", icon: Gift,        group: "main", badge: "New", permission: "setting.edit" },
+  { key: "birthday", label: "Birthday Notification", icon: Cake,   group: "main", permission: "setting.edit" },
   { key: "policy",   label: "App Policy",       icon: ShieldCheck, group: "more" },
   { key: "support",  label: "Support",          icon: LifeBuoy,    group: "more" },
 ];
@@ -198,6 +204,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             {section === "company"  && <CompanyView />}
             {section === "branches" && <BranchesView />}
             {section === "referral" && <ReferralView />}
+            {section === "birthday" && <BirthdayView />}
             {section === "policy"   && <PolicyView />}
             {section === "support"  && <SupportView />}
           </div>
@@ -253,11 +260,28 @@ function Card({ children, className }: { children: React.ReactNode; className?: 
   );
 }
 
-function Toggle({ checked }: { checked: boolean }) {
+function Toggle({ checked, disabled }: { checked: boolean; disabled?: boolean }) {
   return (
-    <label className="inline-flex items-center cursor-pointer">
-      <input type="checkbox" defaultChecked={checked} className="sr-only peer" />
-      <div className="w-10 h-5 bg-gray-200 peer-checked:bg-brand-600 rounded-full relative transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:after:translate-x-5 after:transition" />
+    <label
+      className={cn(
+        "inline-flex items-center",
+        disabled ? "cursor-not-allowed" : "cursor-pointer"
+      )}
+    >
+      <input
+        type="checkbox"
+        defaultChecked={checked}
+        disabled={disabled}
+        className="sr-only peer"
+      />
+      <div
+        className={cn(
+          "w-10 h-5 rounded-full relative transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:after:translate-x-5 after:transition",
+          disabled
+            ? "bg-gray-200 opacity-50"
+            : "bg-gray-200 peer-checked:bg-brand-600"
+        )}
+      />
     </label>
   );
 }
@@ -297,7 +321,7 @@ function AppSettingView() {
     <div className="space-y-5">
       <div>
         <H2>Customer App Version</H2>
-        <P>Manage the customer mobile app's release, minimum supported version, and security policies.</P>
+        <P>Manage the customer mobile app&apos;s release and minimum supported version.</P>
       </div>
       <Card>
         <div className="font-medium text-gray-900 mb-3">Admin console version</div>
@@ -325,14 +349,6 @@ function AppSettingView() {
         {/* Customer-update alert */}
         <CustomerUpdateAlert />
       </Card>
-      <Card>
-        <div className="font-medium text-gray-900 mb-3">Security</div>
-        <div className="space-y-2.5 text-sm">
-          <Row label="Session timeout" value="30 minutes" />
-          <Row label="Password policy" value="Strong" />
-          <Row label="Failed attempts lockout" value="5 attempts" />
-        </div>
-      </Card>
     </div>
   );
 }
@@ -347,34 +363,69 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function MenuView() {
-  const MENUS = [
-    { name: "Home", show: true },
-    { name: "My Loans", show: true },
-    { name: "Apply for Loan", show: true },
-    { name: "Repayment Schedule", show: true },
-    { name: "Blogs", show: false },
-    { name: "Chat Support", show: true },
-    { name: "Branches", show: true },
-    { name: "Feedback", show: true },
-    { name: "Settings", show: true },
+  const STEPS: { name: string; show: boolean; disabled?: boolean }[] = [
+    { name: "Borrower Quick Information Submission", show: true },
+    { name: "Borrower choice branch",                show: true },
+    { name: "Borrower Employment Information",       show: true },
+    { name: "Input referral",                        show: true },
+    { name: "Borrower MWL Agency information",       show: true },
+    { name: "Borrower Loan Request Information",     show: true },
+    { name: "Borrower Bank Account",                 show: true },
+    { name: "Borrower Add Guarantor Information",    show: false, disabled: true },
+    { name: "Guarantor System Send SMS/Link",        show: false, disabled: true },
+    { name: "Guarantor Receives SMS/Link",           show: false, disabled: true },
+    { name: "Guarantor Confirm OTP",                 show: true },
+    { name: "Guarantor Verify Face With ID Card",    show: true },
+    { name: "Guarantor CBC Consent",                 show: true },
+    { name: "Borrower Confirm Review Guarantor",     show: true },
+    { name: "Borrower Upload Required Documents",    show: true },
+    { name: "Branch LOS / Assessment",               show: true },
+    { name: "Digital CBC consent",                   show: true },
+    { name: "Credit Assessment & Approve",           show: true },
+    { name: "Accept Loan",                           show: true },
+    { name: "Loan Disbursement Releases",            show: true },
   ];
+  const enabledCount = STEPS.filter(s => s.show && !s.disabled).length;
   return (
     <div className="space-y-5">
       <div>
-        <H2>Menu Setting</H2>
-        <P>Toggle off to hide a menu from the customer app.</P>
+        <H2>Apply Loan Setting</H2>
+        <P>Toggle off any step to skip it in the customer-app loan application flow.</P>
       </div>
-      <Card>
-        <div className="space-y-1 text-sm">
-          {MENUS.map(m => (
-            <div
-              key={m.name}
-              className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
-            >
-              <div className="font-medium text-gray-900">{m.name}</div>
-              <Toggle checked={m.show} />
+      <Card className="!p-0">
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <div className="font-medium text-gray-900 text-sm">Application steps</div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {STEPS.length} steps · {enabledCount} enabled
             </div>
-          ))}
+          </div>
+        </div>
+        <div className="px-5 py-2 max-h-[460px] overflow-y-auto scrollbar-thin">
+          <div className="divide-y divide-gray-100">
+            {STEPS.map((m, idx) => (
+              <div
+                key={m.name}
+                className={cn(
+                  "flex items-center justify-between py-2.5 text-sm",
+                  m.disabled && "opacity-60"
+                )}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-6 h-6 rounded-md bg-gray-100 text-gray-500 text-[11px] font-medium flex items-center justify-center flex-shrink-0">
+                    {idx + 1}
+                  </span>
+                  <span className="font-medium text-gray-900 truncate">{m.name}</span>
+                  {m.disabled && (
+                    <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                      Disabled
+                    </span>
+                  )}
+                </div>
+                <Toggle checked={m.show} disabled={m.disabled} />
+              </div>
+            ))}
+          </div>
         </div>
       </Card>
     </div>
@@ -1681,6 +1732,267 @@ function CustomerUpdateAlert() {
             </>
           )}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ====================================================================
+   Birthday Notification view
+   ==================================================================== */
+
+const BIRTHDAY_UPCOMING = [
+  { name: "Sokha Chan", date: "Apr 23 (in 2 days)", age: 31, status: "Scheduled" },
+  { name: "Dara Meas",  date: "Apr 25 (in 4 days)", age: 42, status: "Scheduled" },
+  { name: "Pisey Ros",  date: "Apr 28 (in 7 days)", age: 27, status: "Draft" },
+];
+
+const DEFAULT_BIRTHDAY_TEMPLATE = {
+  title: "Happy Birthday, {{name}}!",
+  body:
+    "Wishing you a wonderful year ahead filled with happiness, good health, " +
+    "and success. Thank you for being part of the WeLoan365 family.",
+};
+
+function BirthdayView() {
+  const [template, setTemplate] = useState(DEFAULT_BIRTHDAY_TEMPLATE);
+  const [autoSend, setAutoSend] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <H2>Birthday Notification</H2>
+        <P>Automated happy-birthday messages sent to customers on their birthday.</P>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="col-span-2 !p-0">
+          <div className="px-5 py-3 border-b border-gray-200">
+            <div className="font-medium text-gray-900 text-sm">Upcoming — next 7 day</div>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50">
+                {["Customer", "Birthday", "Turning", "Status"].map(h => (
+                  <th
+                    key={h}
+                    className="text-left px-4 py-2 text-[12px] font-medium text-gray-500"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {BIRTHDAY_UPCOMING.map(u => (
+                <tr key={u.name} className="border-t border-gray-100">
+                  <td className="px-4 py-2.5 font-medium text-gray-900">{u.name}</td>
+                  <td className="px-4 py-2.5 text-gray-700">{u.date}</td>
+                  <td className="px-4 py-2.5 text-gray-700">{u.age}</td>
+                  <td className="px-4 py-2.5">
+                    <StatusBadge status={u.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+
+        <Card>
+          <div className="font-medium text-gray-900 text-sm">Message template</div>
+          <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 mt-3">
+            <Cake className="w-5 h-5 text-pink-500 mb-1.5" />
+            <div className="font-medium text-gray-900 text-sm">{template.title}</div>
+            <p className="text-xs text-gray-600 mt-1 leading-relaxed whitespace-pre-wrap">
+              {template.body}
+            </p>
+          </div>
+          <button
+            onClick={() => setEditOpen(true)}
+            className="mt-3 w-full py-2 text-xs border border-gray-200 rounded-md hover:bg-gray-50 inline-flex items-center justify-center gap-1.5"
+          >
+            <Pencil className="w-3.5 h-3.5 text-gray-500" />
+            Edit template
+          </button>
+
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-gray-900 inline-flex items-center gap-1.5">
+                <Send className="w-3.5 h-3.5 text-brand-600" />
+                Auto send
+              </div>
+              <div className="text-[11px] text-gray-500 mt-0.5">
+                Deliver automatically on the customer&apos;s birthday.
+              </div>
+            </div>
+            <label className="inline-flex items-center cursor-pointer flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={autoSend}
+                onChange={e => setAutoSend(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-10 h-5 bg-gray-200 peer-checked:bg-brand-600 rounded-full relative transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 peer-checked:after:translate-x-5 after:transition" />
+            </label>
+          </div>
+        </Card>
+      </div>
+
+      <BirthdayEditTemplateModal
+        open={editOpen}
+        initial={template}
+        onClose={() => setEditOpen(false)}
+        onSave={next => {
+          setTemplate(next);
+          setEditOpen(false);
+        }}
+        onReset={() => setTemplate(DEFAULT_BIRTHDAY_TEMPLATE)}
+      />
+    </div>
+  );
+}
+
+function BirthdayEditTemplateModal({
+  open,
+  initial,
+  onClose,
+  onSave,
+  onReset,
+}: {
+  open: boolean;
+  initial: { title: string; body: string };
+  onClose: () => void;
+  onSave: (next: { title: string; body: string }) => void;
+  onReset: () => void;
+}) {
+  const [title, setTitle] = useState(initial.title);
+  const [body, setBody]   = useState(initial.body);
+
+  useEffect(() => {
+    if (open) {
+      setTitle(initial.title);
+      setBody(initial.body);
+    }
+  }, [open, initial.title, initial.body]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const isDirty = title !== initial.title || body !== initial.body;
+  const canSave = title.trim().length > 0 && body.trim().length > 0;
+  const previewTitle = title.replace(/\{\{\s*name\s*\}\}/g, "Sokha Chan");
+  const previewBody  = body.replace(/\{\{\s*name\s*\}\}/g, "Sokha Chan");
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
+          <div>
+            <div className="text-base font-semibold text-gray-900">Edit message template</div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              Customise the birthday wish. Use{" "}
+              <code className="px-1 py-0.5 bg-gray-100 rounded text-[11px]">{"{{name}}"}</code>{" "}
+              to insert the customer&apos;s first name.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 flex-shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-5 grid grid-cols-2 gap-5">
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-gray-700">Title</label>
+              <input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Happy Birthday, {{name}}!"
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-gray-700">Message body</label>
+                <span className={cn(
+                  "text-[11px]",
+                  body.length > 240 ? "text-red-600" : "text-gray-400"
+                )}>
+                  {body.length} / 240
+                </span>
+              </div>
+              <textarea
+                value={body}
+                onChange={e => setBody(e.target.value)}
+                rows={6}
+                maxLength={240}
+                placeholder="Wishing you a wonderful year ahead…"
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 resize-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-700">Preview</label>
+            <div className="mt-1 border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <Cake className="w-6 h-6 text-pink-500 mb-2" />
+              <div className="font-medium text-gray-900">
+                {previewTitle || <span className="text-gray-400 italic">Title preview…</span>}
+              </div>
+              <p className="text-xs text-gray-600 mt-1 leading-relaxed whitespace-pre-wrap">
+                {previewBody || <span className="text-gray-400 italic">Message preview…</span>}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
+          <button
+            onClick={onReset}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 font-medium"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset to default
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onSave({ title, body })}
+              disabled={!isDirty || !canSave}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md",
+                isDirty && canSave
+                  ? "bg-brand-600 text-white hover:bg-brand-700"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              )}
+            >
+              Save changes
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

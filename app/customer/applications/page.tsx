@@ -34,6 +34,12 @@ import {
   Users as UsersIcon,
   Package,
   Percent,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
+  MessageCircle,
+  Phone,
 } from "lucide-react";
 
 const MONTHS = [
@@ -84,6 +90,16 @@ export default function ApplicationsPage() {
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [restructureFor, setRestructureFor] = useState<Application | null>(null);
+
+  // ---- overview counts ----
+  const overview = useMemo(() => {
+    const progress    = list.filter(a => a.status === "Progress").length;
+    const approved    = list.filter(a => a.status === "Approved").length;
+    const restructure = list.filter(a => a.status === "Approved" && a.restructureRequest).length;
+    const rejected    = list.filter(a => a.status === "Rejected").length;
+    return { progress, approved, restructure, rejected };
+  }, [list]);
 
   // ---- filtered list ----
   const filtered = useMemo(() => {
@@ -152,6 +168,38 @@ export default function ApplicationsPage() {
           </button>
         }
       />
+
+      {/* 4-block overview */}
+      <div className="grid grid-cols-4 gap-3">
+        <OverviewTile
+          icon={Loader2}
+          iconClass="text-amber-600 bg-amber-50"
+          label="In progress"
+          value={overview.progress}
+          hint="Awaiting review or approval"
+        />
+        <OverviewTile
+          icon={CheckCircle2}
+          iconClass="text-emerald-600 bg-emerald-50"
+          label="Approved"
+          value={overview.approved}
+          hint="Approved & active loans"
+        />
+        <OverviewTile
+          icon={RotateCcw}
+          iconClass="text-brand-600 bg-brand-50"
+          label="Re-structure"
+          value={overview.restructure}
+          hint="Approved loans with a re-structure request"
+        />
+        <OverviewTile
+          icon={XCircle}
+          iconClass="text-red-600 bg-red-50"
+          label="Rejected"
+          value={overview.rejected}
+          hint="Declined applications"
+        />
+      </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         {/* Toolbar */}
@@ -283,7 +331,20 @@ export default function ApplicationsPage() {
                     className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60"
                   >
                     <td className="px-6 py-3.5 text-gray-700 font-mono text-xs">{r.id}</td>
-                    <td className="px-6 py-3.5 text-gray-900 font-medium">{r.name}</td>
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-gray-900 font-medium">{r.name}</span>
+                        {r.status === "Approved" && r.restructureRequest && (
+                          <button
+                            onClick={() => setRestructureFor(r)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-50 border border-brand-200 text-brand-700 hover:bg-brand-100"
+                          >
+                            <RotateCcw className="w-2.5 h-2.5" />
+                            Re-structure request
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-3.5 text-gray-600">{r.branch}</td>
                     <td className="px-6 py-3.5 text-gray-700">{r.range}</td>
                     <td className="px-6 py-3.5 text-gray-600">{r.sent}</td>
@@ -362,6 +423,164 @@ export default function ApplicationsPage() {
         onClose={() => setCreateOpen(false)}
         onSave={handleCreate}
       />
+
+      <RestructureRequestModal
+        application={restructureFor}
+        onClose={() => setRestructureFor(null)}
+      />
+    </div>
+  );
+}
+
+/* ---------- overview tile ---------- */
+
+function OverviewTile({
+  icon: Icon,
+  iconClass,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  iconClass: string;
+  label: string;
+  value: number;
+  hint: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-card p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-xs text-gray-500">{label}</div>
+          <div className="text-2xl font-semibold text-gray-900 mt-1.5">{value}</div>
+          <div className="text-[11px] text-gray-400 mt-1.5">{hint}</div>
+        </div>
+        <div className={cn("w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0", iconClass)}>
+          <Icon className="w-4 h-4" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- restructure request modal ---------- */
+
+function RestructureRequestModal({
+  application,
+  onClose,
+}: {
+  application: Application | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && application) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [application, onClose]);
+
+  if (!application || !application.restructureRequest) return null;
+  const req = application.restructureRequest;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-md bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
+              <RotateCcw className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-base font-semibold text-gray-900">Re-structure request</div>
+              <div className="text-xs text-gray-500 mt-0.5 truncate">
+                <span className="font-medium text-gray-700">{application.name}</span> ·{" "}
+                <span className="font-mono">{application.id}</span> · {application.product} · ${application.amount.toLocaleString()} · {application.term}m · {application.rate}% APR
+              </div>
+              <div className="text-[11px] text-gray-400 mt-1">
+                Requested on {req.requestedAt}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 flex-shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-4">
+          {/* Reason from customer */}
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 mb-1.5">
+              Reason from customer
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3 text-sm text-gray-700 leading-relaxed">
+              “{req.reason}”
+            </div>
+          </div>
+
+          {/* Requested change */}
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 mb-1.5">
+              Requested change
+            </div>
+            <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-3 text-sm text-gray-800 leading-relaxed">
+              {req.requestedChange}
+            </div>
+          </div>
+
+          {/* Contact actions */}
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 mb-2">
+              Contact customer directly
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/chat"
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-200 rounded-md hover:bg-gray-50 text-sm text-gray-700 font-medium"
+              >
+                <MessageCircle className="w-4 h-4 text-brand-600" />
+                Chat in app
+              </Link>
+              <a
+                href={`tel:${req.phone.replace(/\s/g, "")}`}
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-200 rounded-md hover:bg-gray-50 text-sm text-gray-700 font-medium"
+              >
+                <Phone className="w-4 h-4 text-emerald-600" />
+                Call {req.phone}
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            Close
+          </button>
+          <div className="flex items-center gap-2">
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50">
+              <XCircle className="w-4 h-4" />
+              Decline request
+            </button>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white rounded-md hover:bg-emerald-700">
+              <CheckCircle2 className="w-4 h-4" />
+              Approve re-structure
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -769,7 +988,7 @@ function NewApplicationModal({
       range: `$${(+amount).toLocaleString()}`,
       sent: formatToday(),
       officer,
-      status: "Pending",
+      status: "Progress",
     };
     onSave(a);
   };

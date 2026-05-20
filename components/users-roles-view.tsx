@@ -483,7 +483,6 @@ type RoleTemplate = {
   description: string;
   stage: StageKey;
   approvalLimit: number | null;
-  branchScope: "own" | "all";
   permissions: string[];
 };
 
@@ -493,7 +492,6 @@ const TEMPLATES: RoleTemplate[] = [
     description: "Onboards customers and submits new loan applications.",
     stage: "intake",
     approvalLimit: 0,
-    branchScope: "own",
     permissions: ["customer.view", "customer.create", "customer.edit", "customer.kyc", "loan.view", "loan.create", "report.view"],
   },
   {
@@ -501,7 +499,6 @@ const TEMPLATES: RoleTemplate[] = [
     description: "Reviews applications and verifies credit assessment.",
     stage: "review",
     approvalLimit: 0,
-    branchScope: "own",
     permissions: ["customer.view", "loan.view", "loan.review", "report.view"],
   },
   {
@@ -509,7 +506,6 @@ const TEMPLATES: RoleTemplate[] = [
     description: "Approves loans up to the branch limit.",
     stage: "approve",
     approvalLimit: 50000,
-    branchScope: "own",
     permissions: ["customer.view", "loan.view", "loan.review", "loan.approve", "loan.reject", "portfolio.view", "report.view"],
   },
   {
@@ -517,7 +513,6 @@ const TEMPLATES: RoleTemplate[] = [
     description: "Approves higher-tier loans across all branches.",
     stage: "approve",
     approvalLimit: 250000,
-    branchScope: "all",
     permissions: ["customer.view", "loan.view", "loan.review", "loan.approve", "loan.reject", "portfolio.view", "portfolio.restructure", "report.view", "report.export"],
   },
   {
@@ -525,7 +520,6 @@ const TEMPLATES: RoleTemplate[] = [
     description: "Disburses approved loans and records repayments.",
     stage: "disburse",
     approvalLimit: 0,
-    branchScope: "own",
     permissions: ["customer.view", "loan.view", "disburse.execute", "payment.record", "payment.view"],
   },
   {
@@ -533,7 +527,6 @@ const TEMPLATES: RoleTemplate[] = [
     description: "Reviews disbursed loans for compliance and audit.",
     stage: "audit",
     approvalLimit: 0,
-    branchScope: "all",
     permissions: ["customer.view", "loan.view", "payment.view", "portfolio.view", "report.view", "audit.view", "audit.export"],
   },
 ];
@@ -725,10 +718,6 @@ function RoleCard({
               {fmt$(role.approvalLimit)}
             </span>
             <span className="inline-flex items-center gap-1">
-              <Building2 className="w-3 h-3 text-gray-400" />
-              {role.branchScope === "all" ? "All branches" : "Own branch"}
-            </span>
-            <span className="inline-flex items-center gap-1">
               <Users className="w-3 h-3 text-gray-400" />
               {role.userCount} {role.userCount === 1 ? "user" : "users"}
             </span>
@@ -823,7 +812,6 @@ function CreateRoleModal({
   const [stage, setStage] = useState<StageKey>("intake");
   const [approvalLimitStr, setApprovalLimitStr] = useState("0");
   const [unlimited, setUnlimited] = useState(false);
-  const [branchScope, setBranchScope] = useState<"own" | "all">("own");
   const [perms, setPerms] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
@@ -833,7 +821,6 @@ function CreateRoleModal({
     setName(t.name);
     setDescription(t.description);
     setStage(t.stage);
-    setBranchScope(t.branchScope);
     if (t.approvalLimit === null) {
       setUnlimited(true);
       setApprovalLimitStr("0");
@@ -884,7 +871,6 @@ function CreateRoleModal({
       description: description.trim() || "—",
       stage,
       approvalLimit: limit,
-      branchScope,
       permissions: Array.from(perms),
       userCount: 0,
       isSystem: false,
@@ -957,28 +943,6 @@ function CreateRoleModal({
                 placeholder="What this role does in the loan workflow"
                 className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
-            </div>
-          </div>
-
-          {/* Branch scope */}
-          <div>
-            <label className="text-xs font-medium text-gray-600">Branch scope</label>
-            <div className="mt-1 flex gap-2">
-              {(["own", "all"] as const).map(v => (
-                <button
-                  type="button"
-                  key={v}
-                  onClick={() => setBranchScope(v)}
-                  className={cn(
-                    "flex-1 px-3 py-2 text-sm rounded-md border transition",
-                    branchScope === v
-                      ? "border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500/30"
-                      : "border-gray-200 text-gray-700 hover:border-gray-300"
-                  )}
-                >
-                  {v === "own" ? "Own branch only" : "All branches"}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -1194,4 +1158,3 @@ function groupBy<T, K extends string>(arr: T[], keyFn: (t: T) => K): Record<K, T
     return acc;
   }, {} as Record<K, T[]>);
 }
-

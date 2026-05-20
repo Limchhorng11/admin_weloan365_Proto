@@ -29,7 +29,6 @@ const TITLES: { match: string; title: string }[] = [
   { match: "/customer/consultations", title: "Consultations" },
   { match: "/customer/applications",  title: "Loan Applications" },
   { match: "/customer/feedback",      title: "Feedback & Rate" },
-  { match: "/customer/birthday",      title: "Birthday Notifications" },
   { match: "/loan-product",           title: "Loan Products" },
   { match: "/content/posts",          title: "Blog Posts" },
   { match: "/chat",                   title: "Chat" },
@@ -237,8 +236,7 @@ function ViewAsMenu({
                 </div>
                 <div className="text-[11px] text-gray-500 mt-0.5">
                   Approval limit{" "}
-                  <span className="font-medium text-gray-700">{fmtLimit(r.approvalLimit)}</span> ·
-                  {r.branchScope === "all" ? " all branches" : " own branch"}
+                  <span className="font-medium text-gray-700">{fmtLimit(r.approvalLimit)}</span>
                 </div>
               </div>
             </button>

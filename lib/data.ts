@@ -1,9 +1,11 @@
-export type ApplicationStatus =
-  | "Pending"
-  | "Review"
-  | "Approved"
-  | "Disbursed"
-  | "Rejected";
+export type ApplicationStatus = "Progress" | "Approved" | "Rejected";
+
+export type RestructureRequest = {
+  requestedAt: string;
+  reason: string;
+  requestedChange: string;
+  phone: string;
+};
 
 export type Application = {
   id: string;
@@ -19,16 +21,34 @@ export type Application = {
   sent: string;
   officer: string;
   status: ApplicationStatus;
+  /** Set when an approved loan's borrower has requested re-structure. */
+  restructureRequest?: RestructureRequest;
 };
 
 export const APPLICATIONS: Application[] = [
-  { id: "APP-10293", cid: "C-0421", name: "Sokha Chan",  product: "Personal",  amount: 2500,  term: 12, rate: 14.5, score: 712, branch: "Phnom Penh — Central",  range: "$2,500",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Pending"   },
-  { id: "APP-10294", cid: "C-0422", name: "Dara Meas",   product: "SME Micro", amount: 8000,  term: 18, rate: 16.0, score: 684, branch: "Siem Reap",             range: "$8,000",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Pending"   },
-  { id: "APP-10295", cid: "C-0424", name: "Pisey Ros",   product: "Auto",      amount: 15000, term: 36, rate: 11.5, score: 758, branch: "Battambang",            range: "$15,000", sent: "Apr 20, 2026", officer: "Sophea K.",  status: "Disbursed" },
-  { id: "APP-10296", cid: "C-0423", name: "Vichet Lim",  product: "Personal",  amount: 1200,  term: 6,  rate: 13.0, score: 745, branch: "Phnom Penh — Toul Kork",range: "$1,200",  sent: "Apr 19, 2026", officer: "Sophea K.",  status: "Review"    },
-  { id: "APP-10297", cid: "C-0426", name: "Bopha Sok",   product: "Personal",  amount: 3000,  term: 12, rate: 14.5, score: 698, branch: "Kampong Cham",          range: "$3,000",  sent: "Apr 18, 2026", officer: "Unassigned", status: "Pending"   },
-  { id: "APP-10298", cid: "C-0427", name: "Rithy Pen",   product: "SME Micro", amount: 12000, term: 24, rate: 15.5, score: 720, branch: "Siem Reap",             range: "$12,000", sent: "Apr 17, 2026", officer: "Sophea K.",  status: "Approved"  },
-  { id: "APP-10299", cid: "C-0425", name: "Narith Kim",  product: "Agri",      amount: 4000,  term: 12, rate: 15.0, score: 640, branch: "Phnom Penh — Central",  range: "$4,000",  sent: "Apr 16, 2026", officer: "Laybun N.",  status: "Rejected"  },
+  { id: "APP-10293", cid: "C-0421", name: "Sokha Chan",  product: "Personal",  amount: 2500,  term: 12, rate: 14.5, score: 712, branch: "Phnom Penh — Central",  range: "$2,500",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
+  { id: "APP-10294", cid: "C-0422", name: "Dara Meas",   product: "SME Micro", amount: 8000,  term: 18, rate: 16.0, score: 684, branch: "Siem Reap",             range: "$8,000",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
+  {
+    id: "APP-10295", cid: "C-0424", name: "Pisey Ros",   product: "Auto",      amount: 15000, term: 36, rate: 11.5, score: 758, branch: "Battambang",            range: "$15,000", sent: "Apr 20, 2026", officer: "Sophea K.",  status: "Approved",
+    restructureRequest: {
+      requestedAt: "2026-04-23",
+      reason: "Recent medical expenses have tightened my monthly cash flow. I'd like to lower my installment until the situation improves.",
+      requestedChange: "Extend term from 36 → 48 months; reduce monthly payment to ~$380.",
+      phone: "+855 96 221 004",
+    },
+  },
+  { id: "APP-10296", cid: "C-0423", name: "Vichet Lim",  product: "Personal",  amount: 1200,  term: 6,  rate: 13.0, score: 745, branch: "Phnom Penh — Toul Kork",range: "$1,200",  sent: "Apr 19, 2026", officer: "Sophea K.",  status: "Progress" },
+  { id: "APP-10297", cid: "C-0426", name: "Bopha Sok",   product: "Personal",  amount: 3000,  term: 12, rate: 14.5, score: 698, branch: "Kampong Cham",          range: "$3,000",  sent: "Apr 18, 2026", officer: "Unassigned", status: "Progress" },
+  {
+    id: "APP-10298", cid: "C-0427", name: "Rithy Pen",   product: "SME Micro", amount: 12000, term: 24, rate: 15.5, score: 720, branch: "Siem Reap",             range: "$12,000", sent: "Apr 17, 2026", officer: "Sophea K.",  status: "Approved",
+    restructureRequest: {
+      requestedAt: "2026-04-22",
+      reason: "Business slow-down this quarter — need a temporary grace period before resuming full installments.",
+      requestedChange: "3-month payment holiday, then resume at original schedule.",
+      phone: "+855 92 118 006",
+    },
+  },
+  { id: "APP-10299", cid: "C-0425", name: "Narith Kim",  product: "Agri",      amount: 4000,  term: 12, rate: 15.0, score: 640, branch: "Phnom Penh — Central",  range: "$4,000",  sent: "Apr 16, 2026", officer: "Laybun N.",  status: "Rejected" },
 ];
 
 export const CHART_DATA: { label: string; value: number; highlight?: boolean }[] = [
@@ -395,6 +415,7 @@ export type PermissionCategory =
   | "Loan Portfolio"
   | "Reports"
   | "User & Role"
+  | "Branch"
   | "Settings"
   | "Audit";
 
@@ -428,6 +449,11 @@ export const PERMISSIONS: Permission[] = [
   { key: "user.edit",   label: "Edit user",        category: "User & Role" },
   { key: "role.edit",   label: "Manage roles & permissions", category: "User & Role", sensitive: true },
 
+  { key: "branch.phnom_penh",    label: "Phnom Penh",    category: "Branch" },
+  { key: "branch.siem_reap",     label: "Siem Reap",     category: "Branch" },
+  { key: "branch.battambang",    label: "Battambang",    category: "Branch" },
+  { key: "branch.kompong_cham",  label: "Kompong Cham",  category: "Branch" },
+
   { key: "setting.view", label: "View settings", category: "Settings" },
   { key: "setting.edit", label: "Edit settings", category: "Settings", sensitive: true },
 
@@ -441,7 +467,6 @@ export type Role = {
   description: string;
   /** maximum loan amount this role can approve. null = unlimited, 0 = cannot approve */
   approvalLimit: number | null;
-  branchScope: "own" | "all";
   /** "*" means all permissions */
   permissions: string[] | "*";
   userCount: number;
@@ -455,7 +480,6 @@ export const ROLES: Role[] = [
     name: "Admin",
     description: "Full system access. Can manage users, roles, and all settings.",
     approvalLimit: null,
-    branchScope: "all",
     permissions: "*",
     userCount: 1,
     isSystem: true,
@@ -465,7 +489,6 @@ export const ROLES: Role[] = [
     name: "Branch Manager",
     description: "Manage branch operations and approve mid-tier loans.",
     approvalLimit: 50000,
-    branchScope: "own",
     permissions: [
       "customer.view", "customer.create", "customer.edit", "customer.kyc",
       "loan.view", "loan.create", "loan.review", "loan.approve", "loan.reject",
@@ -474,6 +497,7 @@ export const ROLES: Role[] = [
       "portfolio.view", "portfolio.restructure",
       "report.view", "report.export",
       "user.view",
+      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
       "audit.view",
     ],
     userCount: 1,
@@ -484,13 +508,13 @@ export const ROLES: Role[] = [
     name: "Senior Credit Officer",
     description: "Senior loan origination with first-tier approval authority.",
     approvalLimit: 10000,
-    branchScope: "own",
     permissions: [
       "customer.view", "customer.create", "customer.edit", "customer.kyc",
       "loan.view", "loan.create", "loan.review", "loan.approve", "loan.reject",
       "payment.view",
       "portfolio.view",
       "report.view",
+      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
     ],
     userCount: 1,
     isSystem: true,
@@ -500,13 +524,13 @@ export const ROLES: Role[] = [
     name: "Credit Officer",
     description: "Originate and review loan applications. Cannot approve.",
     approvalLimit: 0,
-    branchScope: "own",
     permissions: [
       "customer.view", "customer.create", "customer.edit", "customer.kyc",
       "loan.view", "loan.create", "loan.review",
       "payment.view",
       "portfolio.view",
       "report.view",
+      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
     ],
     userCount: 1,
     isSystem: true,
@@ -516,12 +540,12 @@ export const ROLES: Role[] = [
     name: "Approval Committee",
     description: "Final-tier approval for high-value loans. View-only on operations.",
     approvalLimit: null,
-    branchScope: "all",
     permissions: [
       "customer.view",
       "loan.view", "loan.approve", "loan.reject",
       "portfolio.view",
       "report.view",
+      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
       "audit.view",
     ],
     userCount: 1,
@@ -532,12 +556,12 @@ export const ROLES: Role[] = [
     name: "Cashier",
     description: "Disburse approved loans and record customer repayments. Does not handle loan applications.",
     approvalLimit: 0,
-    branchScope: "own",
     permissions: [
       "customer.view",
       "disburse.execute",
       "payment.record", "payment.view",
       "portfolio.view",
+      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
     ],
     userCount: 1,
     isSystem: true,
@@ -547,7 +571,6 @@ export const ROLES: Role[] = [
     name: "Compliance",
     description: "Read-only access to all data for audit and regulatory reporting.",
     approvalLimit: 0,
-    branchScope: "all",
     permissions: [
       "customer.view",
       "loan.view",
@@ -555,6 +578,7 @@ export const ROLES: Role[] = [
       "portfolio.view",
       "report.view", "report.export",
       "user.view",
+      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
       "audit.view", "audit.export",
     ],
     userCount: 1,
