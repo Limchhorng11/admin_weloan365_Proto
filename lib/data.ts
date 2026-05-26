@@ -27,6 +27,15 @@ export type Application = {
 
 export const APPLICATIONS: Application[] = [
   { id: "APP-10293", cid: "C-0421", name: "Sokha Chan",  product: "Personal",  amount: 2500,  term: 12, rate: 14.5, score: 712, branch: "Phnom Penh — Central",  range: "$2,500",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
+  {
+    id: "APP-10231", cid: "C-0421", name: "Sokha Chan",  product: "Personal",  amount: 1500,  term: 6,  rate: 13.5, score: 712, branch: "Phnom Penh — Central",  range: "$1,500",  sent: "Nov 4, 2025",  officer: "Sophea K.",  status: "Approved",
+    restructureRequest: {
+      requestedAt: "2026-05-18",
+      reason: "Repayment deadline overlaps with my term-end school fees. I'd like a slightly longer term so monthly amounts are easier.",
+      requestedChange: "Extend term from 6 → 9 months; lower monthly installment to ~$175.",
+      phone: "+855 12 345 678",
+    },
+  },
   { id: "APP-10294", cid: "C-0422", name: "Dara Meas",   product: "SME Micro", amount: 8000,  term: 18, rate: 16.0, score: 684, branch: "Siem Reap",             range: "$8,000",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
   {
     id: "APP-10295", cid: "C-0424", name: "Pisey Ros",   product: "Auto",      amount: 15000, term: 36, rate: 11.5, score: 758, branch: "Battambang",            range: "$15,000", sent: "Apr 20, 2026", officer: "Sophea K.",  status: "Approved",
@@ -338,10 +347,55 @@ export const PRODUCTS: LoanProduct[] = [
 ];
 
 export const CONSULTATIONS = [
-  { id: "RC-221", customer: "Sokha Chan",  topic: "Personal loan options",    requested: "2026-04-21 09:12", status: "open",    officer: "Unassigned" },
-  { id: "RC-220", customer: "Dara Meas",   topic: "SME expansion financing",  requested: "2026-04-20 14:03", status: "open",    officer: "Laybun N." },
-  { id: "RC-219", customer: "Pisey Ros",   topic: "Auto refinance rates",     requested: "2026-04-19 11:45", status: "closed",  officer: "Sophea K." },
-  { id: "RC-218", customer: "Chenda Oum",  topic: "First-time borrower",      requested: "2026-04-18 16:20", status: "pending", officer: "Laybun N." },
+  {
+    id: "RC-221",
+    customer: "Sokha Chan",
+    topic: "Personal loan options",
+    requested: "2026-04-21 09:12",
+    status: "open",
+    officer: "Unassigned",
+    // Structured intake from the customer mobile-app form
+    preferredBranch: "Phnom Penh — Central",
+    preferredDate: "May 26, 2026",
+    preferredTime: "13:00",
+    note: "I'm a teacher earning $480/mo and I'd like to compare ML and SBL for a small grocery shop.",
+  },
+  {
+    id: "RC-220",
+    customer: "Dara Meas",
+    topic: "SME expansion financing",
+    requested: "2026-04-20 14:03",
+    status: "open",
+    officer: "Laybun N.",
+    preferredBranch: "Siem Reap",
+    preferredDate: "May 27, 2026",
+    preferredTime: "10:30",
+    note: "Looking to expand my grocery shop into a second location near Wat Bo. Want to understand SME limits and what collateral is typically required.",
+  },
+  {
+    id: "RC-219",
+    customer: "Pisey Ros",
+    topic: "Auto refinance rates",
+    requested: "2026-04-19 11:45",
+    status: "closed",
+    officer: "Sophea K.",
+    preferredBranch: "Battambang",
+    preferredDate: "Apr 25, 2026",
+    preferredTime: "09:00",
+    note: "I have an existing auto loan from another bank (~$11,500 balance) and want to see if WeLoan can offer a lower rate.",
+  },
+  {
+    id: "RC-218",
+    customer: "Chenda Oum",
+    topic: "First-time borrower",
+    requested: "2026-04-18 16:20",
+    status: "pending",
+    officer: "Laybun N.",
+    preferredBranch: "Phnom Penh — Central",
+    preferredDate: "Apr 28, 2026",
+    preferredTime: "14:30",
+    note: "First-time applying for a loan — would like to know what documents I need to bring and how long the approval usually takes for a small personal loan.",
+  },
 ];
 
 export const FEEDBACK = [

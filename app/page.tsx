@@ -98,7 +98,7 @@ export default function DashboardPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
-                {["ID", "Name", "Branch", "Loan range", "Sent", "Status"].map(h => (
+                {["Name", "Branch", "Loan range", "Sent", "Status"].map(h => (
                   <th
                     key={h}
                     className="text-left px-6 py-3 text-[12px] font-medium text-gray-500"
@@ -117,7 +117,6 @@ export default function DashboardPage() {
                   key={r.id}
                   className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60"
                 >
-                  <td className="px-6 py-3.5 text-gray-700">{r.id}</td>
                   <td className="px-6 py-3.5 text-gray-900 font-medium">{r.name}</td>
                   <td className="px-6 py-3.5 text-gray-600">{r.branch}</td>
                   <td className="px-6 py-3.5 text-gray-700">{r.range}</td>

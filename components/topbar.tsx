@@ -15,14 +15,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   ShieldCheck,
-  Check,
-  Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/lib/role-context";
-import { ROLES } from "@/lib/data";
 
-type MenuKey = "notif" | "user" | "viewas" | null;
+type MenuKey = "notif" | "user" | null;
 
 const TITLES: { match: string; title: string }[] = [
   { match: "/customer/accounts",      title: "Customers" },
@@ -39,13 +36,13 @@ export function Topbar() {
   const active = TITLES.find(t => pathname === t.match || pathname.startsWith(t.match + "/"));
   const title = active?.title ?? "Dashboard";
 
-  const { role, user, setRoleKey } = useRole();
+  const { role, user } = useRole();
   const [open, setOpen] = useState<MenuKey>(null);
-  const shellRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (shellRef.current && !shellRef.current.contains(e.target as Node)) setOpen(null);
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) setOpen(null);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(null);
@@ -66,41 +63,11 @@ export function Topbar() {
   const initials = user.name.split(" ").map(s => s[0]).join("");
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 lg:px-8 sticky top-0 z-20">
-      <div className="flex items-center gap-3">
-        <h1 className="text-sm font-medium text-gray-700">{title}</h1>
-
-        {/* View-as pill */}
-        <div ref={shellRef} className="hidden md:block">
-          <div className="relative">
-            <button
-              onClick={() => toggle("viewas")}
-              className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition",
-                open === "viewas"
-                  ? "bg-brand-50 border-brand-200 text-brand-700"
-                  : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
-              )}
-              title="Switch role to preview the UI"
-            >
-              <Eye className="w-3 h-3" />
-              <span>Viewing as: {role.name}</span>
-              <ChevronDown
-                className={cn("w-3 h-3 transition", open === "viewas" && "rotate-180")}
-              />
-            </button>
-            {open === "viewas" && (
-              <ViewAsMenu
-                currentKey={role.key}
-                onPick={k => {
-                  setRoleKey(k);
-                  setOpen(null);
-                }}
-              />
-            )}
-          </div>
-        </div>
-      </div>
+    <header
+      ref={headerRef}
+      className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 lg:px-8 sticky top-0 z-20"
+    >
+      <h1 className="text-sm font-medium text-gray-700">{title}</h1>
 
       <div className="flex items-center gap-1">
         {/* Notifications */}
@@ -164,86 +131,19 @@ export function Topbar() {
 function Dropdown({
   children,
   className,
-  align = "right",
 }: {
   children: React.ReactNode;
   className?: string;
-  align?: "right" | "left";
 }) {
   return (
     <div
       className={cn(
-        "absolute top-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-30 overflow-hidden",
-        align === "right" ? "right-0" : "left-0",
+        "absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-30 overflow-hidden",
         className
       )}
     >
       {children}
     </div>
-  );
-}
-
-/* ---------- View-as ---------- */
-
-function ViewAsMenu({
-  currentKey,
-  onPick,
-}: {
-  currentKey: string;
-  onPick: (key: string) => void;
-}) {
-  const fmtLimit = (n: number | null) =>
-    n === null ? "Unlimited" : n === 0 ? "—" : "$" + n.toLocaleString();
-  return (
-    <Dropdown className="w-[300px]" align="left">
-      <div className="px-4 py-2.5 border-b border-gray-200">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-          Preview as role
-        </div>
-        <div className="text-[11px] text-gray-500 mt-0.5">
-          Switches the UI to what this role sees and can do.
-        </div>
-      </div>
-      <div className="max-h-[360px] overflow-y-auto scrollbar-thin py-1">
-        {ROLES.map(r => {
-          const active = r.key === currentKey;
-          return (
-            <button
-              key={r.key}
-              onClick={() => onPick(r.key)}
-              className={cn(
-                "w-full text-left px-4 py-2 hover:bg-gray-50 flex items-start gap-2.5",
-                active && "bg-brand-50/60"
-              )}
-            >
-              <div
-                className={cn(
-                  "w-2 h-2 rounded-full mt-1.5 flex-shrink-0",
-                  active ? "bg-brand-600" : "bg-gray-300"
-                )}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "text-sm font-medium",
-                      active ? "text-brand-700" : "text-gray-900"
-                    )}
-                  >
-                    {r.name}
-                  </span>
-                  {active && <Check className="w-3.5 h-3.5 text-brand-600" />}
-                </div>
-                <div className="text-[11px] text-gray-500 mt-0.5">
-                  Approval limit{" "}
-                  <span className="font-medium text-gray-700">{fmtLimit(r.approvalLimit)}</span>
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </Dropdown>
   );
 }
 

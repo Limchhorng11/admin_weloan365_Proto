@@ -1,12 +1,11 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { ROLES, USERS, type Role } from "./data";
 
 type RoleContextValue = {
   role: Role;
   user: (typeof USERS)[number];
-  setRoleKey: (key: string) => void;
   /** Check if the current role has a permission. */
   can: (permission: string) => boolean;
   /** Check if the current role can approve a loan of `amount`. */
@@ -27,10 +26,8 @@ const ROLE_TO_USER: Record<string, string> = {
 };
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [roleKey, setRoleKey] = useState<string>("admin");
-
   const value = useMemo<RoleContextValue>(() => {
-    const role = ROLES.find(r => r.key === roleKey) ?? ROLES[0];
+    const role = ROLES.find(r => r.key === "admin") ?? ROLES[0];
     const userName = ROLE_TO_USER[role.key];
     const user = USERS.find(u => u.name === userName) ?? USERS[0];
 
@@ -44,8 +41,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       return amount <= role.approvalLimit;
     };
 
-    return { role, user, setRoleKey, can, canApprove };
-  }, [roleKey]);
+    return { role, user, can, canApprove };
+  }, []);
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 }

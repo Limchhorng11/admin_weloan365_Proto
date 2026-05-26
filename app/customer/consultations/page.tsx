@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { TableToolbar } from "@/components/table-toolbar";
@@ -13,10 +13,8 @@ import {
   Send,
   UserPlus,
   Phone,
-  Mail,
   ExternalLink,
   CheckCircle2,
-  RefreshCw,
   Paperclip,
   MessageCircle,
   Search,
@@ -24,14 +22,18 @@ import {
   Crown,
   Building2,
   Briefcase,
+  Pencil,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+
+const PAGE_SIZE = 3;
 
 type Consult = (typeof CONSULTATIONS)[number];
 type Officer = (typeof USERS)[number];
 
 export default function ConsultationsPage() {
-  const { user, role } = useRole();
-  const isAdmin = role.key === "admin";
+  const { user } = useRole();
 
   const [list, setList] = useState<Consult[]>(CONSULTATIONS);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -43,23 +45,36 @@ export default function ConsultationsPage() {
 
   const unassignedCount = list.filter(c => c.officer === "Unassigned").length;
 
-  // Quick self-claim — toolbar button bulk-claims all unassigned for the current user.
-  const bulkAssignToMe = () => {
-    if (unassignedCount === 0) return;
-    setList(prev =>
-      prev.map(c =>
-        c.officer === "Unassigned" ? { ...c, officer: user.name, status: "open" } : c
-      )
-    );
-  };
+  /* ---------- pagination ---------- */
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
-  const assignToMe = (id: string) =>
-    setList(prev =>
-      prev.map(c => (c.id === id ? { ...c, officer: user.name, status: "open" } : c))
-    );
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return list.slice(start, start + PAGE_SIZE);
+  }, [list, page]);
+
+  const firstIdx = list.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastIdx = Math.min(page * PAGE_SIZE, list.length);
 
   const closeConsultation = (id: string) =>
     setList(prev => prev.map(c => (c.id === id ? { ...c, status: "closed" } : c)));
+
+  // Revert a closed consultation back to open so the operator can keep working on it.
+  const reopenConsultation = (id: string) =>
+    setList(prev =>
+      prev.map(c =>
+        c.id === id
+          ? {
+              ...c,
+              status: c.officer === "Unassigned" ? "pending" : "open",
+            }
+          : c
+      )
+    );
 
   const reassign = (id: string, officer: string) =>
     setList(prev =>
@@ -84,14 +99,11 @@ export default function ConsultationsPage() {
       />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
-        <TableToolbar
-          action={unassignedCount > 0 ? `Assign to me (${unassignedCount})` : undefined}
-          onActionClick={bulkAssignToMe}
-        />
+        <TableToolbar />
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
-              {["ID", "Customer", "Topic", "Requested", "Status", "Officer"].map(h => (
+              {["Customer", "Topic", "Requested", "Status", "Officer"].map(h => (
                 <th
                   key={h}
                   className="text-left px-6 py-3 text-[12px] font-medium text-gray-500"
@@ -103,7 +115,7 @@ export default function ConsultationsPage() {
             </tr>
           </thead>
           <tbody>
-            {list.map(c => {
+            {paginated.map(c => {
               const isMine    = c.officer === user.name;
               const unassigned = c.officer === "Unassigned";
               const isClosed   = c.status === "closed";
@@ -112,7 +124,6 @@ export default function ConsultationsPage() {
                   key={c.id}
                   className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60"
                 >
-                  <td className="px-6 py-3.5 text-gray-700 font-mono text-xs">{c.id}</td>
                   <td className="px-6 py-3.5 font-medium text-gray-900">{c.customer}</td>
                   <td className="px-6 py-3.5 text-gray-700">{c.topic}</td>
                   <td className="px-6 py-3.5 text-gray-600 text-xs">{c.requested}</td>
@@ -144,28 +155,16 @@ export default function ConsultationsPage() {
                   <td className="px-6 py-3.5 text-right">
                     <div className="inline-flex items-center gap-3">
                       {!isClosed && (
-                        <>
-                          {/* Quick self-claim — visible only when unassigned */}
-                          {unassigned && (
-                            <button
-                              onClick={() => assignToMe(c.id)}
-                              className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium"
-                            >
-                              <UserPlus className="w-3.5 h-3.5" />
-                              Assign to me
-                            </button>
-                          )}
-                          {/* Pick an officer — opens the officer popup (Table 2). Admin-only. */}
-                          {isAdmin && (
-                            <button
-                              onClick={() => setPickerFor(c.id)}
-                              className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium"
-                            >
-                              <Briefcase className="w-3.5 h-3.5" />
-                              {unassigned ? "Assign" : "Reassign"}
-                            </button>
-                          )}
-                        </>
+                        // Single action — opens the officer picker for any role.
+                        // Self-claim is still possible via the "Assign to me"
+                        // shortcut inside the picker.
+                        <button
+                          onClick={() => setPickerFor(c.id)}
+                          className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium"
+                        >
+                          <Briefcase className="w-3.5 h-3.5" />
+                          {unassigned ? "Assign to person" : "Reassign to person"}
+                        </button>
                       )}
                       <button
                         onClick={() => setOpenId(c.id)}
@@ -180,19 +179,71 @@ export default function ConsultationsPage() {
             })}
           </tbody>
         </table>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 text-sm text-gray-500">
+          <div>
+            Showing{" "}
+            <span className="font-medium text-gray-700">
+              {firstIdx}-{lastIdx}
+            </span>{" "}
+            of <span className="font-medium text-gray-700">{list.length}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500">
+              Page <span className="font-medium text-gray-700">{page}</span> of{" "}
+              <span className="font-medium text-gray-700">{totalPages}</span>
+            </span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                aria-label="Previous page"
+                className={cn(
+                  "p-1.5 rounded border border-gray-200",
+                  page === 1
+                    ? "text-gray-300 cursor-not-allowed bg-gray-50"
+                    : "text-gray-600 hover:bg-gray-50"
+                )}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                aria-label="Next page"
+                className={cn(
+                  "p-1.5 rounded border border-gray-200",
+                  page === totalPages
+                    ? "text-gray-300 cursor-not-allowed bg-gray-50"
+                    : "text-gray-600 hover:bg-gray-50"
+                )}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <ConsultationDetailModal
         consultation={active}
         onClose={() => setOpenId(null)}
-        onAssignToMe={() => active && assignToMe(active.id)}
         onCloseConsultation={() => {
           if (active) {
             closeConsultation(active.id);
             setOpenId(null);
           }
         }}
-        onReassign={(officer: string) => active && reassign(active.id, officer)}
+        // "Assign to person" / "Reassign to person" — close this modal
+        // and hand off to the same officer picker the list uses.
+        onPickAssignee={() => {
+          if (active) {
+            setPickerFor(active.id);
+            setOpenId(null);
+          }
+        }}
+        onReopen={() => active && reopenConsultation(active.id)}
       />
 
       <OfficerPickerModal
@@ -213,19 +264,19 @@ export default function ConsultationsPage() {
 function ConsultationDetailModal({
   consultation,
   onClose,
-  onAssignToMe,
   onCloseConsultation,
-  onReassign,
+  onPickAssignee,
+  onReopen,
 }: {
   consultation: Consult | null;
   onClose: () => void;
-  onAssignToMe: () => void;
   onCloseConsultation: () => void;
-  onReassign: (officer: string) => void;
+  onPickAssignee: () => void;
+  onReopen: () => void;
 }) {
   const { user } = useRole();
   const [reply, setReply] = useState("");
-  const [reassignOpen, setReassignOpen] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   if (!consultation) return null;
 
@@ -254,7 +305,7 @@ function ConsultationDetailModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+        className="relative bg-white rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -279,12 +330,6 @@ function ConsultationDetailModal({
                     {customer.phone}
                   </span>
                 )}
-                {customer?.email && (
-                  <span className="inline-flex items-center gap-1">
-                    <Mail className="w-3 h-3" />
-                    {customer.email}
-                  </span>
-                )}
                 {customer && (
                   <Link
                     href={`/customer/accounts/${customer.id}`}
@@ -306,93 +351,73 @@ function ConsultationDetailModal({
           </button>
         </div>
 
-        {/* Topic + meta strip */}
-        <div className="px-6 py-3 border-b border-gray-200 bg-gray-50/60 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-4">
-            <div>
-              <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
-                Topic
-              </div>
-              <div className="text-sm font-medium text-gray-900">{consultation.topic}</div>
+        {/* Customer's request — structured intake from the mobile form */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-white">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              Customer's request
             </div>
-            <div>
-              <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
-                Requested
-              </div>
-              <div className="text-gray-700">{consultation.requested}</div>
+            <div className="text-[11px] text-gray-500">
+              Submitted{" "}
+              <span className="font-medium text-gray-700">{consultation.requested}</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
-              Officer
-            </div>
-            <div className="text-gray-700 inline-flex items-center gap-1.5">
-              {unassigned ? (
-                <span className="text-gray-400 italic">Unassigned</span>
-              ) : (
-                <>
-                  {consultation.officer}
-                  {isMine && (
-                    <span className="text-[10px] font-medium bg-brand-50 text-brand-700 rounded-full px-1.5 py-0.5">
-                      You
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
+          <dl className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+            <InfoRow label="Topic" value={consultation.topic} />
+            <InfoRow label="Preferred date" value={consultation.preferredDate} />
+            <InfoRow label="Preferred time" value={consultation.preferredTime} />
+            <InfoRow label="Preferred branch" value={consultation.preferredBranch} />
+            <InfoRow
+              label="Officer"
+              value={
+                unassigned ? (
+                  <span className="text-gray-400 italic">Unassigned</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    {consultation.officer}
+                    {isMine && (
+                      <span className="text-[10px] font-medium bg-brand-50 text-brand-700 rounded-full px-1.5 py-0.5">
+                        You
+                      </span>
+                    )}
+                  </span>
+                )
+              }
+            />
+            {consultation.note && (
+              <InfoRow
+                label="Notes"
+                value={
+                  <span className="text-gray-700 italic">"{consultation.note}"</span>
+                }
+              />
+            )}
+          </dl>
         </div>
 
-        {/* Conversation thread */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin p-6 bg-gray-50 space-y-4">
-          <div className="text-center text-xs text-gray-400">
-            {consultation.requested}
+        {/* Closed-state indicator (only when the consultation is closed) */}
+        {isClosed && (
+          <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-center gap-2 text-xs text-gray-500">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            Consultation closed
           </div>
-
-          <Bubble side="left" name={consultation.customer}>
-            Hi, I'd like more information about your{" "}
-            <b className="font-medium">{consultation.topic.toLowerCase()}</b>. What are the
-            eligibility requirements and the typical interest rate?
-          </Bubble>
-
-          {!unassigned && !isClosed && (
-            <Bubble side="right" name={consultation.officer}>
-              Hello {consultation.customer.split(" ")[0]}, thanks for reaching out. I'll
-              gather the details for {consultation.topic.toLowerCase()} and get back to you
-              shortly.
-            </Bubble>
-          )}
-
-          {isClosed && (
-            <Bubble side="right" name={consultation.officer}>
-              We've prepared a summary and an application link for you. Let me know if you
-              have any other questions.
-            </Bubble>
-          )}
-
-          {isClosed && (
-            <div className="flex items-center justify-center gap-2 text-xs text-gray-500 pt-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Consultation closed
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Reply / actions */}
-        {!isClosed && (
+        {!isClosed && (unassigned || isMine) && (
           <div className="border-t border-gray-200 p-3 bg-white">
             {unassigned ? (
               <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-100">
                 <div className="flex items-center gap-2 text-sm text-amber-800">
                   <MessageCircle className="w-4 h-4" />
-                  This consultation isn't assigned yet. Claim it to start replying.
+                  This consultation isn't assigned yet. Assign an officer to start replying.
                 </div>
                 <button
-                  onClick={onAssignToMe}
+                  onClick={onPickAssignee}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700"
                 >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  Assign to me
+                  <Briefcase className="w-3.5 h-3.5" />
+                  Assign to person
                 </button>
               </div>
             ) : (
@@ -407,20 +432,16 @@ function ConsultationDetailModal({
                 <textarea
                   value={reply}
                   onChange={e => setReply(e.target.value)}
-                  placeholder={isMine ? "Reply to customer…" : "Read-only — assigned to another officer"}
+                  placeholder="Reply to customer…"
                   rows={2}
-                  disabled={!isMine}
-                  className={cn(
-                    "flex-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
-                    !isMine && "opacity-60 cursor-not-allowed"
-                  )}
+                  className="flex-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
                 />
                 <button
                   onClick={send}
-                  disabled={!isMine || !reply.trim()}
+                  disabled={!reply.trim()}
                   className={cn(
                     "inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-md font-medium",
-                    isMine && reply.trim()
+                    reply.trim()
                       ? "bg-brand-600 text-white hover:bg-brand-700"
                       : "bg-gray-100 text-gray-400 cursor-not-allowed"
                   )}
@@ -435,33 +456,18 @@ function ConsultationDetailModal({
 
         {/* Footer actions */}
         <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50/60">
-          <div className="relative">
+          {!isClosed ? (
             <button
-              onClick={() => setReassignOpen(o => !o)}
+              onClick={onPickAssignee}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700 font-medium"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-gray-500" />
-              Reassign
+              <Briefcase className="w-3.5 h-3.5 text-gray-500" />
+              {unassigned ? "Assign to person" : "Reassign to person"}
             </button>
-            {reassignOpen && (
-              <div className="absolute bottom-full mb-1 left-0 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-10 py-1">
-                {["Laybun N.", "Sophea K.", "Ratanak L.", "Sreyneang P.", "Unassigned"].map(
-                  o => (
-                    <button
-                      key={o}
-                      onClick={() => {
-                        onReassign(o);
-                        setReassignOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700"
-                    >
-                      {o === consultation.officer ? `${o} (current)` : o}
-                    </button>
-                  )
-                )}
-              </div>
-            )}
-          </div>
+          ) : (
+            // Keep layout balanced — empty spacer when closed.
+            <div />
+          )}
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
@@ -469,9 +475,17 @@ function ConsultationDetailModal({
             >
               Close
             </button>
-            {!isClosed && (
+            {isClosed ? (
               <button
-                onClick={onCloseConsultation}
+                onClick={onReopen}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 bg-white text-gray-700 rounded-md hover:bg-gray-50 font-medium"
+              >
+                <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                Edit
+              </button>
+            ) : (
+              <button
+                onClick={() => setConfirmClose(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700 font-medium"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -480,6 +494,55 @@ function ConsultationDetailModal({
             )}
           </div>
         </div>
+
+        {/* Confirm "Mark as closed" overlay */}
+        {confirmClose && (
+          <div
+            className="absolute inset-0 bg-black/40 flex items-center justify-center p-4 z-10"
+            onClick={() => setConfirmClose(false)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-5 py-4 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-gray-900">
+                    Mark consultation as closed?
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    The conversation with{" "}
+                    <span className="font-medium text-gray-700">
+                      {consultation.customer}
+                    </span>{" "}
+                    will be archived. You won't be able to send further replies.
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmClose(false)}
+                  className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-md bg-white hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setConfirmClose(false);
+                    onCloseConsultation();
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700 font-medium"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Yes, mark as closed
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -517,6 +580,23 @@ function Bubble({
           {children}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------- info row (label / value pair used across the popup) ---------- */
+
+function InfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 px-4 py-2.5">
+      <dt className="text-sm text-gray-500 flex-shrink-0">{label}</dt>
+      <dd className="text-sm text-gray-900 text-right">{value}</dd>
     </div>
   );
 }

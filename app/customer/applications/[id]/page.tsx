@@ -32,23 +32,27 @@ import { useRole } from "@/lib/role-context";
 type TabDef = { key: TabKey; label: string; permission?: string };
 
 const TABS: TabDef[] = [
-  { key: "status",    label: "Loan Status" },
-  { key: "kyc",       label: "KYC / Docs / CBC",          permission: "customer.view" },
-  { key: "repayment", label: "Repayment & Collection",    permission: "payment.view" },
-  { key: "reminders", label: "Reminders / Notifications" },
-  { key: "audit",     label: "Audit Log",                 permission: "audit.view" },
-  { key: "reports",   label: "Reports & Analytics",       permission: "report.view" },
-  { key: "officer",   label: "Person in Charge" },
+  { key: "status",      label: "Loan Status" },
+  { key: "kyc",         label: "KYC / Docs / CBC",          permission: "customer.view" },
+  { key: "guarantor",   label: "Guarantor info",            permission: "customer.view" },
+  { key: "repayment",   label: "Repayment & Collection",    permission: "payment.view" },
+  { key: "reminders",   label: "Reminders / Notifications" },
+  { key: "audit",       label: "Audit Log",                 permission: "audit.view" },
+  { key: "reports",     label: "Reports & Analytics",       permission: "report.view" },
+  { key: "officer",     label: "Person in Charge" },
+  { key: "restructure", label: "Re-structure" },
 ];
 
 type TabKey =
   | "status"
   | "kyc"
+  | "guarantor"
   | "repayment"
   | "reminders"
   | "audit"
   | "reports"
-  | "officer";
+  | "officer"
+  | "restructure";
 
 export default function ApplicationDetailPage({
   params,
@@ -61,8 +65,21 @@ export default function ApplicationDetailPage({
   const { role, can, canApprove } = useRole();
 
   const visibleTabs = useMemo(
-    () => TABS.filter(t => !t.permission || can(t.permission)),
-    [can]
+    () =>
+      TABS.filter(t => {
+        // Re-structure is only meaningful once the loan has been approved.
+        if (t.key === "restructure" && a.status !== "Approved") return false;
+        // Repayment is only meaningful once a loan exists — hide while in Progress
+        // (and also on rejected loans, see below).
+        if (t.key === "repayment" && a.status === "Progress") return false;
+        // For rejected loans, only surface the tabs relevant to the rejection record.
+        if (a.status === "Rejected") {
+          const REJECTED_TABS: TabKey[] = ["status", "kyc", "audit", "officer"];
+          if (!REJECTED_TABS.includes(t.key)) return false;
+        }
+        return !t.permission || can(t.permission);
+      }),
+    [can, a.status]
   );
 
   const [tab, setTab] = useState<TabKey>("status");
@@ -120,20 +137,11 @@ export default function ApplicationDetailPage({
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-5 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/customer/applications"
-              className="p-1 -ml-1 text-gray-400 hover:text-gray-700 rounded"
-              aria-label="Back"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <div>
-              <div className="text-xs font-mono text-gray-500">{a.id}</div>
-              <div className="text-xl font-semibold text-gray-900">{a.name}</div>
-              <div className="text-sm text-gray-500">
-                {a.product} • ${a.amount.toLocaleString()} • {a.term}m • {a.rate}% APR
-              </div>
+          <div>
+            <div className="text-xs font-mono text-gray-500">{a.id}</div>
+            <div className="text-xl font-semibold text-gray-900">{a.name}</div>
+            <div className="text-sm text-gray-500">
+              {a.product} • ${a.amount.toLocaleString()} • {a.term}m
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -225,11 +233,13 @@ export default function ApplicationDetailPage({
         <div className="p-6">
           {tab === "status"    && <LoanStatusTab a={a} />}
           {tab === "kyc"       && <KycTab a={a} />}
+          {tab === "guarantor" && <GuarantorTab a={a} />}
           {tab === "repayment" && <RepaymentTab a={a} />}
           {tab === "reminders" && <RemindersTab a={a} />}
           {tab === "audit"     && <AuditTab a={a} />}
-          {tab === "reports"   && <ReportsTab />}
-          {tab === "officer"   && <OfficerTab a={a} />}
+          {tab === "reports"     && <ReportsTab />}
+          {tab === "officer"     && <OfficerTab a={a} />}
+          {tab === "restructure" && <RestructureTab a={a} />}
         </div>
       </div>
 
@@ -345,16 +355,12 @@ function getStages(status: ApplicationStatus): StageInfo[] {
     APPROVAL.who = "Sophea K.";
     APPROVAL.when = "Apr 21";
   } else if (status === "Rejected") {
-    // For demo: assume rejected after credit check
-    REVIEW.state = "done";
+    // Rejected at Document Review — surface that stage in red and leave
+    // the downstream stages as "pending" (they never happened).
+    REVIEW.state = "failed";
     REVIEW.who = "Laybun N.";
     REVIEW.when = "Apr 20";
-    CREDIT_CHECK.state = "done";
-    CREDIT_CHECK.who = "System / Sophea K.";
-    CREDIT_CHECK.when = "Apr 21";
-    APPROVAL.state = "failed";
-    APPROVAL.who = "Sophea K.";
-    APPROVAL.when = "Apr 21";
+    // CREDIT_CHECK and APPROVAL stay in their default "pending" state.
   }
   return [SUBMISSION, REVIEW, CREDIT_CHECK, APPROVAL];
 }
@@ -554,13 +560,6 @@ function KycTab({ a }: { a: Application }) {
     { name: "Utility Bill",     status: "verified" as const },
   ];
 
-  // Mock guarantor — would come from the application record in production.
-  const guarantor = {
-    name: "Sophea Meas",
-    phone: "+855 12 998 221",
-    score: 736,
-  };
-
   // Mock referral code — 5 digits as per Credit Officer code convention.
   const referralCode = "10247";
 
@@ -593,69 +592,22 @@ function KycTab({ a }: { a: Application }) {
             <Row label="KYC status" value={<StatusBadge status="Verified" />} />
           </dl>
         </div>
-        <div className="space-y-6">
-          <div>
-            <SectionLabel>Credit Bureau (CBC) report</SectionLabel>
-            <div className="space-y-4 text-sm">
-              <div>
-                <div className="flex justify-between mb-1.5">
-                  <span className="text-gray-500">Credit score</span>
-                  <span className="font-medium text-gray-900">{a.score} / 850</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      "h-full",
-                      a.score >= 720 ? "bg-emerald-500" : a.score >= 680 ? "bg-amber-500" : "bg-red-500"
-                    )}
-                    style={{ width: `${(a.score / 850) * 100}%` }}
-                  />
-                </div>
+        <div>
+          <SectionLabel>Credit Bureau (CBC) report</SectionLabel>
+          <div className="space-y-4 text-sm">
+            <div>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-gray-500">Credit score</span>
+                <span className="font-medium text-gray-900">{a.score} / 850</span>
               </div>
-            </div>
-          </div>
-
-          {/* Guarantor */}
-          <div>
-            <SectionLabel>Guarantor information</SectionLabel>
-
-            <div className="rounded-lg border border-gray-200 p-3 space-y-3">
-              {/* Overview */}
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-gray-200 text-gray-700 text-xs font-semibold flex items-center justify-center flex-shrink-0">
-                  {guarantor.name.split(" ").map(s => s[0]).join("")}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-gray-900">{guarantor.name}</div>
-                  <div className="text-[11px] text-gray-500 inline-flex items-center gap-1">
-                    <Phone className="w-3 h-3" />
-                    {guarantor.phone}
-                  </div>
-                </div>
-              </div>
-
-              {/* Guarantor CBC */}
-              <div className="pt-3 border-t border-gray-100">
-                <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400 mb-1.5">
-                  Guarantor CBC
-                </div>
-                <div className="flex justify-between mb-1.5 text-sm">
-                  <span className="text-gray-500">Credit score</span>
-                  <span className="font-medium text-gray-900">{guarantor.score} / 850</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      "h-full",
-                      guarantor.score >= 720
-                        ? "bg-emerald-500"
-                        : guarantor.score >= 680
-                        ? "bg-amber-500"
-                        : "bg-red-500"
-                    )}
-                    style={{ width: `${(guarantor.score / 850) * 100}%` }}
-                  />
-                </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full",
+                    a.score >= 720 ? "bg-emerald-500" : a.score >= 680 ? "bg-amber-500" : "bg-red-500"
+                  )}
+                  style={{ width: `${(a.score / 850) * 100}%` }}
+                />
               </div>
             </div>
           </div>
@@ -691,6 +643,82 @@ function KycTab({ a }: { a: Application }) {
         </div>
       </div>
     </>
+  );
+}
+
+/* ---------- tab: Guarantor info ---------- */
+
+function GuarantorTab({ a }: { a: Application }) {
+  // Mock guarantor — would come from the application record in production.
+  const guarantor = {
+    name: "Sophea Meas",
+    phone: "+855 12 998 221",
+    nationalId: "200405 ••• 6712",
+    dateOfBirth: "1990-02-14",
+    address: "Phnom Penh, Cambodia",
+    score: 736,
+  };
+
+  const initials = guarantor.name.split(" ").map(s => s[0]).join("");
+
+  return (
+    <div className="grid grid-cols-2 gap-8">
+      {/* Left: Guarantor personal info */}
+      <div>
+        <SectionLabel>Guarantor — personal info</SectionLabel>
+        <div className="border border-gray-200 rounded-lg p-4 mb-4 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-full bg-gray-200 text-gray-700 text-sm font-semibold flex items-center justify-center flex-shrink-0">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <div className="text-base font-semibold text-gray-900">{guarantor.name}</div>
+            <div className="text-xs text-gray-500 inline-flex items-center gap-1 mt-0.5">
+              <Phone className="w-3 h-3" />
+              {guarantor.phone}
+            </div>
+          </div>
+        </div>
+        <dl className="divide-y divide-gray-100">
+          <Row label="National ID" value={<span className="font-mono text-xs">{guarantor.nationalId}</span>} />
+          <Row label="Date of birth" value={guarantor.dateOfBirth} />
+          <Row label="Address" value={guarantor.address} />
+          <Row label="Guarantee for" value={<span className="font-medium text-gray-700">{a.name}</span>} />
+        </dl>
+      </div>
+
+      {/* Right: Guarantor CBC report */}
+      <div>
+        <SectionLabel>Guarantor — Credit Bureau (CBC) report</SectionLabel>
+        <div className="space-y-4 text-sm">
+          <div>
+            <div className="flex justify-between mb-1.5">
+              <span className="text-gray-500">Credit score</span>
+              <span className="font-medium text-gray-900">{guarantor.score} / 850</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full",
+                  guarantor.score >= 720
+                    ? "bg-emerald-500"
+                    : guarantor.score >= 680
+                    ? "bg-amber-500"
+                    : "bg-red-500"
+                )}
+                style={{ width: `${(guarantor.score / 850) * 100}%` }}
+              />
+            </div>
+            <div className="text-[11px] text-gray-500 mt-1.5">
+              {guarantor.score >= 720
+                ? "Excellent — strong support for the application."
+                : guarantor.score >= 680
+                ? "Fair — review CBC details before final decision."
+                : "Below threshold — guarantor may not strengthen the file."}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1177,6 +1205,158 @@ function OfficerTab({ a }: { a: Application }) {
           setReassignOpen(false);
         }}
       />
+    </div>
+  );
+}
+
+/* ---------- tab: Re-structure (peer of Person in Charge) ---------- */
+
+function RestructureTab({ a }: { a: Application }) {
+  const [decision, setDecision] = useState<"pending" | "approved" | "declined">(
+    "pending"
+  );
+
+  const isApproved = a.status === "Approved";
+  const req = a.restructureRequest;
+
+  // Loans that are still in Progress or have been Rejected can't be restructured.
+  if (!isApproved) {
+    return (
+      <div className="border border-dashed border-gray-200 rounded-lg p-10 text-center bg-gray-50/40">
+        <RotateCcw className="w-7 h-7 text-gray-300 mx-auto mb-2" />
+        <div className="text-sm font-medium text-gray-900">
+          Re-structure not available
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          Customers can only request a re-structure on loans that have already been approved.
+        </div>
+      </div>
+    );
+  }
+
+  // Approved loan, but no pending customer request.
+  if (!req) {
+    return (
+      <div className="border border-dashed border-gray-200 rounded-lg p-10 text-center bg-gray-50/40">
+        <RotateCcw className="w-7 h-7 text-gray-300 mx-auto mb-2" />
+        <div className="text-sm font-medium text-gray-900">
+          No pending re-structure request
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          When {a.name.split(" ")[0]} submits a re-structure request from the app, the details will appear here.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        {/* Header */}
+        <div className="px-4 py-3 bg-brand-50/40 border-b border-gray-200 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-md bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
+            <RotateCcw className="w-4 h-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-gray-900">
+              {a.name} requested a loan re-structure
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              Submitted on {req.requestedAt} · {a.product} · ${a.amount.toLocaleString()} · {a.term}m
+            </div>
+          </div>
+          {decision !== "pending" && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium",
+                decision === "approved"
+                  ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                  : "bg-red-50 border border-red-200 text-red-700"
+              )}
+            >
+              {decision === "approved" ? (
+                <>
+                  <CheckCircle2 className="w-3 h-3" />
+                  Approved
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-3 h-3" />
+                  Declined
+                </>
+              )}
+            </span>
+          )}
+        </div>
+
+        {/* Reason + requested change */}
+        <div className="p-4 grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 mb-1.5">
+              Reason from customer
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3 text-sm text-gray-700 leading-relaxed">
+              “{req.reason}”
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 mb-1.5">
+              Requested change
+            </div>
+            <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-3 text-sm text-gray-800 leading-relaxed">
+              {req.requestedChange}
+            </div>
+          </div>
+        </div>
+
+        {/* Contact actions */}
+        <div className="px-4 pb-4 grid grid-cols-2 gap-2">
+          <Link
+            href="/chat"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-200 rounded-md hover:bg-gray-50 text-sm text-gray-700 font-medium"
+          >
+            <MessageCircle className="w-4 h-4 text-brand-600" />
+            Chat in app
+          </Link>
+          <a
+            href={`tel:${req.phone.replace(/\s/g, "")}`}
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-200 rounded-md hover:bg-gray-50 text-sm text-gray-700 font-medium"
+          >
+            <Phone className="w-4 h-4 text-emerald-600" />
+            Call {req.phone}
+          </a>
+        </div>
+
+        {/* Decision footer */}
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-end gap-2">
+          <button
+            disabled={decision !== "pending"}
+            onClick={() => setDecision("declined")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border",
+              decision === "pending"
+                ? "border-red-200 text-red-600 hover:bg-red-50"
+                : "border-gray-200 text-gray-300 cursor-not-allowed"
+            )}
+          >
+            <XCircle className="w-4 h-4" />
+            Decline request
+          </button>
+          <button
+            disabled={decision !== "pending"}
+            onClick={() => setDecision("approved")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md",
+              decision === "pending"
+                ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+            )}
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Approve re-structure
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   MessageCircle,
-  Pencil,
+  KeyRound,
   Mail,
   Phone,
   Building2,
@@ -66,9 +66,7 @@ export default function CustomerDetailPage({
             <div>
               <div className="text-xs font-mono text-gray-500">{c.id}</div>
               <div className="text-xl font-semibold text-gray-900">{c.name}</div>
-              <div className="text-sm text-gray-500">
-                {c.phone} • {c.email}
-              </div>
+              <div className="text-sm text-gray-500">{c.phone}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -79,8 +77,8 @@ export default function CustomerDetailPage({
             </button>
             {can("customer.edit") && (
               <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700">
-                <Pencil className="w-4 h-4 text-gray-500" />
-                Edit profile
+                <KeyRound className="w-4 h-4 text-gray-500" />
+                Change password for customer
               </button>
             )}
           </div>
@@ -168,7 +166,7 @@ export default function CustomerDetailPage({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
-                {["App ID", "Product", "Amount", "Term", "Rate", "Status"].map(h => (
+                {["Product", "Amount", "Term", "Rate", "Status"].map(h => (
                   <th
                     key={h}
                     className="text-left px-6 py-3 text-[12px] font-medium text-gray-500"
@@ -182,7 +180,6 @@ export default function CustomerDetailPage({
             <tbody>
               {customerApps.map(a => (
                 <tr key={a.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                  <td className="px-6 py-3.5 text-gray-700 font-mono text-xs">{a.id}</td>
                   <td className="px-6 py-3.5 font-medium text-gray-900">{a.product}</td>
                   <td className="px-6 py-3.5 text-gray-700">${a.amount.toLocaleString()}</td>
                   <td className="px-6 py-3.5 text-gray-700">{a.term}m</td>
