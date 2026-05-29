@@ -26,9 +26,9 @@ export type Application = {
 };
 
 export const APPLICATIONS: Application[] = [
-  { id: "APP-10293", cid: "C-0421", name: "Sokha Chan",  product: "Personal",  amount: 2500,  term: 12, rate: 14.5, score: 712, branch: "Phnom Penh — Central",  range: "$2,500",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
+  { id: "APP-10293", cid: "C-0421", name: "Sokha Chan",  product: "Micro Loan (ML)",  amount: 2500,  term: 12, rate: 14.5, score: 712, branch: "Phnom Penh — Central",  range: "$2,500",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
   {
-    id: "APP-10231", cid: "C-0421", name: "Sokha Chan",  product: "Personal",  amount: 1500,  term: 6,  rate: 13.5, score: 712, branch: "Phnom Penh — Central",  range: "$1,500",  sent: "Nov 4, 2025",  officer: "Sophea K.",  status: "Approved",
+    id: "APP-10231", cid: "C-0421", name: "Sokha Chan",  product: "Micro Loan (ML)",  amount: 1500,  term: 6,  rate: 13.5, score: 712, branch: "Phnom Penh — Central",  range: "$1,500",  sent: "Nov 4, 2025",  officer: "Sophea K.",  status: "Approved",
     restructureRequest: {
       requestedAt: "2026-05-18",
       reason: "Repayment deadline overlaps with my term-end school fees. I'd like a slightly longer term so monthly amounts are easier.",
@@ -36,9 +36,9 @@ export const APPLICATIONS: Application[] = [
       phone: "+855 12 345 678",
     },
   },
-  { id: "APP-10294", cid: "C-0422", name: "Dara Meas",   product: "SME Micro", amount: 8000,  term: 18, rate: 16.0, score: 684, branch: "Siem Reap",             range: "$8,000",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
+  { id: "APP-10294", cid: "C-0422", name: "Dara Meas",   product: "Small Business Loan (SBL)", amount: 8000,  term: 18, rate: 16.0, score: 684, branch: "Siem Reap",             range: "$8,000",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
   {
-    id: "APP-10295", cid: "C-0424", name: "Pisey Ros",   product: "Auto",      amount: 15000, term: 36, rate: 11.5, score: 758, branch: "Battambang",            range: "$15,000", sent: "Apr 20, 2026", officer: "Sophea K.",  status: "Approved",
+    id: "APP-10295", cid: "C-0424", name: "Pisey Ros",   product: "Small & Medium Enterprise (SME)", amount: 15000, term: 36, rate: 11.5, score: 758, branch: "Battambang",            range: "$15,000", sent: "Apr 20, 2026", officer: "Sophea K.",  status: "Approved",
     restructureRequest: {
       requestedAt: "2026-04-23",
       reason: "Recent medical expenses have tightened my monthly cash flow. I'd like to lower my installment until the situation improves.",
@@ -46,10 +46,10 @@ export const APPLICATIONS: Application[] = [
       phone: "+855 96 221 004",
     },
   },
-  { id: "APP-10296", cid: "C-0423", name: "Vichet Lim",  product: "Personal",  amount: 1200,  term: 6,  rate: 13.0, score: 745, branch: "Phnom Penh — Toul Kork",range: "$1,200",  sent: "Apr 19, 2026", officer: "Sophea K.",  status: "Progress" },
-  { id: "APP-10297", cid: "C-0426", name: "Bopha Sok",   product: "Personal",  amount: 3000,  term: 12, rate: 14.5, score: 698, branch: "Kampong Cham",          range: "$3,000",  sent: "Apr 18, 2026", officer: "Unassigned", status: "Progress" },
+  { id: "APP-10296", cid: "C-0423", name: "Vichet Lim",  product: "Micro Loan (ML)",  amount: 1200,  term: 6,  rate: 13.0, score: 745, branch: "Phnom Penh — Toul Kork",range: "$1,200",  sent: "Apr 19, 2026", officer: "Sophea K.",  status: "Progress" },
+  { id: "APP-10297", cid: "C-0426", name: "Bopha Sok",   product: "Micro Loan (ML)",  amount: 3000,  term: 12, rate: 14.5, score: 698, branch: "Kampong Cham",          range: "$3,000",  sent: "Apr 18, 2026", officer: "Unassigned", status: "Progress" },
   {
-    id: "APP-10298", cid: "C-0427", name: "Rithy Pen",   product: "SME Micro", amount: 12000, term: 24, rate: 15.5, score: 720, branch: "Siem Reap",             range: "$12,000", sent: "Apr 17, 2026", officer: "Sophea K.",  status: "Approved",
+    id: "APP-10298", cid: "C-0427", name: "Rithy Pen",   product: "Small Business Loan (SBL)", amount: 12000, term: 24, rate: 15.5, score: 720, branch: "Siem Reap",             range: "$12,000", sent: "Apr 17, 2026", officer: "Sophea K.",  status: "Approved",
     restructureRequest: {
       requestedAt: "2026-04-22",
       reason: "Business slow-down this quarter — need a temporary grace period before resuming full installments.",
@@ -57,7 +57,7 @@ export const APPLICATIONS: Application[] = [
       phone: "+855 92 118 006",
     },
   },
-  { id: "APP-10299", cid: "C-0425", name: "Narith Kim",  product: "Agri",      amount: 4000,  term: 12, rate: 15.0, score: 640, branch: "Phnom Penh — Central",  range: "$4,000",  sent: "Apr 16, 2026", officer: "Laybun N.",  status: "Rejected" },
+  { id: "APP-10299", cid: "C-0425", name: "Narith Kim",  product: "Micro Loan (ML)",  amount: 4000,  term: 12, rate: 15.0, score: 640, branch: "Phnom Penh — Central",  range: "$4,000",  sent: "Apr 16, 2026", officer: "Laybun N.",  status: "Rejected" },
 ];
 
 export const CHART_DATA: { label: string; value: number; highlight?: boolean }[] = [
@@ -113,6 +113,77 @@ export const MWL_COUNTRIES: { code: MwlCountry; name: string; flag: string }[] =
   { code: "SG", name: "Singapore", flag: "🇸🇬" },
 ];
 
+/** Common overseas-destination name → ISO 3166-1 alpha-2 code lookup.
+ *  Used to auto-derive the short "KR / JP / SG"-style badge for new MWL
+ *  sub-products from a free-form country name typed by an admin. */
+const ISO_BY_NAME: Record<string, string> = {
+  // East / Southeast Asia
+  KOREA: "KR", "SOUTH KOREA": "KR", "REPUBLIC OF KOREA": "KR",
+  JAPAN: "JP",
+  SINGAPORE: "SG",
+  MALAYSIA: "MY",
+  THAILAND: "TH",
+  VIETNAM: "VN", "VIET NAM": "VN",
+  INDONESIA: "ID",
+  CHINA: "CN",
+  "HONG KONG": "HK",
+  TAIWAN: "TW",
+  PHILIPPINES: "PH",
+  BRUNEI: "BN",
+  LAOS: "LA",
+  MYANMAR: "MM",
+  // South Asia
+  INDIA: "IN",
+  PAKISTAN: "PK",
+  BANGLADESH: "BD",
+  "SRI LANKA": "LK",
+  NEPAL: "NP",
+  // Oceania
+  AUSTRALIA: "AU",
+  "NEW ZEALAND": "NZ",
+  // Middle East
+  "SAUDI ARABIA": "SA",
+  UAE: "AE", "UNITED ARAB EMIRATES": "AE",
+  QATAR: "QA",
+  KUWAIT: "KW",
+  BAHRAIN: "BH",
+  OMAN: "OM",
+  JORDAN: "JO",
+  ISRAEL: "IL",
+  LEBANON: "LB",
+  IRAQ: "IQ",
+  IRAN: "IR",
+  YEMEN: "YE",
+  // Europe / Americas (common overseas-worker destinations)
+  USA: "US", "UNITED STATES": "US", AMERICA: "US",
+  CANADA: "CA",
+  UK: "GB", "UNITED KINGDOM": "GB", BRITAIN: "GB", ENGLAND: "GB",
+  FRANCE: "FR",
+  GERMANY: "DE",
+  ITALY: "IT",
+  SPAIN: "ES",
+  PORTUGAL: "PT",
+  NETHERLANDS: "NL", HOLLAND: "NL",
+  BELGIUM: "BE",
+  SWEDEN: "SE",
+  NORWAY: "NO",
+  DENMARK: "DK",
+  FINLAND: "FI",
+  RUSSIA: "RU",
+};
+
+/** Given a free-form country name, return a 2-character uppercase code that
+ *  matches the existing "KR / JP / SG" badge convention.
+ *  Falls back to the first two letters of the input when the name is unknown. */
+export function countryCodeFor(name: string): string {
+  const key = name.trim().toUpperCase();
+  if (!key) return "??";
+  if (ISO_BY_NAME[key]) return ISO_BY_NAME[key];
+  // Fallback: first two A–Z letters of the input (e.g. "Arab" → "AR").
+  const letters = key.replace(/[^A-Z]/g, "").slice(0, 2);
+  return letters.length === 2 ? letters : (letters + "X").slice(0, 2);
+}
+
 export type LoanProduct = {
   id: string;
   name: string;
@@ -135,116 +206,101 @@ export type LoanProduct = {
   earlyPayoff: boolean;    // is early payoff allowed
   /** Product kind — defaults to "non-mwl" in legacy records. */
   kind?: ProductKind;
-  /** For mwl-sub: which destination country this variant targets. */
-  country?: MwlCountry;
+  /** For mwl-sub: destination country. May be a legacy MWL_COUNTRIES code
+   *  (KR / JP / SG → flag lookup works) or a free-form name added by admins. */
+  country?: string;
   /** For mwl-sub: the parent's product id. */
   parentId?: string;
 };
 
 export const PRODUCTS: LoanProduct[] = [
+  /* ───────── NHFC product catalogue (per reference sheet) ───────── */
   {
-    id: "LP-01",
-    name: "Personal Loan",
-    min: 500, max: 5000,
-    rateMin: 13.0, rateMax: 15.5,
-    termMin: 6, termMax: 24,
-    status: "active", loans: 412,
+    id: "LP-07",
+    name: "Micro Loan (ML)",
+    min: 100, max: 3000,
+    rateMin: 14.0, rateMax: 18.0,
+    termMin: 6, termMax: 48,
+    status: "active", loans: 0,
     description:
-      "A flexible unsecured loan for personal needs — emergencies, education, " +
-      "home improvement, or family events. No collateral required for qualified " +
-      "applicants.",
+      "Micro Loan (ML) is designed to support low-income people in rural and urban " +
+      "areas through micro / small businesses and agricultural activities, offered " +
+      "in both Khmer Riel and US Dollars.",
     eligibility:
-      "• Cambodian citizen or permanent resident\n" +
-      "• Age between 21 and 60\n" +
-      "• Minimum 6 months at current employer\n" +
-      "• Monthly income at least $300",
+      "• Age 18 to 65 years old\n" +
+      "• Permanent residential address at NHFC's operating area\n" +
+      "• Stable and verifiable income source\n" +
+      "• Hard or soft title collateral",
     requiredDocs:
-      "National ID\nPayslip (last 3 months)\nBank statement (last 6 months)\nUtility bill",
+      "National ID\nFamily / residence book\nProof of income / business activity\nLand title (soft or hard)",
     processingFee: 1.5,
     latePenalty: 2.0,
     earlyPayoff: true,
   },
   {
-    id: "LP-02",
-    name: "SME Micro Loan",
-    min: 2000, max: 25000,
-    rateMin: 15.0, rateMax: 17.0,
-    termMin: 6, termMax: 36,
-    status: "active", loans: 198,
+    id: "LP-08",
+    name: "Small Business Loan (SBL)",
+    min: 1000, max: 30000,
+    rateMin: 12.0, rateMax: 16.0,
+    termMin: 6, termMax: 96,
+    status: "active", loans: 0,
     description:
-      "Working-capital and growth financing for small and medium enterprises. " +
-      "Designed for businesses needing inventory, equipment, or short-term " +
-      "operating funds.",
+      "Small Business Loan (SBL) supports clients in starting or expanding micro / " +
+      "small businesses for improved profitability and sustainable growth. Provided " +
+      "to clients in both rural and urban areas, offered in US Dollars and Khmer Riel.",
     eligibility:
-      "• Business operating for at least 12 months\n" +
-      "• Valid business license\n" +
-      "• Monthly revenue at least $1,500\n" +
-      "• Owner age between 25 and 65",
+      "• Age 18 to 65 years old\n" +
+      "• Permanent residential address at NHFC's operating area\n" +
+      "• Stable and verifiable income source\n" +
+      "• Hard or soft title collateral",
     requiredDocs:
-      "National ID\nBusiness License\nBank statement (last 12 months)\nIncome tax filing",
-    processingFee: 2.0,
-    latePenalty: 2.5,
+      "National ID\nBusiness license / activity proof\nBank statement (last 12 months)\nLand title (soft or hard)",
+    processingFee: 1.5,
+    latePenalty: 2.0,
     earlyPayoff: true,
   },
   {
-    id: "LP-03",
-    name: "Auto Loan",
-    min: 5000, max: 40000,
-    rateMin: 10.5, rateMax: 12.5,
-    termMin: 12, termMax: 60,
-    status: "active", loans: 67,
+    id: "LP-09",
+    name: "Small & Medium Enterprise (SME)",
+    min: 5000, max: 100000,
+    rateMin: 11.0, rateMax: 15.0,
+    termMin: 6, termMax: 120,
+    status: "active", loans: 0,
     description:
-      "Vehicle financing for new or pre-owned cars and motorcycles. " +
-      "The vehicle title serves as collateral until the loan is fully repaid.",
+      "SME Loan supports existing and new clients or entrepreneurs in establishing " +
+      "new businesses or expanding existing ones, offered in both US Dollars and " +
+      "Khmer Riel.",
     eligibility:
-      "• Age 21 to 65\n" +
-      "• Stable employment, minimum 1 year\n" +
-      "• Down payment: at least 20% of vehicle price\n" +
-      "• Valid driver's license",
+      "• Age 18 to 65 years old\n" +
+      "• Permanent residential address at NHFC's operating area\n" +
+      "• Stable and verifiable income source\n" +
+      "• Hard or soft title collateral",
     requiredDocs:
-      "National ID\nDriver's license\nVehicle invoice/proforma\nPayslip (last 3 months)",
+      "National ID\nBusiness license & financials\nBank statement (last 12 months)\nLand title (soft or hard)",
+    processingFee: 1.5,
+    latePenalty: 2.0,
+    earlyPayoff: true,
+  },
+  {
+    id: "LP-10",
+    name: "Housing Loan (HL)",
+    min: 10000, max: 300000,
+    rateMin: 9.0, rateMax: 13.0,
+    termMin: 12, termMax: 240,
+    status: "active", loans: 0,
+    description:
+      "Housing Loan (HL) supports affordable housing in response to population growth " +
+      "and real-estate market demand. A long-term loan provided for house purchase, " +
+      "offered in both US Dollars and Khmer Riel.",
+    eligibility:
+      "• Age 18 to 65 years old\n" +
+      "• Permanent residential address at NHFC's operating area\n" +
+      "• Stable and verifiable income source\n" +
+      "• Hard or soft title collateral",
+    requiredDocs:
+      "National ID\nProof of income\nProperty sale & purchase agreement\nLand title (soft or hard)",
     processingFee: 1.0,
     latePenalty: 2.0,
-    earlyPayoff: true,
-  },
-  {
-    id: "LP-04",
-    name: "Agri Loan",
-    min: 1000, max: 8000,
-    rateMin: 14.0, rateMax: 16.0,
-    termMin: 6, termMax: 18,
-    status: "active", loans: 89,
-    description:
-      "Seasonal financing for farmers — seeds, fertiliser, livestock, or " +
-      "equipment. Flexible repayment aligned with harvest cycles.",
-    eligibility:
-      "• Active farmer or agricultural worker\n" +
-      "• Proof of land ownership or lease\n" +
-      "• Minimum 1 year of farming experience",
-    requiredDocs:
-      "National ID\nLand title or lease agreement\nFarming activity proof",
-    processingFee: 1.5,
-    latePenalty: 1.5,
-    earlyPayoff: true,
-  },
-  {
-    id: "LP-05",
-    name: "Education Loan",
-    min: 1500, max: 12000,
-    rateMin: 9.5, rateMax: 11.0,
-    termMin: 12, termMax: 48,
-    status: "draft", loans: 0,
-    description:
-      "Affordable financing for tuition, textbooks, and living expenses. " +
-      "Subsidised rate for students with strong academic standing.",
-    eligibility:
-      "• Enrolled in an accredited institution\n" +
-      "• Co-signer required (parent or guardian)\n" +
-      "• GPA 2.5 or higher",
-    requiredDocs:
-      "National ID\nProof of enrollment\nCo-signer documents\nAcademic transcript",
-    processingFee: 0.5,
-    latePenalty: 1.0,
     earlyPayoff: true,
   },
 
@@ -274,7 +330,7 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-06-KR",
-    name: "MWL — Korea (EPS)",
+    name: "MWL — Korea",
     min: 1000, max: 8000,
     rateMin: 12.0, rateMax: 13.5,
     termMin: 12, termMax: 36,
@@ -298,7 +354,7 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-06-JP",
-    name: "MWL — Japan (TITP / SSW)",
+    name: "MWL — Japan",
     min: 800, max: 7000,
     rateMin: 12.5, rateMax: 14.0,
     termMin: 12, termMax: 36,
@@ -322,7 +378,7 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-06-SG",
-    name: "MWL — Singapore (WP)",
+    name: "MWL — Singapore",
     min: 500, max: 5000,
     rateMin: 13.0, rateMax: 14.0,
     termMin: 6, termMax: 24,
@@ -350,7 +406,7 @@ export const CONSULTATIONS = [
   {
     id: "RC-221",
     customer: "Sokha Chan",
-    topic: "Personal loan options",
+    topic: "Micro Loan options",
     requested: "2026-04-21 09:12",
     status: "open",
     officer: "Unassigned",
@@ -375,14 +431,14 @@ export const CONSULTATIONS = [
   {
     id: "RC-219",
     customer: "Pisey Ros",
-    topic: "Auto refinance rates",
+    topic: "Housing Loan inquiry",
     requested: "2026-04-19 11:45",
     status: "closed",
     officer: "Sophea K.",
     preferredBranch: "Battambang",
     preferredDate: "Apr 25, 2026",
     preferredTime: "09:00",
-    note: "I have an existing auto loan from another bank (~$11,500 balance) and want to see if WeLoan can offer a lower rate.",
+    note: "I'm looking at a $90,000 house purchase and want to understand the down-payment, term, and rate options for the Housing Loan.",
   },
   {
     id: "RC-218",
@@ -394,7 +450,7 @@ export const CONSULTATIONS = [
     preferredBranch: "Phnom Penh — Central",
     preferredDate: "Apr 28, 2026",
     preferredTime: "14:30",
-    note: "First-time applying for a loan — would like to know what documents I need to bring and how long the approval usually takes for a small personal loan.",
+    note: "First-time applying for a loan — would like to know what documents I need to bring and how long the approval usually takes for a small Micro Loan.",
   },
 ];
 
@@ -507,11 +563,11 @@ export const POSTS: Post[] = [
   },
   {
     id: "P-011",
-    title: "New Education Loan launching soon",
+    title: "New Housing Loan launching soon",
     category: "news",
-    excerpt: "Subsidised rate for university and vocational students. Launching May 1.",
+    excerpt: "Long-term financing for home purchase, up to $300,000. Launching May 1.",
     body:
-      "We're launching the **Education Loan** product on May 1, 2026.\n\nKey features:\n- Rate from **9.5% APR**\n- Term up to 48 months\n- Co-signer required\n\nVisit any branch from May 1 to apply.",
+      "We're launching the **Housing Loan (HL)** product on May 1, 2026.\n\nKey features:\n- Rate from **9% APR**\n- Term up to 240 months (20 years)\n- Hard or soft title collateral required\n- For house purchase in NHFC's operating areas\n\nVisit any branch from May 1 to apply.",
     thumbnail: "",
     author: "Admin",
     status: "Scheduled",
@@ -537,7 +593,7 @@ export const POSTS: Post[] = [
     category: "promotion",
     excerpt: "Customers get 0.5% off on new loans during their birthday month.",
     body:
-      "🎂 Celebrate your birthday with us — get **0.5% off** your APR on any new loan, valid for the entire month of your birthday.\n\n- Available on Personal, SME Micro, and Auto loans\n- Stack with referral rewards\n- Apply in-app or at any branch",
+      "🎂 Celebrate your birthday with us — get **0.5% off** your APR on any new loan, valid for the entire month of your birthday.\n\n- Available on Micro Loan (ML), Small Business Loan (SBL), and SME loans\n- Stack with referral rewards\n- Apply in-app or at any branch",
     thumbnail: "",
     author: "Sophea K.",
     status: "Draft",

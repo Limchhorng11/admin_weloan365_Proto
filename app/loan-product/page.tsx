@@ -6,8 +6,8 @@ import { StatusBadge } from "@/components/status-badge";
 import {
   PRODUCTS,
   MWL_COUNTRIES,
+  countryCodeFor,
   type LoanProduct,
-  type MwlCountry,
 } from "@/lib/data";
 import { useRole } from "@/lib/role-context";
 import { cn } from "@/lib/utils";
@@ -26,7 +26,6 @@ import {
   Files,
   Pencil,
   Globe,
-  CornerDownRight,
 } from "lucide-react";
 
 type StatusFilter = "all" | "active" | "draft";
@@ -57,6 +56,7 @@ export default function ProductsPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
   const detail = detailId ? products.find(p => p.id === detailId) ?? null : null;
@@ -103,8 +103,23 @@ export default function ProductsPage() {
   // and one sub-product per selected country in a single call).
   const handleSaveProduct = (next: LoanProduct | LoanProduct[]) => {
     const list = Array.isArray(next) ? next : [next];
-    setProducts(prev => [...list, ...prev]);
+    setProducts(prev => {
+      // Replace by id when it already exists (edit flow), otherwise prepend (create flow).
+      const existingIds = new Set(prev.map(p => p.id));
+      const updates = list.filter(p => existingIds.has(p.id));
+      const inserts = list.filter(p => !existingIds.has(p.id));
+      const merged = prev.map(p => updates.find(u => u.id === p.id) ?? p);
+      return [...inserts, ...merged];
+    });
     setCreateOpen(false);
+    setEditingId(null);
+  };
+
+  // Edit click on the detail modal → close detail, open create-modal in edit mode.
+  const handleEdit = (p: LoanProduct) => {
+    setDetailId(null);
+    setEditingId(p.id);
+    setCreateOpen(true);
   };
 
   const handleUpdateStatus = (id: string, next: "active" | "draft") => {
@@ -225,60 +240,73 @@ export default function ProductsPage() {
             <tbody>
               {sortForGrouping(filtered, products).map(p => {
                 const isParent = p.kind === "mwl-parent";
-                const isSub = p.kind === "mwl-sub";
-                const country = isSub
+                const isSub    = p.kind === "mwl-sub";
+                const country  = isSub
                   ? MWL_COUNTRIES.find(c => c.code === p.country)
                   : undefined;
-                // MWL sub-products: count siblings to show "X countries" on parent.
                 const childCount = isParent
                   ? products.filter(x => x.parentId === p.id).length
                   : 0;
+
+                // Cell-level tone: sub-rows read as nested data, lighter weight.
+                const cellTone = isSub ? "text-gray-600" : "text-gray-700";
+
                 return (
                   <tr
                     key={p.id}
-                    className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60"
+                    className={cn(
+                      "border-b border-gray-100 last:border-0 hover:bg-gray-50/60",
+                      isSub && "bg-gray-50/30"
+                    )}
                   >
-                    <td className="px-6 py-3.5">
-                      <div className="flex items-center gap-2">
+                    {/* Name cell — indented + tree connector for sub-products */}
+                    <td className={cn("py-3", isSub ? "pl-12 pr-6" : "px-6")}>
+                      <div className="flex items-center gap-2 min-w-0">
                         {isSub && (
-                          <CornerDownRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                          <span
+                            className="text-gray-300 select-none flex-shrink-0"
+                            aria-hidden="true"
+                          >
+                            └
+                          </span>
                         )}
-                        {country && <span className="text-base">{country.flag}</span>}
+                        {isSub && p.country && (
+                          <span
+                            className="text-[10px] font-medium uppercase tracking-wider text-gray-500 flex-shrink-0"
+                            title={country?.name ?? p.country}
+                          >
+                            {p.country}
+                          </span>
+                        )}
                         <span
                           className={cn(
-                            "font-medium text-gray-900",
-                            isSub && "ml-0",
+                            "truncate",
+                            isSub ? "text-gray-700 text-sm" : "font-medium text-gray-900"
                           )}
                         >
                           {p.name}
                         </span>
-                        {isParent && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wider border border-violet-100">
-                            <Globe className="w-2.5 h-2.5" />
-                            MWL · {childCount} {childCount === 1 ? "country" : "countries"}
-                          </span>
-                        )}
-                        {isSub && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wider border border-violet-100">
-                            MWL sub
+                        {isParent && childCount > 0 && (
+                          <span className="text-[11px] text-gray-400">
+                            · {childCount} {childCount === 1 ? "country" : "countries"}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-3.5 text-gray-700">
+                    <td className={cn("px-6 py-3", cellTone)}>
                       ${p.min.toLocaleString()} – ${p.max.toLocaleString()}
                     </td>
-                    <td className="px-6 py-3.5 text-gray-700">
+                    <td className={cn("px-6 py-3", cellTone)}>
                       {p.rateMin}% – {p.rateMax}%
                     </td>
-                    <td className="px-6 py-3.5 text-gray-700">
+                    <td className={cn("px-6 py-3", cellTone)}>
                       {p.termMin}–{p.termMax}m
                     </td>
-                    <td className="px-6 py-3.5 text-gray-700">{p.loans}</td>
-                    <td className="px-6 py-3.5">
+                    <td className={cn("px-6 py-3", cellTone)}>{p.loans}</td>
+                    <td className="px-6 py-3">
                       <StatusBadge status={p.status === "active" ? "Active" : "Draft"} />
                     </td>
-                    <td className="px-6 py-3.5 text-right">
+                    <td className="px-6 py-3 text-right">
                       <button
                         onClick={() => setDetailId(p.id)}
                         className="text-xs text-brand-600 hover:underline font-medium"
@@ -297,7 +325,11 @@ export default function ProductsPage() {
       <CreateProductModal
         open={createOpen}
         nextId={nextId}
-        onClose={() => setCreateOpen(false)}
+        editing={editingId ? products.find(p => p.id === editingId) ?? null : null}
+        onClose={() => {
+          setCreateOpen(false);
+          setEditingId(null);
+        }}
         onSave={handleSaveProduct}
       />
 
@@ -306,6 +338,7 @@ export default function ProductsPage() {
         onClose={() => setDetailId(null)}
         canEdit={mayEdit}
         onUpdateStatus={handleUpdateStatus}
+        onEdit={handleEdit}
       />
     </div>
   );
@@ -552,23 +585,29 @@ function FilterPopover({
   );
 }
 
-/* ---------- create product modal (CMS-style) ---------- */
+/* ---------- create / edit product modal (CMS-style) ---------- */
 
 function CreateProductModal({
   open,
   nextId,
+  editing,
   onClose,
   onSave,
 }: {
   open: boolean;
   nextId: string;
+  /** When provided, modal opens in edit mode and prefills from this product. */
+  editing?: LoanProduct | null;
   onClose: () => void;
   onSave: (p: LoanProduct | LoanProduct[]) => void;
 }) {
-  // Tab: Non-MWL (default) shows the standard form; MWL adds a country
-  // multi-select and saves one parent + one sub-product per chosen country.
+  // Tab: Non-MWL (default) shows the standard form; MWL adds an
+  // open-ended list of destination countries and saves one parent +
+  // one sub-product per added country.
   const [kind, setKind] = useState<"non-mwl" | "mwl">("non-mwl");
-  const [countries, setCountries] = useState<MwlCountry[]>([]);
+  const [countries, setCountries] = useState<string[]>([]);
+  const [countryInput, setCountryInput] = useState("");
+  const isEdit = !!editing;
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -579,17 +618,38 @@ function CreateProductModal({
   const [termMin, setTermMin] = useState("");
   const [termMax, setTermMax] = useState("");
   const [eligibility, setEligibility] = useState("");
-  const [requiredDocs, setRequiredDocs] = useState("");
+  const [benefits, setBenefits] = useState("");
   const [processingFee, setProcessingFee] = useState("1.5");
   const [latePenalty, setLatePenalty] = useState("2.0");
-  const [earlyPayoff, setEarlyPayoff] = useState(true);
   const [status, setStatus] = useState<"active" | "draft">("draft");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (editing) {
+      // Edit mode — prefill every field from the existing product.
+      setKind(editing.kind === "non-mwl" || !editing.kind ? "non-mwl" : "mwl");
+      setCountries([]); // editing a single product, not adding new sub-products
+      setCountryInput("");
+      setName(editing.name);
+      setDescription(editing.description);
+      setMin(String(editing.min));
+      setMax(String(editing.max));
+      setRateMin(String(editing.rateMin));
+      setRateMax(String(editing.rateMax));
+      setTermMin(String(editing.termMin));
+      setTermMax(String(editing.termMax));
+      setEligibility(editing.eligibility);
+      setBenefits(editing.requiredDocs);
+      setProcessingFee(String(editing.processingFee));
+      setLatePenalty(String(editing.latePenalty));
+      setStatus(editing.status);
+      setError(null);
+    } else {
+      // Create mode — empty defaults.
       setKind("non-mwl");
       setCountries([]);
+      setCountryInput("");
       setName("");
       setDescription("");
       setMin("");
@@ -599,14 +659,13 @@ function CreateProductModal({
       setTermMin("");
       setTermMax("");
       setEligibility("");
-      setRequiredDocs("");
+      setBenefits("");
       setProcessingFee("1.5");
       setLatePenalty("2.0");
-      setEarlyPayoff(true);
       setStatus("draft");
       setError(null);
     }
-  }, [open]);
+  }, [open, editing]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -618,8 +677,16 @@ function CreateProductModal({
 
   if (!open) return null;
 
+  // For MWL mode we never create a new parent — new entries attach to the
+  // existing Migrant Worker Loan family. Find that parent dynamically so the
+  // form keeps working if the demo data is reshuffled.
+  const mwlParent = PRODUCTS.find(p => p.kind === "mwl-parent");
+
   const validate = (): string | null => {
-    if (!name.trim()) return "Product name is required.";
+    // Name is required in all modes that show the field — i.e. anything except
+    // create-MWL (which derives the name from the parent and the country).
+    if ((isEdit || kind === "non-mwl") && !name.trim())
+      return "Product name is required.";
     if (!description.trim()) return "Description is required.";
     const minN = +min, maxN = +max;
     if (!minN || !maxN || minN >= maxN) return "Amount range must be valid (min < max).";
@@ -627,8 +694,11 @@ function CreateProductModal({
     if (rMinN < 0 || rMaxN <= 0 || rMinN > rMaxN) return "Rate range must be valid.";
     const tMinN = +termMin, tMaxN = +termMax;
     if (!tMinN || !tMaxN || tMinN > tMaxN) return "Term range must be valid.";
-    if (kind === "mwl" && countries.length === 0)
-      return "Pick at least one destination country for this MWL product.";
+    if (!isEdit && kind === "mwl") {
+      if (!mwlParent) return "No Migrant Worker Loan parent found to attach to.";
+      if (countries.length === 0)
+        return "Add at least one destination country for this MWL sub-product.";
+    }
     return null;
   };
 
@@ -644,14 +714,29 @@ function CreateProductModal({
       termMin: +termMin,
       termMax: +termMax,
       status: (publish ? "active" : "draft") as "active" | "draft",
-      loans: 0,
+      loans: editing?.loans ?? 0,
       description: description.trim(),
       eligibility: eligibility.trim(),
-      requiredDocs: requiredDocs.trim(),
+      // Free-form "Benefits" replaces the older "Required documents" field.
+      // It's still persisted on `requiredDocs` to avoid a breaking schema change.
+      requiredDocs: benefits.trim(),
       processingFee: +processingFee,
       latePenalty: +latePenalty,
-      earlyPayoff,
+      // Early payoff is no longer offered — default to true so existing readers
+      // that check this flag keep their current behavior.
+      earlyPayoff: true,
     };
+
+    // EDIT mode — replace the existing product, keep its id/kind/parent/country.
+    if (editing) {
+      const updated: LoanProduct = {
+        ...editing,
+        ...base,
+        name: name.trim(),
+      };
+      onSave(updated);
+      return;
+    }
 
     if (kind === "non-mwl") {
       const product: LoanProduct = {
@@ -664,32 +749,45 @@ function CreateProductModal({
       return;
     }
 
-    // MWL → one parent product + one sub-product per selected country.
-    const parentName = name.trim();
-    const parent: LoanProduct = {
-      ...base,
-      id: nextId,
-      name: parentName,
-      kind: "mwl-parent",
-    };
-    const subs: LoanProduct[] = countries.map(code => {
-      const meta = MWL_COUNTRIES.find(c => c.code === code)!;
+    // MWL → no new parent. Attach one sub-product per added country to the
+    // existing Migrant Worker Loan family.
+    if (!mwlParent) return; // validate() already guards this; defensive only.
+    const subs: LoanProduct[] = countries.map((country, idx) => {
+      // Auto-derive the 2-letter overseas country code (KR/JP/SG-style).
+      const code = countryCodeFor(country);
       return {
         ...base,
-        id: `${nextId}-${code}`,
-        name: `${parentName} — ${meta.name}`,
+        // Generate distinct IDs so multiple added countries don't collide
+        // with each other if the same nextId is reused on save.
+        id: `${nextId}-${code}-${idx + 1}`,
+        // Use the short "MWL" prefix to match existing sub-products
+        // (MWL — Korea, MWL — Japan, …) rather than the parent's full name.
+        name: `MWL — ${country}`,
         kind: "mwl-sub",
+        // Store the 2-letter code in the `country` field so the table badge
+        // renders consistently regardless of whether the country existed in
+        // MWL_COUNTRIES or was added free-form by an admin.
         country: code,
-        parentId: nextId,
+        parentId: mwlParent.id,
       };
     });
-    onSave([parent, ...subs]);
+    onSave(subs);
   };
 
-  const toggleCountry = (code: MwlCountry) =>
-    setCountries(prev =>
-      prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code],
-    );
+  // Add the typed country (deduped, trimmed, max ~40 chars).
+  const commitCountry = () => {
+    const v = countryInput.trim().slice(0, 40);
+    if (!v) return;
+    if (countries.some(c => c.toLowerCase() === v.toLowerCase())) {
+      setCountryInput("");
+      return;
+    }
+    setCountries(prev => [...prev, v]);
+    setCountryInput("");
+  };
+
+  const removeCountry = (name: string) =>
+    setCountries(prev => prev.filter(c => c !== name));
 
   return (
     <div
@@ -702,27 +800,28 @@ function CreateProductModal({
       >
         <div className="px-6 py-4 border-b border-gray-200 flex items-start justify-between">
           <div>
-            <div className="text-base font-semibold text-gray-900">Create new loan product</div>
+            <div className="text-base font-semibold text-gray-900">
+              {isEdit ? "Edit loan product" : "Create new loan product"}
+            </div>
             <div className="text-xs text-gray-500 mt-0.5">
-              {kind === "non-mwl" ? (
+              {isEdit ? (
+                <>
+                  Editing{" "}
+                  <span className="font-mono text-gray-700">{editing!.id}</span>{" "}
+                  · changes save in place.
+                </>
+              ) : kind === "non-mwl" ? (
                 <>
                   New product will be created with ID{" "}
                   <span className="font-mono text-gray-700">{nextId}</span>.
                 </>
               ) : (
                 <>
-                  New MWL parent with ID{" "}
-                  <span className="font-mono text-gray-700">{nextId}</span>
-                  {countries.length > 0 && (
-                    <>
-                      {" "}+{" "}
-                      {countries
-                        .map(c => `${nextId}-${c}`)
-                        .join(", ")}{" "}
-                      sub-product
-                      {countries.length === 1 ? "" : "s"}
-                    </>
-                  )}
+                  New MWL sub-product
+                  {countries.length > 1 ? "s" : ""} will attach to{" "}
+                  <span className="font-medium text-gray-700">
+                    {mwlParent?.name ?? "Migrant Worker Loan"}
+                  </span>
                   .
                 </>
               )}
@@ -737,7 +836,8 @@ function CreateProductModal({
           </button>
         </div>
 
-        {/* Product-kind tabs */}
+        {/* Product-kind tabs — hidden in edit mode (kind is immutable). */}
+        {!isEdit && (
         <div className="px-6 pt-4 border-b border-gray-200 flex gap-1">
           {(
             [
@@ -766,6 +866,7 @@ function CreateProductModal({
             );
           })}
         </div>
+        )}
 
         <div className="flex-1 overflow-y-auto scrollbar-thin p-6 space-y-6">
           {error && (
@@ -774,65 +875,89 @@ function CreateProductModal({
             </div>
           )}
 
-          {/* MWL-only: country picker — shown first since it drives how many
-              sub-products get created. */}
-          {kind === "mwl" && (
+          {/* MWL-only: free-form destination country list. Admin types a country
+              name and presses Enter (or +) to add it; one sub-product is created
+              under the existing Migrant Worker Loan parent per added country.
+              Hidden in edit mode (countries can't be re-keyed for an existing sub). */}
+          {!isEdit && kind === "mwl" && (
             <Section
               icon={Globe}
               title="Destination countries"
-              hint="One MWL sub-product will be created for each country you pick. They inherit the fields below as defaults and can be edited individually later."
+              hint={`Adds one sub-product to "${mwlParent?.name ?? "Migrant Worker Loan"}" per country. Type a country and press Enter to add.`}
             >
-              <div className="grid grid-cols-3 gap-2">
-                {MWL_COUNTRIES.map(c => {
-                  const checked = countries.includes(c.code);
-                  return (
-                    <button
-                      key={c.code}
-                      type="button"
-                      onClick={() => toggleCountry(c.code)}
-                      className={cn(
-                        "flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-left transition",
-                        checked
-                          ? "border-brand-500 bg-brand-50/60 text-brand-700"
-                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
-                      )}
-                    >
-                      <span className="text-xl leading-none">{c.flag}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold leading-tight">
-                          {c.name}
-                        </div>
-                        <div className="text-[10px] uppercase tracking-wider text-gray-500">
-                          {c.code}
-                        </div>
-                      </div>
-                      <div
-                        className={cn(
-                          "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
-                          checked
-                            ? "bg-brand-600 border-brand-600 text-white"
-                            : "border-gray-300",
-                        )}
-                      >
-                        {checked && <Check className="w-3 h-3" strokeWidth={3} />}
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="flex items-center gap-2">
+                <input
+                  value={countryInput}
+                  onChange={e => setCountryInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitCountry();
+                    }
+                  }}
+                  placeholder="e.g. Korea, Japan, Malaysia…"
+                  className="form-input flex-1"
+                  maxLength={40}
+                />
+                <button
+                  type="button"
+                  onClick={commitCountry}
+                  disabled={!countryInput.trim()}
+                  className={cn(
+                    "px-3 py-2 text-sm font-medium rounded-md border",
+                    countryInput.trim()
+                      ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
+                      : "border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed"
+                  )}
+                >
+                  + Add
+                </button>
               </div>
+
+              {countries.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {countries.map(c => (
+                    <span
+                      key={c}
+                      className="inline-flex items-center gap-1 pl-1.5 pr-1 py-0.5 rounded-full bg-brand-50 text-brand-700 text-xs font-medium border border-brand-100"
+                    >
+                      <span
+                        className="px-1 py-0.5 rounded-sm bg-white/70 text-[10px] font-semibold text-brand-700 uppercase tracking-wider"
+                        title="Auto-generated short code"
+                      >
+                        {countryCodeFor(c)}
+                      </span>
+                      <span>{c}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeCountry(c)}
+                        className="ml-0.5 p-0.5 rounded-full hover:bg-brand-100 text-brand-600"
+                        aria-label={`Remove ${c}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[11px] text-gray-400 italic mt-1">
+                  No countries added yet.
+                </div>
+              )}
 
               {countries.length > 0 && (
                 <div className="mt-3 px-3 py-2 rounded-md bg-violet-50/70 border border-violet-100 text-[11px] text-violet-800 leading-relaxed">
-                  Will create <b>{countries.length + 1}</b> records on save:
-                  the MWL parent <span className="font-mono">{nextId}</span> plus{" "}
-                  {countries.map((c, i) => (
-                    <span key={c}>
-                      <span className="font-mono">
-                        {nextId}-{c}
-                      </span>
-                      {i < countries.length - 1 ? ", " : ""}
-                    </span>
-                  ))}
+                  Will create <b>{countries.length}</b> new sub-product
+                  {countries.length === 1 ? "" : "s"} under{" "}
+                  <span className="font-medium">
+                    {mwlParent?.name ?? "Migrant Worker Loan"}
+                  </span>
+                  {mwlParent?.id && (
+                    <>
+                      {" "}
+                      (<span className="font-mono">{mwlParent.id}</span>)
+                    </>
+                  )}
                   .
                 </div>
               )}
@@ -841,25 +966,26 @@ function CreateProductModal({
 
           {/* Basic info */}
           <Section icon={FileText} title="Basic information" hint="Customer-facing copy. Shown in the mobile app and web portal.">
-            <Field
-              label={kind === "mwl" ? "MWL family name *" : "Product name *"}
-              hint={
-                kind === "mwl"
-                  ? "Country sub-products are named '[Family name] — [Country]'."
-                  : undefined
-              }
-            >
-              <input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder={
-                  kind === "mwl"
-                    ? "e.g. Migrant Worker Loan"
-                    : "e.g. Home Improvement Loan"
-                }
-                className="form-input"
-              />
-            </Field>
+            {isEdit || kind === "non-mwl" ? (
+              <Field label="Product name *">
+                <input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="e.g. Home Improvement Loan"
+                  className="form-input"
+                />
+              </Field>
+            ) : (
+              <div className="text-[11px] text-gray-500">
+                Sub-products will be named{" "}
+                <span className="font-medium text-gray-700">MWL — [Country]</span>
+                {" "}(consistent with existing entries under{" "}
+                <span className="font-medium text-gray-700">
+                  {mwlParent?.name ?? "Migrant Worker Loan"}
+                </span>
+                ).
+              </div>
+            )}
             <Field
               label="Description *"
               hint={`Markdown supported. ${description.length} characters.`}
@@ -902,13 +1028,6 @@ function CreateProductModal({
                 <input type="number" step="0.1" value={latePenalty} onChange={e => setLatePenalty(e.target.value)} className="form-input" />
               </Field>
             </div>
-            <div className="flex items-center justify-between mt-1">
-              <div>
-                <div className="text-sm text-gray-900 font-medium">Allow early payoff</div>
-                <div className="text-xs text-gray-500">Customers can repay early without a penalty.</div>
-              </div>
-              <Toggle checked={earlyPayoff} onChange={setEarlyPayoff} />
-            </div>
           </Section>
 
           {/* Eligibility */}
@@ -922,13 +1041,13 @@ function CreateProductModal({
             />
           </Section>
 
-          {/* Documents */}
-          <Section icon={Files} title="Required documents" hint="One document per line.">
+          {/* Benefits */}
+          <Section icon={Files} title="Benefits" hint="One benefit per line. Shown to customers on the product page.">
             <textarea
               rows={4}
-              value={requiredDocs}
-              onChange={e => setRequiredDocs(e.target.value)}
-              placeholder={"National ID\nPayslip (last 3 months)\nBank statement (last 6 months)"}
+              value={benefits}
+              onChange={e => setBenefits(e.target.value)}
+              placeholder={"Flexible repayment schedule\nNo collateral for qualified applicants\n0.5% birthday discount"}
               className="form-input resize-none"
             />
           </Section>
@@ -949,13 +1068,13 @@ function CreateProductModal({
               onClick={() => submit(false)}
               className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
             >
-              Save as draft
+              {isEdit ? "Save as draft" : "Save as draft"}
             </button>
             <button
               onClick={() => submit(true)}
               className="px-3 py-1.5 text-sm font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700"
             >
-              Publish &amp; activate
+              {isEdit ? "Save changes" : "Publish & activate"}
             </button>
           </div>
         </div>
@@ -1025,30 +1144,6 @@ function Field({
   );
 }
 
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "w-10 h-5 rounded-full relative transition",
-        checked ? "bg-brand-600" : "bg-gray-200"
-      )}
-    >
-      <span
-        className={cn(
-          "absolute top-0.5 left-0.5 bg-white rounded-full h-4 w-4 transition",
-          checked && "translate-x-5"
-        )}
-      />
-    </button>
-  );
-}
 
 /* ---------- detail product modal ---------- */
 
@@ -1057,11 +1152,13 @@ function DetailProductModal({
   onClose,
   canEdit,
   onUpdateStatus,
+  onEdit,
 }: {
   product: LoanProduct | null;
   onClose: () => void;
   canEdit: boolean;
   onUpdateStatus: (id: string, next: "active" | "draft") => void;
+  onEdit: (p: LoanProduct) => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1236,7 +1333,10 @@ function DetailProductModal({
           </button>
           {canEdit && (
             <div className="flex items-center gap-2">
-              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white">
+              <button
+                onClick={() => onEdit(product)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
+              >
                 <Pencil className="w-3.5 h-3.5 text-gray-500" />
                 Edit
               </button>

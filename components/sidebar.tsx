@@ -10,7 +10,6 @@ import {
   Package,
   Newspaper,
   Settings,
-  Search,
   PanelLeft,
   ChevronDown,
   MessageSquareText,
@@ -173,19 +172,6 @@ export function Sidebar() {
           <button className="p-1.5 rounded-md hover:bg-gray-100" title="Collapse">
             <PanelLeft className="w-4 h-4 text-gray-500" />
           </button>
-        </div>
-
-        <div className="px-3 pt-3">
-          <div className="relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
-            <input
-              placeholder="Search..."
-              className="w-full pl-8 pr-8 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
-            <kbd className="absolute right-2 top-1.5 text-[11px] text-gray-400 bg-white border border-gray-200 rounded px-1">
-              /
-            </kbd>
-          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-3 scrollbar-thin">
