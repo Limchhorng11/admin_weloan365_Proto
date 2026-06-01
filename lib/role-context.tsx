@@ -16,13 +16,10 @@ const RoleContext = createContext<RoleContextValue | null>(null);
 
 /** Pick a representative staff member to show as the "logged-in user" for each role. */
 const ROLE_TO_USER: Record<string, string> = {
-  admin:          "Kosal M.",
-  branch_manager: "Ratanak L.",
-  senior_co:      "Sophea K.",
-  co:             "Laybun N.",
-  approval:       "Mengsrun H.",
-  cashier:        "Pisey C.",
-  compliance:     "Sreyneang P.",
+  admin:            "Kosal M.",
+  senior_officer:   "Sophea K.",
+  credit_officer:   "Laybun N.",
+  customer_service: "Pisey C.",
 };
 
 export function RoleProvider({ children }: { children: ReactNode }) {

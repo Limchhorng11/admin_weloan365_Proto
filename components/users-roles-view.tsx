@@ -20,6 +20,8 @@ import {
   Square,
   X,
   ChevronDown,
+  Mail,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
@@ -320,19 +322,37 @@ function UserModal({
   const [role, setRole] = useState(user?.role ?? ROLES[0].name);
   const [branch, setBranch] = useState(user?.branch ?? "Phnom Penh");
   const [status, setStatus] = useState<StaffUser["status"]>(user?.status ?? "Active");
+  const [accessMethod, setAccessMethod] = useState<"invite" | "password">("invite");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return setError("Name is required");
     if (!email.trim()) return setError("Email is required");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      return setError("Enter a valid email address");
+
+    // On create, the access method drives the initial status:
+    // an invited user is Pending until they accept; a password-set user is Active.
+    let finalStatus = status;
+    if (!editMode) {
+      if (accessMethod === "password") {
+        if (password.length < 8)
+          return setError("Temporary password must be at least 8 characters");
+        finalStatus = "Active";
+      } else {
+        finalStatus = "Pending";
+      }
+    }
+
     onSave({
       id: user?.id,
       name: name.trim(),
       email: email.trim(),
       role,
       branch: branch.trim(),
-      status,
+      status: finalStatus,
     });
   };
 
@@ -410,28 +430,82 @@ function UserModal({
                 ))}
               </select>
             </div>
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600">Status</label>
-              <div className="mt-1 flex gap-2">
-                {(["Active", "Inactive"] as const).map(s => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setStatus(s)}
-                    className={cn(
-                      "flex-1 px-3 py-2 text-sm rounded-md border transition",
-                      status === s
-                        ? s === "Active"
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30"
-                          : "border-gray-400 bg-gray-50 text-gray-700 ring-1 ring-gray-400/30"
-                        : "border-gray-200 text-gray-700 hover:border-gray-300"
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
+            {editMode ? (
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-600">Status</label>
+                <div className="mt-1 flex gap-2">
+                  {(["Active", "Inactive"] as const).map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setStatus(s)}
+                      className={cn(
+                        "flex-1 px-3 py-2 text-sm rounded-md border transition",
+                        status === s
+                          ? s === "Active"
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30"
+                            : "border-gray-400 bg-gray-50 text-gray-700 ring-1 ring-gray-400/30"
+                          : "border-gray-200 text-gray-700 hover:border-gray-300"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-600">Access</label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  {([
+                    { key: "invite", icon: Mail, label: "Send email invite" },
+                    { key: "password", icon: KeyRound, label: "Set temporary password" },
+                  ] as const).map(opt => {
+                    const Icon = opt.icon;
+                    const active = accessMethod === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setAccessMethod(opt.key)}
+                        className={cn(
+                          "flex items-center gap-2 px-3 py-2 text-sm rounded-md border text-left transition",
+                          active
+                            ? "border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500/30"
+                            : "border-gray-200 text-gray-700 hover:border-gray-300"
+                        )}
+                      >
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        <span className="leading-tight">{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {accessMethod === "invite" ? (
+                  <div className="mt-2 text-[11px] text-gray-500 flex items-start gap-1.5">
+                    <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400" />
+                    <span>
+                      An invitation will be emailed to{" "}
+                      <span className="font-medium text-gray-700">{email.trim() || "the address above"}</span>.
+                      The account stays <span className="font-medium">Pending</span> until they accept and set a password.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="Temporary password (min 8 characters)"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    />
+                    <div className="text-[11px] text-gray-500 mt-1">
+                      The user will be required to change it on first login.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (
@@ -452,7 +526,7 @@ function UserModal({
               type="submit"
               className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
             >
-              {editMode ? "Save changes" : "Add user"}
+              {editMode ? "Save changes" : accessMethod === "invite" ? "Send invite" : "Create user"}
             </button>
           </div>
         </form>
@@ -486,48 +560,37 @@ type RoleTemplate = {
   permissions: string[];
 };
 
+/** Every permission key — keeps the "Full access" template in sync as permissions evolve. */
+const ALL_PERMISSION_KEYS = PERMISSIONS.map(p => p.key);
+
 const TEMPLATES: RoleTemplate[] = [
   {
-    name: "Credit Officer",
-    description: "Onboards customers and submits new loan applications.",
-    stage: "intake",
-    approvalLimit: 0,
-    permissions: ["customer.view", "customer.create", "customer.edit", "customer.kyc", "loan.view", "loan.create", "report.view"],
+    name: "Super Admin",
+    description: "Full access — manage users, roles, and all settings.",
+    stage: "general",
+    approvalLimit: null,
+    permissions: ALL_PERMISSION_KEYS,
   },
   {
-    name: "Credit Reviewer",
-    description: "Reviews applications and verifies credit assessment.",
+    name: "Credit Officer",
+    description: "Loan review — onboards customers and reviews loan applications.",
     stage: "review",
     approvalLimit: 0,
-    permissions: ["customer.view", "loan.view", "loan.review", "report.view"],
+    permissions: ["customer.view", "customer.create", "customer.edit", "customer.kyc", "loan.view", "loan.create", "loan.review", "report.view"],
   },
   {
-    name: "Branch Approver",
-    description: "Approves loans up to the branch limit.",
-    stage: "approve",
-    approvalLimit: 50000,
-    permissions: ["customer.view", "loan.view", "loan.review", "loan.approve", "loan.reject", "portfolio.view", "report.view"],
-  },
-  {
-    name: "Senior Approver",
-    description: "Approves higher-tier loans across all branches.",
-    stage: "approve",
-    approvalLimit: 250000,
-    permissions: ["customer.view", "loan.view", "loan.review", "loan.approve", "loan.reject", "portfolio.view", "portfolio.restructure", "report.view", "report.export"],
-  },
-  {
-    name: "Cashier",
-    description: "Disburses approved loans and records repayments.",
-    stage: "disburse",
+    name: "Finance Officer",
+    description: "Repayment — records and tracks customer loan repayments.",
+    stage: "general",
     approvalLimit: 0,
-    permissions: ["customer.view", "loan.view", "disburse.execute", "payment.record", "payment.view"],
+    permissions: ["customer.view", "loan.view", "payment.record", "payment.view"],
   },
   {
-    name: "Compliance",
-    description: "Reviews disbursed loans for compliance and audit.",
-    stage: "audit",
+    name: "Support",
+    description: "Customer support — assists customers with their accounts and applications.",
+    stage: "general",
     approvalLimit: 0,
-    permissions: ["customer.view", "loan.view", "payment.view", "portfolio.view", "report.view", "audit.view", "audit.export"],
+    permissions: ["customer.view", "customer.create", "customer.edit", "loan.view", "payment.view", "report.view"],
   },
 ];
 

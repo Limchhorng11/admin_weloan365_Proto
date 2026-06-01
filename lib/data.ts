@@ -199,11 +199,15 @@ export type LoanProduct = {
   description: string;
   /** Customer eligibility criteria (one per line). */
   eligibility: string;
-  /** Documents the customer needs to provide (one per line). */
+  /** Documents the customer needs to provide (one per line).
+   *  Repurposed as "Benefits" in newer forms — kept under this key for
+   *  backwards compatibility with seeded data. */
   requiredDocs: string;
   processingFee: number;   // % of disbursed amount
   latePenalty: number;     // % per month on overdue
   earlyPayoff: boolean;    // is early payoff allowed
+  /** Repayment method (e.g. "Flexible", "Periodic principal and interest"). */
+  repaymentMethod?: string;
   /** Product kind — defaults to "non-mwl" in legacy records. */
   kind?: ProductKind;
   /** For mwl-sub: destination country. May be a legacy MWL_COUNTRIES code
@@ -494,11 +498,11 @@ export const CHATS = [
    ==================================================================== */
 
 export const POST_CATEGORIES = [
-  { id: "blog",         label: "Blog",         tone: "blue"   },
-  { id: "news",         label: "News",         tone: "violet" },
-  { id: "announcement", label: "Announcement", tone: "amber"  },
-  { id: "tips",         label: "Tips",         tone: "emerald"},
-  { id: "promotion",    label: "Promotion",    tone: "rose"   },
+  { id: "blog", label: "Blog", tone: "blue"    },
+  { id: "news", label: "News", tone: "violet"  },
+  { id: "tips", label: "Tips", tone: "emerald" },
+  { id: "edu",  label: "Edu",  tone: "amber"   },
+  { id: "csr",  label: "CSR",  tone: "rose"    },
 ] as const;
 
 export type PostCategoryId = (typeof POST_CATEGORIES)[number]["id"];
@@ -538,7 +542,7 @@ export const POSTS: Post[] = [
   {
     id: "P-013",
     title: "Khmer New Year holiday schedule",
-    category: "announcement",
+    category: "news",
     excerpt: "All branches will be closed Apr 13–15. Mobile app remains available.",
     body:
       "All WeLoan365 branches will be **closed for Khmer New Year** from Apr 13 to Apr 15, 2026.\n\n- The mobile app remains fully available\n- Loan payments processed automatically continue\n- In-app chat will be staffed at reduced capacity\n\nWe wish all our customers a happy and prosperous new year!",
@@ -577,7 +581,7 @@ export const POSTS: Post[] = [
   {
     id: "P-010",
     title: "Branch hours update — Siem Reap",
-    category: "announcement",
+    category: "news",
     excerpt: "Extended Saturday hours starting April.",
     body:
       "The Siem Reap branch will now be open on **Saturdays** from 8:00 AM to 1:00 PM, in addition to weekday hours.\n\nNo appointment required — walk-ins welcome.",
@@ -590,7 +594,7 @@ export const POSTS: Post[] = [
   {
     id: "P-009",
     title: "Birthday rate discount — limited time",
-    category: "promotion",
+    category: "csr",
     excerpt: "Customers get 0.5% off on new loans during their birthday month.",
     body:
       "🎂 Celebrate your birthday with us — get **0.5% off** your APR on any new loan, valid for the entire month of your birthday.\n\n- Available on Micro Loan (ML), Small Business Loan (SBL), and SME loans\n- Stack with referral rewards\n- Apply in-app or at any branch",
@@ -599,6 +603,34 @@ export const POSTS: Post[] = [
     status: "Draft",
     date: "—",
     views: 0,
+  },
+  {
+    id: "P-007",
+    title: "Scholarships for rural students — 2026 program",
+    category: "csr",
+    excerpt:
+      "WeLoan365 awards 50 scholarships to high-school students in rural provinces.",
+    body:
+      "As part of our community commitment, WeLoan365 will award **50 full scholarships** for the 2026 academic year to outstanding high-school students from rural provinces.\n\n## Who is eligible\n- Grade 11 or 12 students in NHFC operating areas\n- Demonstrated financial need\n- Minimum GPA 3.0\n\n## How to apply\n- Visit any branch with a letter from your school principal\n- Application deadline: June 30, 2026\n\nGiving back to the communities we serve is at the heart of who we are.",
+    thumbnail: "",
+    author: "Admin",
+    status: "Published",
+    date: "2026-04-05",
+    views: 1820,
+  },
+  {
+    id: "P-006",
+    title: "Budgeting 101 — the 50/30/20 rule",
+    category: "edu",
+    excerpt:
+      "A simple framework to split your income between needs, wants, and savings.",
+    body:
+      "The **50/30/20 rule** is a simple way to budget your monthly income:\n\n## 50% — Needs\nRent, utilities, groceries, transport, insurance.\n\n## 30% — Wants\nDining out, entertainment, hobbies, subscriptions.\n\n## 20% — Savings & debt repayment\nEmergency fund, retirement, paying down loans faster than required.\n\nThis isn't rigid — adjust the ratios to your situation. The point is to *spend with intention*, not by accident.",
+    thumbnail: "",
+    author: "Sophea K.",
+    status: "Published",
+    date: "2026-03-28",
+    views: 1015,
   },
   {
     id: "P-008",
@@ -615,14 +647,26 @@ export const POSTS: Post[] = [
   },
 ];
 
-export const USERS = [
+export type StaffUserStatus = "Active" | "Inactive" | "Pending";
+
+export type StaffUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  branch: string;
+  status: StaffUserStatus;
+  lastActive: string;
+};
+
+export const USERS: StaffUser[] = [
   { id: "U-01", name: "Laybun N.",    email: "laybunnavitou@kosign.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago" },
-  { id: "U-02", name: "Sophea K.",    email: "sophea.k@kosign.com.kh",      role: "Senior Credit Officer", branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago"  },
-  { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@kosign.com.kh",     role: "Branch Manager",        branch: "Battambang",  status: "Active",   lastActive: "Today"     },
-  { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@kosign.com.kh",   role: "Compliance",            branch: "HQ",          status: "Active",   lastActive: "Today"     },
+  { id: "U-02", name: "Sophea K.",    email: "sophea.k@kosign.com.kh",      role: "Senior Officer",        branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago"  },
+  { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@kosign.com.kh",     role: "Senior Officer",        branch: "Battambang",  status: "Active",   lastActive: "Today"     },
+  { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@kosign.com.kh",   role: "Customer Service",      branch: "HQ",          status: "Active",   lastActive: "Today"     },
   { id: "U-05", name: "Kosal M.",     email: "kosal.m@kosign.com.kh",       role: "Admin",                 branch: "HQ",          status: "Inactive", lastActive: "30 d ago"  },
-  { id: "U-06", name: "Pisey C.",     email: "pisey.c@kosign.com.kh",       role: "Cashier",               branch: "Phnom Penh",  status: "Active",   lastActive: "10 min ago"},
-  { id: "U-07", name: "Mengsrun H.",  email: "mengsrun.h@kosign.com.kh",    role: "Approval Committee",    branch: "HQ",          status: "Active",   lastActive: "Yesterday" },
+  { id: "U-06", name: "Pisey C.",     email: "pisey.c@kosign.com.kh",       role: "Customer Service",      branch: "Phnom Penh",  status: "Active",   lastActive: "10 min ago"},
+  { id: "U-07", name: "Mengsrun H.",  email: "mengsrun.h@kosign.com.kh",    role: "Senior Officer",        branch: "HQ",          status: "Active",   lastActive: "Yesterday" },
 ];
 
 /* ====================================================================
@@ -640,11 +684,10 @@ export type Permission = {
 export type PermissionCategory =
   | "Customer"
   | "Loan Application"
-  | "Disbursement & Repayment"
+  | "Repayment"
   | "Loan Portfolio"
   | "Reports"
   | "User & Role"
-  | "Branch"
   | "Settings"
   | "Audit";
 
@@ -660,11 +703,9 @@ export const PERMISSIONS: Permission[] = [
   { key: "loan.approve",      label: "Approve application",    category: "Loan Application", sensitive: true },
   { key: "loan.reject",       label: "Reject application",     category: "Loan Application" },
 
-  { key: "disburse.execute",  label: "Disburse loan",          category: "Disbursement & Repayment", sensitive: true },
-  { key: "disburse.reverse",  label: "Reverse disbursement",   category: "Disbursement & Repayment", sensitive: true },
-  { key: "payment.record",    label: "Record repayment",       category: "Disbursement & Repayment" },
-  { key: "payment.view",      label: "View payment history",   category: "Disbursement & Repayment" },
-  { key: "payment.reverse",   label: "Reverse payment",        category: "Disbursement & Repayment", sensitive: true },
+  { key: "payment.record",    label: "Record repayment",       category: "Repayment" },
+  { key: "payment.view",      label: "View payment history",   category: "Repayment" },
+  { key: "payment.reverse",   label: "Reverse payment",        category: "Repayment", sensitive: true },
 
   { key: "portfolio.view",        label: "View loan portfolio",        category: "Loan Portfolio" },
   { key: "portfolio.restructure", label: "Restructure loan",           category: "Loan Portfolio", sensitive: true },
@@ -677,11 +718,6 @@ export const PERMISSIONS: Permission[] = [
   { key: "user.create", label: "Create user",      category: "User & Role" },
   { key: "user.edit",   label: "Edit user",        category: "User & Role" },
   { key: "role.edit",   label: "Manage roles & permissions", category: "User & Role", sensitive: true },
-
-  { key: "branch.phnom_penh",    label: "Phnom Penh",    category: "Branch" },
-  { key: "branch.siem_reap",     label: "Siem Reap",     category: "Branch" },
-  { key: "branch.battambang",    label: "Battambang",    category: "Branch" },
-  { key: "branch.kompong_cham",  label: "Kompong Cham",  category: "Branch" },
 
   { key: "setting.view", label: "View settings", category: "Settings" },
   { key: "setting.edit", label: "Edit settings", category: "Settings", sensitive: true },
@@ -714,42 +750,24 @@ export const ROLES: Role[] = [
     isSystem: true,
   },
   {
-    key: "branch_manager",
-    name: "Branch Manager",
-    description: "Manage branch operations and approve mid-tier loans.",
+    key: "senior_officer",
+    name: "Senior Officer",
+    description: "Senior loan officer — reviews and approves loans up to the senior limit.",
     approvalLimit: 50000,
     permissions: [
       "customer.view", "customer.create", "customer.edit", "customer.kyc",
       "loan.view", "loan.create", "loan.review", "loan.approve", "loan.reject",
-      "disburse.execute",
       "payment.view", "payment.record",
       "portfolio.view", "portfolio.restructure",
       "report.view", "report.export",
       "user.view",
-      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
       "audit.view",
     ],
-    userCount: 1,
+    userCount: 3,
     isSystem: true,
   },
   {
-    key: "senior_co",
-    name: "Senior Credit Officer",
-    description: "Senior loan origination with first-tier approval authority.",
-    approvalLimit: 10000,
-    permissions: [
-      "customer.view", "customer.create", "customer.edit", "customer.kyc",
-      "loan.view", "loan.create", "loan.review", "loan.approve", "loan.reject",
-      "payment.view",
-      "portfolio.view",
-      "report.view",
-      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
-    ],
-    userCount: 1,
-    isSystem: true,
-  },
-  {
-    key: "co",
+    key: "credit_officer",
     name: "Credit Officer",
     description: "Originate and review loan applications. Cannot approve.",
     approvalLimit: 0,
@@ -759,58 +777,22 @@ export const ROLES: Role[] = [
       "payment.view",
       "portfolio.view",
       "report.view",
-      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
     ],
     userCount: 1,
     isSystem: true,
   },
   {
-    key: "approval",
-    name: "Approval Committee",
-    description: "Final-tier approval for high-value loans. View-only on operations.",
-    approvalLimit: null,
-    permissions: [
-      "customer.view",
-      "loan.view", "loan.approve", "loan.reject",
-      "portfolio.view",
-      "report.view",
-      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
-      "audit.view",
-    ],
-    userCount: 1,
-    isSystem: true,
-  },
-  {
-    key: "cashier",
-    name: "Cashier",
-    description: "Disburse approved loans and record customer repayments. Does not handle loan applications.",
+    key: "customer_service",
+    name: "Customer Service",
+    description: "Assist customers with their accounts, applications, and repayments.",
     approvalLimit: 0,
     permissions: [
-      "customer.view",
-      "disburse.execute",
-      "payment.record", "payment.view",
-      "portfolio.view",
-      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
-    ],
-    userCount: 1,
-    isSystem: true,
-  },
-  {
-    key: "compliance",
-    name: "Compliance",
-    description: "Read-only access to all data for audit and regulatory reporting.",
-    approvalLimit: 0,
-    permissions: [
-      "customer.view",
+      "customer.view", "customer.create", "customer.edit",
       "loan.view",
-      "payment.view",
-      "portfolio.view",
-      "report.view", "report.export",
-      "user.view",
-      "branch.phnom_penh", "branch.siem_reap", "branch.battambang", "branch.kompong_cham",
-      "audit.view", "audit.export",
+      "payment.view", "payment.record",
+      "report.view",
     ],
-    userCount: 1,
+    userCount: 2,
     isSystem: true,
   },
 ];
@@ -829,10 +811,9 @@ export type ApprovalLayer = {
 };
 
 export const APPROVAL_LAYERS: ApprovalLayer[] = [
-  { level: 1, name: "Credit Officer Review",     role: "Credit Officer",        min: 0,     max: null,   description: "Initial review, KYC verification, and credit assessment. Always required." },
-  { level: 2, name: "Senior Officer Approval",   role: "Senior Credit Officer", min: 2000,  max: 10000,  description: "Required for loans above $2,000." },
-  { level: 3, name: "Branch Manager Approval",   role: "Branch Manager",        min: 10000, max: 50000,  description: "Required for loans above $10,000." },
-  { level: 4, name: "Loan Committee Approval",   role: "Approval Committee",    min: 50000, max: null,   description: "Required for loans above $50,000." },
+  { level: 1, name: "Credit Officer Review",   role: "Credit Officer", min: 0,     max: null,   description: "Initial review, KYC verification, and credit assessment. Always required." },
+  { level: 2, name: "Senior Officer Approval", role: "Senior Officer", min: 2000,  max: 50000,  description: "Required for loans above $2,000, up to the senior limit." },
+  { level: 3, name: "Admin Approval",          role: "Admin",          min: 50000, max: null,   description: "Required for loans above $50,000." },
 ];
 
 export type Branch = {
@@ -850,4 +831,55 @@ export const BRANCHES: Branch[] = [
   { id: "BR-03", name: "Siem Reap",              address: "#12, Wat Bo Road",            phone: "+855 63 900 003", lat: 13.3633, lng: 103.8564 },
   { id: "BR-04", name: "Battambang",             address: "#78, St. 3, Svay Por",        phone: "+855 53 900 004", lat: 13.0950, lng: 103.2025 },
   { id: "BR-05", name: "Kampong Cham",           address: "#10, Preah Monivong Blvd",    phone: "+855 42 900 005", lat: 11.9971, lng: 105.4595 },
+];
+
+/* ====================================================================
+   PROMOTIONS (content management — Title, Description, Image)
+   ==================================================================== */
+
+export type PromotionStatus = "Active" | "Inactive";
+
+export type Promotion = {
+  id: string;
+  title: string;
+  description: string;
+  /** data URL (uploaded) or remote URL; empty = placeholder */
+  image: string;
+  status: PromotionStatus;
+  date: string;
+};
+
+export const PROMOTIONS: Promotion[] = [
+  {
+    id: "PM-001",
+    title: "Khmer New Year — 0% Processing Fee",
+    description: "Apply for any Micro Loan during Khmer New Year and pay zero processing fee.",
+    image: "",
+    status: "Active",
+    date: "2026-04-10",
+  },
+  {
+    id: "PM-002",
+    title: "Refer a Friend, Earn $10",
+    description: "Get a $10 reward for every friend who is approved for their first loan.",
+    image: "",
+    status: "Active",
+    date: "2026-03-22",
+  },
+  {
+    id: "PM-003",
+    title: "Birthday Month — 0.5% Off APR",
+    description: "Enjoy 0.5% off your APR on any new loan during your birthday month.",
+    image: "",
+    status: "Active",
+    date: "2026-02-14",
+  },
+  {
+    id: "PM-004",
+    title: "Housing Loan Launch Offer",
+    description: "Introductory rate from 9% APR on the new Housing Loan product. Limited time.",
+    image: "",
+    status: "Inactive",
+    date: "2026-01-05",
+  },
 ];

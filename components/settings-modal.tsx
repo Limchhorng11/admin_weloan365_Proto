@@ -1101,10 +1101,10 @@ function ReferralView() {
 
   const CO_CODES: CodeRow[] = [
     { code: "10247", name: "Laybun N.",   role: "Credit Officer",        branch: "Phnom Penh", referrals: 28, applications: 19, disbursed: 11, status: "Active"   },
-    { code: "10248", name: "Sophea K.",   role: "Senior Credit Officer", branch: "Siem Reap",  referrals: 41, applications: 32, disbursed: 21, status: "Active"   },
-    { code: "10312", name: "Ratanak L.",  role: "Branch Manager",        branch: "Battambang", referrals: 14, applications:  9, disbursed:  5, status: "Active"   },
-    { code: "10401", name: "Pisey C.",    role: "Cashier",               branch: "Phnom Penh", referrals:  6, applications:  3, disbursed:  1, status: "Active"   },
-    { code: "10502", name: "Mengsrun H.", role: "Approval Committee",    branch: "HQ",         referrals:  0, applications:  0, disbursed:  0, status: "Disabled" },
+    { code: "10248", name: "Sophea K.",   role: "Senior Officer",   branch: "Siem Reap",  referrals: 41, applications: 32, disbursed: 21, status: "Active"   },
+    { code: "10312", name: "Ratanak L.",  role: "Senior Officer",   branch: "Battambang", referrals: 14, applications:  9, disbursed:  5, status: "Active"   },
+    { code: "10401", name: "Pisey C.",    role: "Customer Service", branch: "Phnom Penh", referrals:  6, applications:  3, disbursed:  1, status: "Active"   },
+    { code: "10502", name: "Mengsrun H.", role: "Senior Officer",   branch: "HQ",         referrals:  0, applications:  0, disbursed:  0, status: "Disabled" },
   ];
 
   return (

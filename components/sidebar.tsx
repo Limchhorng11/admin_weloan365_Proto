@@ -9,6 +9,7 @@ import {
   FileText,
   Package,
   Newspaper,
+  Megaphone,
   Settings,
   PanelLeft,
   ChevronDown,
@@ -48,6 +49,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Loan Application", href: "/customer/applications", icon: FileText, permission: "loan.view" },
       { label: "Loan Product", href: "/loan-product", icon: Package, permission: "loan.view" },
       { label: "Blog Posts", href: "/content/posts", icon: Newspaper },
+      { label: "Promotion", href: "/content/promotions", icon: Megaphone },
     ],
   },
 ];

@@ -26,6 +26,8 @@ import {
   Files,
   Pencil,
   Globe,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 type StatusFilter = "all" | "active" | "draft";
@@ -294,13 +296,19 @@ export default function ProductsPage() {
                       </div>
                     </td>
                     <td className={cn("px-6 py-3", cellTone)}>
-                      ${p.min.toLocaleString()} – ${p.max.toLocaleString()}
+                      {p.min === p.max
+                        ? `$${p.max.toLocaleString()}`
+                        : `$${p.min.toLocaleString()} – $${p.max.toLocaleString()}`}
                     </td>
                     <td className={cn("px-6 py-3", cellTone)}>
-                      {p.rateMin}% – {p.rateMax}%
+                      {p.rateMin === p.rateMax
+                        ? `${p.rateMax}%`
+                        : `${p.rateMin}% – ${p.rateMax}%`}
                     </td>
                     <td className={cn("px-6 py-3", cellTone)}>
-                      {p.termMin}–{p.termMax}m
+                      {p.termMin === p.termMax
+                        ? `${p.termMax}m`
+                        : `${p.termMin}–${p.termMax}m`}
                     </td>
                     <td className={cn("px-6 py-3", cellTone)}>{p.loans}</td>
                     <td className="px-6 py-3">
@@ -585,6 +593,27 @@ function FilterPopover({
   );
 }
 
+/* Parse "• Age: 18 to 65\n• Residence: …" etc. into the 4 structured rows.
+ * If the input doesn't follow this pattern, returns blanks. Used when an
+ * existing product is opened in edit mode. */
+function parseEligibility(text: string): {
+  age: string;
+  residence: string;
+  income: string;
+  collateral: string;
+} {
+  const out = { age: "", residence: "", income: "", collateral: "" };
+  if (!text) return out;
+  for (const raw of text.split(/\n+/)) {
+    const line = raw.replace(/^[\s•·\-*]+/, "").trim();
+    const m = line.match(/^(age|residence|income|collateral)\s*[:：]\s*(.+)$/i);
+    if (!m) continue;
+    const key = m[1].toLowerCase() as keyof typeof out;
+    out[key] = m[2].trim();
+  }
+  return out;
+}
+
 /* ---------- create / edit product modal (CMS-style) ---------- */
 
 function CreateProductModal({
@@ -617,12 +646,39 @@ function CreateProductModal({
   const [rateMax, setRateMax] = useState("");
   const [termMin, setTermMin] = useState("");
   const [termMax, setTermMax] = useState("");
-  const [eligibility, setEligibility] = useState("");
-  const [benefits, setBenefits] = useState("");
-  const [processingFee, setProcessingFee] = useState("1.5");
-  const [latePenalty, setLatePenalty] = useState("2.0");
+  const [repaymentMethod, setRepaymentMethod] = useState("");
+  // Eligibility — four structured rows (composed into the legacy
+  // `eligibility` multi-line string on save).
+  const [ageRule, setAgeRule] = useState("");
+  const [residenceRule, setResidenceRule] = useState("");
+  const [incomeRule, setIncomeRule] = useState("");
+  const [collateralRule, setCollateralRule] = useState("");
   const [status, setStatus] = useState<"active" | "draft">("draft");
   const [error, setError] = useState<string | null>(null);
+
+  // Per-row "show in form" toggle. Hidden rows render as a collapsed label
+  // and their values are dropped on save.
+  type FieldKey =
+    | "loanSize"
+    | "interest"
+    | "loanTerm"
+    | "repaymentMethod"
+    | "age"
+    | "residence"
+    | "income"
+    | "collateral";
+  const [shown, setShown] = useState<Record<FieldKey, boolean>>({
+    loanSize: true,
+    interest: true,
+    loanTerm: true,
+    repaymentMethod: true,
+    age: true,
+    residence: true,
+    income: true,
+    collateral: true,
+  });
+  const toggleShown = (k: FieldKey) =>
+    setShown(prev => ({ ...prev, [k]: !prev[k] }));
 
   useEffect(() => {
     if (!open) return;
@@ -635,18 +691,34 @@ function CreateProductModal({
       setDescription(editing.description);
       setMin(String(editing.min));
       setMax(String(editing.max));
-      setRateMin(String(editing.rateMin));
+      // Interest + Loan Term are single-value in the form — show the max
+      // (broader) value and mirror it into min when the user edits.
+      setRateMin(String(editing.rateMax));
       setRateMax(String(editing.rateMax));
-      setTermMin(String(editing.termMin));
+      setTermMin(String(editing.termMax));
       setTermMax(String(editing.termMax));
-      setEligibility(editing.eligibility);
-      setBenefits(editing.requiredDocs);
-      setProcessingFee(String(editing.processingFee));
-      setLatePenalty(String(editing.latePenalty));
+      setRepaymentMethod(editing.repaymentMethod ?? "");
+      // Parse the legacy "• Age: …\n• Residence: …" style into the 4 fields,
+      // falling back to leaving them blank if the structure isn't recognised.
+      const parsed = parseEligibility(editing.eligibility);
+      setAgeRule(parsed.age);
+      setResidenceRule(parsed.residence);
+      setIncomeRule(parsed.income);
+      setCollateralRule(parsed.collateral);
       setStatus(editing.status);
+      setShown({
+        loanSize: editing.min > 0 || editing.max > 0,
+        interest: editing.rateMin > 0 || editing.rateMax > 0,
+        loanTerm: editing.termMin > 0 || editing.termMax > 0,
+        repaymentMethod: !!editing.repaymentMethod,
+        age: !!parsed.age,
+        residence: !!parsed.residence,
+        income: !!parsed.income,
+        collateral: !!parsed.collateral,
+      });
       setError(null);
     } else {
-      // Create mode — empty defaults.
+      // Create mode — empty defaults, all rows visible.
       setKind("non-mwl");
       setCountries([]);
       setCountryInput("");
@@ -658,11 +730,22 @@ function CreateProductModal({
       setRateMax("");
       setTermMin("");
       setTermMax("");
-      setEligibility("");
-      setBenefits("");
-      setProcessingFee("1.5");
-      setLatePenalty("2.0");
+      setRepaymentMethod("");
+      setAgeRule("");
+      setResidenceRule("");
+      setIncomeRule("");
+      setCollateralRule("");
       setStatus("draft");
+      setShown({
+        loanSize: true,
+        interest: true,
+        loanTerm: true,
+        repaymentMethod: true,
+        age: true,
+        residence: true,
+        income: true,
+        collateral: true,
+      });
       setError(null);
     }
   }, [open, editing]);
@@ -688,12 +771,20 @@ function CreateProductModal({
     if ((isEdit || kind === "non-mwl") && !name.trim())
       return "Product name is required.";
     if (!description.trim()) return "Description is required.";
-    const minN = +min, maxN = +max;
-    if (!minN || !maxN || minN >= maxN) return "Amount range must be valid (min < max).";
-    const rMinN = +rateMin, rMaxN = +rateMax;
-    if (rMinN < 0 || rMaxN <= 0 || rMinN > rMaxN) return "Rate range must be valid.";
-    const tMinN = +termMin, tMaxN = +termMax;
-    if (!tMinN || !tMaxN || tMinN > tMaxN) return "Term range must be valid.";
+    // Only validate ranges for rows the admin chose to include.
+    if (shown.loanSize) {
+      const minN = +min, maxN = +max;
+      if (!minN || !maxN || minN >= maxN)
+        return "Loan size must be valid (min < max).";
+    }
+    if (shown.interest) {
+      const rN = +rateMax;
+      if (rN <= 0) return "Interest must be greater than 0.";
+    }
+    if (shown.loanTerm) {
+      const tN = +termMax;
+      if (!tN || tN <= 0) return "Loan term must be greater than 0.";
+    }
     if (!isEdit && kind === "mwl") {
       if (!mwlParent) return "No Migrant Worker Loan parent found to attach to.";
       if (countries.length === 0)
@@ -702,29 +793,51 @@ function CreateProductModal({
     return null;
   };
 
+  // Compose the 4 eligibility rows into the legacy multi-line string. Only
+  // include rows that are toggled on and have a non-empty value.
+  const composeEligibility = (): string => {
+    const rows: [FieldKey, string, string][] = [
+      ["age", "Age", ageRule],
+      ["residence", "Residence", residenceRule],
+      ["income", "Income", incomeRule],
+      ["collateral", "Collateral", collateralRule],
+    ];
+    return rows
+      .filter(([k, , v]) => shown[k] && v.trim())
+      .map(([, label, v]) => `• ${label}: ${v.trim()}`)
+      .join("\n");
+  };
+
   const submit = (publish: boolean) => {
     const err = validate();
     if (err) return setError(err);
 
     const base = {
-      min: +min,
-      max: +max,
-      rateMin: +rateMin,
-      rateMax: +rateMax,
-      termMin: +termMin,
-      termMax: +termMax,
+      // Hidden rows save as 0 so downstream displays render "0–0" rather than
+      // surfacing stale numbers from the form.
+      min: shown.loanSize ? +min : 0,
+      max: shown.loanSize ? +max : 0,
+      rateMin: shown.interest ? +rateMin : 0,
+      rateMax: shown.interest ? +rateMax : 0,
+      termMin: shown.loanTerm ? +termMin : 0,
+      termMax: shown.loanTerm ? +termMax : 0,
       status: (publish ? "active" : "draft") as "active" | "draft",
       loans: editing?.loans ?? 0,
       description: description.trim(),
-      eligibility: eligibility.trim(),
-      // Free-form "Benefits" replaces the older "Required documents" field.
-      // It's still persisted on `requiredDocs` to avoid a breaking schema change.
-      requiredDocs: benefits.trim(),
-      processingFee: +processingFee,
-      latePenalty: +latePenalty,
-      // Early payoff is no longer offered — default to true so existing readers
-      // that check this flag keep their current behavior.
-      earlyPayoff: true,
+      // Compose the 4 structured eligibility rows back to the existing field.
+      eligibility: composeEligibility(),
+      // Benefits field is no longer in the form — preserve existing value when
+      // editing, default to empty when creating.
+      requiredDocs: editing?.requiredDocs ?? "",
+      processingFee: editing?.processingFee ?? 0,
+      latePenalty: editing?.latePenalty ?? 0,
+      // Early payoff is no longer offered — preserve existing value or default true.
+      earlyPayoff: editing?.earlyPayoff ?? true,
+      // New structured field — saved only when the row is shown and non-empty.
+      repaymentMethod:
+        shown.repaymentMethod && repaymentMethod.trim()
+          ? repaymentMethod.trim()
+          : undefined,
     };
 
     // EDIT mode — replace the existing product, keep its id/kind/parent/country.
@@ -875,10 +988,46 @@ function CreateProductModal({
             </div>
           )}
 
+          {/* Basic Information */}
+          <Section icon={FileText} title="Basic Information" hint="Customer-facing copy. Shown in the mobile app and web portal.">
+            {isEdit || kind === "non-mwl" ? (
+              <Field label="Product name *">
+                <input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="e.g. Home Improvement Loan"
+                  className="form-input"
+                />
+              </Field>
+            ) : (
+              <div className="text-[11px] text-gray-500">
+                Sub-products will be named{" "}
+                <span className="font-medium text-gray-700">MWL — [Country]</span>
+                {" "}(consistent with existing entries under{" "}
+                <span className="font-medium text-gray-700">
+                  {mwlParent?.name ?? "Migrant Worker Loan"}
+                </span>
+                ).
+              </div>
+            )}
+            <Field
+              label="Description *"
+              hint={`Markdown supported. ${description.length} characters.`}
+            >
+              <textarea
+                rows={5}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Describe the product, target customer, and what makes it different. This text shows in the customer app's product catalog."
+                className="form-input resize-none"
+              />
+            </Field>
+          </Section>
+
           {/* MWL-only: free-form destination country list. Admin types a country
               name and presses Enter (or +) to add it; one sub-product is created
               under the existing Migrant Worker Loan parent per added country.
-              Hidden in edit mode (countries can't be re-keyed for an existing sub). */}
+              Placed below Description so Product Name remains the first input. */}
           {!isEdit && kind === "mwl" && (
             <Section
               icon={Globe}
@@ -964,92 +1113,138 @@ function CreateProductModal({
             </Section>
           )}
 
-          {/* Basic info */}
-          <Section icon={FileText} title="Basic information" hint="Customer-facing copy. Shown in the mobile app and web portal.">
-            {isEdit || kind === "non-mwl" ? (
-              <Field label="Product name *">
-                <input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="e.g. Home Improvement Loan"
-                  className="form-input"
-                />
-              </Field>
-            ) : (
-              <div className="text-[11px] text-gray-500">
-                Sub-products will be named{" "}
-                <span className="font-medium text-gray-700">MWL — [Country]</span>
-                {" "}(consistent with existing entries under{" "}
-                <span className="font-medium text-gray-700">
-                  {mwlParent?.name ?? "Migrant Worker Loan"}
-                </span>
-                ).
-              </div>
-            )}
-            <Field
-              label="Description *"
-              hint={`Markdown supported. ${description.length} characters.`}
+          {/* Key Features */}
+          <Section icon={CircleDollarSign} title="Key Features" hint="Toggle the rows you want to publish — hidden rows save as empty.">
+            <div className="border border-gray-200 rounded-md divide-y divide-gray-100 overflow-hidden">
+            <ToggleRow
+              label="Loan Size"
+              shown={shown.loanSize}
+              onToggle={() => toggleShown("loanSize")}
             >
-              <textarea
-                rows={5}
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Describe the product, target customer, and what makes it different. This text shows in the customer app's product catalog."
-                className="form-input resize-none"
-              />
-            </Field>
-          </Section>
+              <div className="flex items-center gap-2">
+                <AffixInput
+                  prefix="$"
+                  type="number"
+                  value={min}
+                  onChange={e => setMin(e.target.value)}
+                  placeholder="100"
+                />
+                <span className="text-xs text-gray-400">–</span>
+                <AffixInput
+                  prefix="$"
+                  type="number"
+                  value={max}
+                  onChange={e => setMax(e.target.value)}
+                  placeholder="3000"
+                />
+              </div>
+            </ToggleRow>
 
-          {/* Financial terms */}
-          <Section icon={CircleDollarSign} title="Financial terms" hint="Used to size and price loans under this product.">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Amount minimum (USD)">
-                <input type="number" value={min} onChange={e => setMin(e.target.value)} placeholder="500" className="form-input" />
-              </Field>
-              <Field label="Amount maximum (USD)">
-                <input type="number" value={max} onChange={e => setMax(e.target.value)} placeholder="5000" className="form-input" />
-              </Field>
-              <Field label="Rate min (%)">
-                <input type="number" step="0.1" value={rateMin} onChange={e => setRateMin(e.target.value)} placeholder="13.0" className="form-input" />
-              </Field>
-              <Field label="Rate max (%)">
-                <input type="number" step="0.1" value={rateMax} onChange={e => setRateMax(e.target.value)} placeholder="15.5" className="form-input" />
-              </Field>
-              <Field label="Term min (months)">
-                <input type="number" value={termMin} onChange={e => setTermMin(e.target.value)} placeholder="6" className="form-input" />
-              </Field>
-              <Field label="Term max (months)">
-                <input type="number" value={termMax} onChange={e => setTermMax(e.target.value)} placeholder="24" className="form-input" />
-              </Field>
-              <Field label="Processing fee (%)">
-                <input type="number" step="0.1" value={processingFee} onChange={e => setProcessingFee(e.target.value)} className="form-input" />
-              </Field>
-              <Field label="Late penalty (% / month)">
-                <input type="number" step="0.1" value={latePenalty} onChange={e => setLatePenalty(e.target.value)} className="form-input" />
-              </Field>
+            <ToggleRow
+              label="Interest"
+              shown={shown.interest}
+              onToggle={() => toggleShown("interest")}
+            >
+              <AffixInput
+                suffix="%"
+                type="number"
+                step="0.1"
+                value={rateMax}
+                onChange={e => {
+                  // Single value writes to both rateMin and rateMax — keeps
+                  // the existing schema while the form shows just one input.
+                  setRateMin(e.target.value);
+                  setRateMax(e.target.value);
+                }}
+                placeholder="14"
+              />
+            </ToggleRow>
+
+            <ToggleRow
+              label="Loan Term"
+              shown={shown.loanTerm}
+              onToggle={() => toggleShown("loanTerm")}
+            >
+              <AffixInput
+                suffix="m"
+                type="number"
+                value={termMax}
+                onChange={e => {
+                  // Single value writes to both termMin and termMax.
+                  setTermMin(e.target.value);
+                  setTermMax(e.target.value);
+                }}
+                placeholder="48"
+              />
+            </ToggleRow>
+
+            <ToggleRow
+              label="Repayment Method"
+              shown={shown.repaymentMethod}
+              onToggle={() => toggleShown("repaymentMethod")}
+            >
+              <input
+                value={repaymentMethod}
+                onChange={e => setRepaymentMethod(e.target.value)}
+                placeholder="e.g. Flexible / Periodic principal and interest"
+                className="form-input"
+              />
+            </ToggleRow>
             </div>
           </Section>
 
           {/* Eligibility */}
-          <Section icon={ShieldCheck} title="Eligibility criteria" hint="One requirement per line. Shown to customers before they apply.">
-            <textarea
-              rows={5}
-              value={eligibility}
-              onChange={e => setEligibility(e.target.value)}
-              placeholder={"• Cambodian citizen\n• Age 21–60\n• Minimum monthly income $300"}
-              className="form-input resize-none"
-            />
-          </Section>
-
-          {/* Benefits */}
-          <Section icon={Files} title="Benefits" hint="One benefit per line. Shown to customers on the product page.">
-            <textarea
-              rows={4}
-              value={benefits}
-              onChange={e => setBenefits(e.target.value)}
-              placeholder={"Flexible repayment schedule\nNo collateral for qualified applicants\n0.5% birthday discount"}
-              className="form-input resize-none"
-            />
+          <Section icon={ShieldCheck} title="Eligibility" hint="Toggle the rows you want to publish — hidden rows save as empty.">
+            <div className="border border-gray-200 rounded-md divide-y divide-gray-100 overflow-hidden">
+            <ToggleRow
+              label="Age"
+              shown={shown.age}
+              onToggle={() => toggleShown("age")}
+            >
+              <input
+                value={ageRule}
+                onChange={e => setAgeRule(e.target.value)}
+                placeholder="18 to 65 years old"
+                className="form-input"
+              />
+            </ToggleRow>
+            <ToggleRow
+              label="Residence"
+              shown={shown.residence}
+              onToggle={() => toggleShown("residence")}
+            >
+              <input
+                value={residenceRule}
+                onChange={e => setResidenceRule(e.target.value)}
+                placeholder="Permanent residential address at NHFC's operating area"
+                className="form-input"
+              />
+            </ToggleRow>
+            <ToggleRow
+              label="Income"
+              shown={shown.income}
+              onToggle={() => toggleShown("income")}
+            >
+              <input
+                value={incomeRule}
+                onChange={e => setIncomeRule(e.target.value)}
+                placeholder="Stable and verifiable income source"
+                className="form-input"
+              />
+            </ToggleRow>
+            <ToggleRow
+              label="Collateral"
+              shown={shown.collateral}
+              onToggle={() => toggleShown("collateral")}
+            >
+              <input
+                value={collateralRule}
+                onChange={e => setCollateralRule(e.target.value)}
+                placeholder="Hard or soft title collateral"
+                className="form-input"
+              />
+            </ToggleRow>
+            </div>
           </Section>
         </div>
 
@@ -1083,16 +1278,39 @@ function CreateProductModal({
       <style jsx>{`
         :global(.form-input) {
           width: 100%;
-          padding: 0.5rem 0.75rem;
+          /* Symmetric Y padding + explicit line-height so the value/placeholder
+             text sits in the vertical center of the input frame. Without an
+             explicit line-height, inputs inherit from the parent and the text
+             can drift toward the top of the frame. */
+          padding-top: 0.5rem;
+          padding-right: 0.75rem;
+          padding-bottom: 0.5rem;
+          padding-left: 0.75rem;
           font-size: 0.875rem;
+          line-height: 1.25rem;
           border: 1px solid #e5e7eb;
           border-radius: 0.375rem;
           background: white;
           outline: none;
         }
+        :global(textarea.form-input) {
+          /* Textareas get slightly looser line spacing for multi-line copy. */
+          line-height: 1.5;
+        }
         :global(.form-input:focus) {
           border-color: #2563eb;
           box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
+        }
+        /* Hide the native up/down spinner controls on number inputs — they
+           clash with our left/right affix decorations (e.g. "$", "%", "m"). */
+        :global(input.form-input[type="number"]) {
+          -moz-appearance: textfield;
+          appearance: textfield;
+        }
+        :global(input.form-input[type="number"]::-webkit-outer-spin-button),
+        :global(input.form-input[type="number"]::-webkit-inner-spin-button) {
+          -webkit-appearance: none;
+          margin: 0;
         }
       `}</style>
     </div>
@@ -1140,6 +1358,99 @@ function Field({
       <label className="text-xs font-medium text-gray-700">{label}</label>
       <div className="mt-1">{children}</div>
       {hint && <div className="text-[11px] text-gray-400 mt-1">{hint}</div>}
+    </div>
+  );
+}
+
+/* Input with an optional prefix (e.g. "$") or suffix (e.g. "%", "m") symbol.
+ * Uses a flex layout so the symbol and the value share the same baseline and
+ * stay vertically centered together — no absolute-positioning alignment quirks. */
+function AffixInput({
+  prefix,
+  suffix,
+  className,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  prefix?: string;
+  suffix?: string;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex items-center gap-1.5 w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md transition cursor-text",
+        "focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20",
+        className
+      )}
+    >
+      {prefix && (
+        <span className="text-gray-500 select-none flex-shrink-0">{prefix}</span>
+      )}
+      <input
+        {...props}
+        className="flex-1 min-w-0 bg-transparent outline-none border-0 p-0 text-sm placeholder:text-gray-400"
+      />
+      {suffix && (
+        <span className="text-gray-500 select-none flex-shrink-0">{suffix}</span>
+      )}
+    </label>
+  );
+}
+
+/* Row inside a Key Features / Eligibility section. Has a show/hide toggle:
+ *   - shown  → renders the children (inputs) under the label
+ *   - hidden → collapses to a muted single line
+ *
+ *   The row itself has no border — wrap a group of rows in a single
+ *   `border border-gray-200 rounded-md divide-y divide-gray-100` container
+ *   so they read as one card. */
+function ToggleRow({
+  label,
+  shown,
+  onToggle,
+  children,
+}: {
+  label: string;
+  shown: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("px-3 py-2.5", !shown && "bg-gray-50/60")}>
+      <div className="flex items-center justify-between gap-3">
+        <label
+          className={cn(
+            "text-xs font-medium",
+            shown ? "text-gray-700" : "text-gray-400"
+          )}
+        >
+          {label}
+        </label>
+        <button
+          type="button"
+          onClick={onToggle}
+          className={cn(
+            "inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider rounded-full px-2 py-0.5 border transition",
+            shown
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+          )}
+          title={shown ? "Hide this field" : "Show this field"}
+          aria-pressed={shown}
+        >
+          {shown ? (
+            <>
+              <Eye className="w-3 h-3" />
+              Shown
+            </>
+          ) : (
+            <>
+              <EyeOff className="w-3 h-3" />
+              Hidden
+            </>
+          )}
+        </button>
+      </div>
+      {shown && <div className="mt-2">{children}</div>}
     </div>
   );
 }
@@ -1254,17 +1565,29 @@ function DetailProductModal({
             <Stat
               icon={CircleDollarSign}
               label="Amount range"
-              value={`$${product.min.toLocaleString()} – $${product.max.toLocaleString()}`}
+              value={
+                product.min === product.max
+                  ? `$${product.max.toLocaleString()}`
+                  : `$${product.min.toLocaleString()} – $${product.max.toLocaleString()}`
+              }
             />
             <Stat
               icon={Percent}
               label="Interest rate"
-              value={`${product.rateMin}% – ${product.rateMax}% APR`}
+              value={
+                product.rateMin === product.rateMax
+                  ? `${product.rateMax}%`
+                  : `${product.rateMin}% – ${product.rateMax}%`
+              }
             />
             <Stat
               icon={Calendar}
               label="Term"
-              value={`${product.termMin} – ${product.termMax} months`}
+              value={
+                product.termMin === product.termMax
+                  ? `${product.termMax} months`
+                  : `${product.termMin} – ${product.termMax} months`
+              }
             />
             <Stat
               icon={Percent}
