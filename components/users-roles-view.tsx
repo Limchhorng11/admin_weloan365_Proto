@@ -20,8 +20,6 @@ import {
   Square,
   X,
   ChevronDown,
-  Mail,
-  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
@@ -155,7 +153,7 @@ function UsersTab() {
 
   const nextId = useMemo(() => {
     const maxN = users.reduce((m, u) => {
-      const n = parseInt(u.id.replace(/[^0-9]/g, ""), 10);
+      const n = parseInt((u.id ?? "").replace(/[^0-9]/g, ""), 10);
       return Number.isFinite(n) && n > m ? n : m;
     }, 0);
     return `U-${String(maxN + 1).padStart(2, "0")}`;
@@ -171,10 +169,12 @@ function UsersTab() {
     if (input.id) {
       setUsers(prev => prev.map(u => (u.id === input.id ? { ...u, ...input } as StaffUser : u)));
     } else {
+      // Spread first, then set id/lastActive last so input's `id: undefined`
+      // (passed in create mode) can't overwrite the generated id.
       const created: StaffUser = {
+        ...input,
         id: nextId,
         lastActive: "Just now",
-        ...input,
       };
       setUsers(prev => [created, ...prev]);
     }
@@ -216,7 +216,7 @@ function UsersTab() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              {["User", "Role", "Branch", "Last active", "Status", ""].map((h, i) => (
+              {["User", "Role", "Branch", "Status", ""].map((h, i) => (
                 <th
                   key={i}
                   className="text-left px-5 py-2 text-[12px] font-medium text-gray-500"
@@ -250,7 +250,6 @@ function UsersTab() {
                     </div>
                   </td>
                   <td className="px-5 py-3 text-gray-600">{u.branch}</td>
-                  <td className="px-5 py-3 text-gray-500 text-xs">{u.lastActive}</td>
                   <td className="px-5 py-3">
                     <StatusBadge status={u.status} />
                   </td>
@@ -281,7 +280,7 @@ function UsersTab() {
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-500">
+                <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-500">
                   No users match your search.
                 </td>
               </tr>
@@ -305,6 +304,16 @@ function UsersTab() {
   );
 }
 
+/** Least-privileged non-admin role — the safe default when creating a new user. */
+const DEFAULT_NEW_USER_ROLE =
+  [...ROLES]
+    .filter(r => r.key !== "admin")
+    .sort(
+      (a, b) =>
+        (a.permissions === "*" ? Infinity : a.permissions.length) -
+        (b.permissions === "*" ? Infinity : b.permissions.length)
+    )[0]?.name ?? ROLES[0].name;
+
 function UserModal({
   user,
   nextId,
@@ -317,13 +326,14 @@ function UserModal({
   onSave: (input: Omit<StaffUser, "id" | "lastActive"> & { id?: string }) => void;
 }) {
   const editMode = user !== null;
+  // An Admin user's role is locked — it can't be changed from the edit form.
+  const editingAdmin =
+    editMode && ROLES.find(r => r.name === user!.role)?.key === "admin";
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
-  const [role, setRole] = useState(user?.role ?? ROLES[0].name);
+  const [role, setRole] = useState(user?.role ?? DEFAULT_NEW_USER_ROLE);
   const [branch, setBranch] = useState(user?.branch ?? "Phnom Penh");
   const [status, setStatus] = useState<StaffUser["status"]>(user?.status ?? "Active");
-  const [accessMethod, setAccessMethod] = useState<"invite" | "password">("invite");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const submit = (e: React.FormEvent) => {
@@ -333,26 +343,13 @@ function UserModal({
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       return setError("Enter a valid email address");
 
-    // On create, the access method drives the initial status:
-    // an invited user is Pending until they accept; a password-set user is Active.
-    let finalStatus = status;
-    if (!editMode) {
-      if (accessMethod === "password") {
-        if (password.length < 8)
-          return setError("Temporary password must be at least 8 characters");
-        finalStatus = "Active";
-      } else {
-        finalStatus = "Pending";
-      }
-    }
-
     onSave({
       id: user?.id,
       name: name.trim(),
       email: email.trim(),
       role,
       branch: branch.trim(),
-      status: finalStatus,
+      status,
     });
   };
 
@@ -408,14 +405,20 @@ function UserModal({
               <select
                 value={role}
                 onChange={e => setRole(e.target.value)}
-                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                disabled={editingAdmin}
+                className={cn(
+                  "mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+                  editingAdmin ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white"
+                )}
               >
                 {ROLES.map(r => (
                   <option key={r.key} value={r.name}>{r.name}</option>
                 ))}
               </select>
               <div className="text-[11px] text-gray-500 mt-1">
-                Manage roles in the Roles tab.
+                {editingAdmin
+                  ? "The Admin role can't be changed here."
+                  : "Manage roles in the Roles tab."}
               </div>
             </div>
             <div>
@@ -430,82 +433,28 @@ function UserModal({
                 ))}
               </select>
             </div>
-            {editMode ? (
-              <div className="col-span-2">
-                <label className="text-xs font-medium text-gray-600">Status</label>
-                <div className="mt-1 flex gap-2">
-                  {(["Active", "Inactive"] as const).map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setStatus(s)}
-                      className={cn(
-                        "flex-1 px-3 py-2 text-sm rounded-md border transition",
-                        status === s
-                          ? s === "Active"
-                            ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30"
-                            : "border-gray-400 bg-gray-50 text-gray-700 ring-1 ring-gray-400/30"
-                          : "border-gray-200 text-gray-700 hover:border-gray-300"
-                      )}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Status</label>
+              <div className="mt-1 flex gap-2">
+                {(["Active", "Inactive"] as const).map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setStatus(s)}
+                    className={cn(
+                      "flex-1 px-3 py-2 text-sm rounded-md border transition",
+                      status === s
+                        ? s === "Active"
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30"
+                          : "border-gray-400 bg-gray-50 text-gray-700 ring-1 ring-gray-400/30"
+                        : "border-gray-200 text-gray-700 hover:border-gray-300"
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="col-span-2">
-                <label className="text-xs font-medium text-gray-600">Access</label>
-                <div className="mt-1 grid grid-cols-2 gap-2">
-                  {([
-                    { key: "invite", icon: Mail, label: "Send email invite" },
-                    { key: "password", icon: KeyRound, label: "Set temporary password" },
-                  ] as const).map(opt => {
-                    const Icon = opt.icon;
-                    const active = accessMethod === opt.key;
-                    return (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        onClick={() => setAccessMethod(opt.key)}
-                        className={cn(
-                          "flex items-center gap-2 px-3 py-2 text-sm rounded-md border text-left transition",
-                          active
-                            ? "border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500/30"
-                            : "border-gray-200 text-gray-700 hover:border-gray-300"
-                        )}
-                      >
-                        <Icon className="w-4 h-4 flex-shrink-0" />
-                        <span className="leading-tight">{opt.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                {accessMethod === "invite" ? (
-                  <div className="mt-2 text-[11px] text-gray-500 flex items-start gap-1.5">
-                    <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400" />
-                    <span>
-                      An invitation will be emailed to{" "}
-                      <span className="font-medium text-gray-700">{email.trim() || "the address above"}</span>.
-                      The account stays <span className="font-medium">Pending</span> until they accept and set a password.
-                    </span>
-                  </div>
-                ) : (
-                  <div className="mt-2">
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="Temporary password (min 8 characters)"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                    />
-                    <div className="text-[11px] text-gray-500 mt-1">
-                      The user will be required to change it on first login.
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
           </div>
 
           {error && (
@@ -526,7 +475,7 @@ function UserModal({
               type="submit"
               className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
             >
-              {editMode ? "Save changes" : accessMethod === "invite" ? "Send invite" : "Create user"}
+              {editMode ? "Save changes" : "Add user"}
             </button>
           </div>
         </form>

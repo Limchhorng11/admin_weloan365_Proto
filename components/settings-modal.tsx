@@ -371,19 +371,15 @@ function MenuView() {
     { name: "Borrower MWL Agency information",       show: true },
     { name: "Borrower Loan Request Information",     show: true },
     { name: "Borrower Bank Account",                 show: true },
-    { name: "Borrower Add Guarantor Information",    show: false, disabled: true },
+    { name: "Review & Confirm",                      show: true },
+    { name: "Add Guarantor",                         show: false, disabled: true },
     { name: "Guarantor System Send SMS/Link",        show: false, disabled: true },
     { name: "Guarantor Receives SMS/Link",           show: false, disabled: true },
     { name: "Guarantor Confirm OTP",                 show: true },
     { name: "Guarantor Verify Face With ID Card",    show: true },
-    { name: "Guarantor CBC Consent",                 show: true },
     { name: "Borrower Confirm Review Guarantor",     show: true },
-    { name: "Borrower Upload Required Documents",    show: true },
-    { name: "Branch LOS / Assessment",               show: true },
-    { name: "Digital CBC consent",                   show: true },
-    { name: "Credit Assessment & Approve",           show: true },
-    { name: "Accept Loan",                           show: true },
-    { name: "Loan Disbursement Releases",            show: true },
+    { name: "Final Submission",                      show: true },
+    { name: "Application submitted",                 show: true },
   ];
   const enabledCount = STEPS.filter(s => s.show && !s.disabled).length;
   return (
