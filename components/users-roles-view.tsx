@@ -20,9 +20,10 @@ import {
   Square,
   X,
   ChevronDown,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { StatusBadge } from "./status-badge";
 import { useRole } from "@/lib/role-context";
 import {
   USERS,
@@ -159,12 +160,6 @@ function UsersTab() {
     return `U-${String(maxN + 1).padStart(2, "0")}`;
   }, [users]);
 
-  const toggleStatus = (id: string) => {
-    setUsers(prev =>
-      prev.map(u => (u.id === id ? { ...u, status: u.status === "Active" ? "Inactive" : "Active" } : u))
-    );
-  };
-
   const handleSave = (input: Omit<StaffUser, "id" | "lastActive"> & { id?: string }) => {
     if (input.id) {
       setUsers(prev => prev.map(u => (u.id === input.id ? { ...u, ...input } as StaffUser : u)));
@@ -216,7 +211,7 @@ function UsersTab() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              {["User", "Role", "Branch", "Status", ""].map((h, i) => (
+              {["User", "Role", "Branch", ""].map((h, i) => (
                 <th
                   key={i}
                   className="text-left px-5 py-2 text-[12px] font-medium text-gray-500"
@@ -229,7 +224,6 @@ function UsersTab() {
           <tbody>
             {filtered.map(u => {
               const role = ROLES.find(r => r.name === u.role);
-              const isActive = u.status === "Active";
               return (
                 <tr key={u.id} className="border-t border-gray-100">
                   <td className="px-5 py-3">
@@ -250,29 +244,14 @@ function UsersTab() {
                     </div>
                   </td>
                   <td className="px-5 py-3 text-gray-600">{u.branch}</td>
-                  <td className="px-5 py-3">
-                    <StatusBadge status={u.status} />
-                  </td>
                   <td className="px-5 py-3 text-right">
                     {can("user.edit") && (
-                      <div className="inline-flex items-center gap-3">
-                        <button
-                          onClick={() => toggleStatus(u.id)}
-                          className={cn(
-                            "text-xs hover:underline font-medium",
-                            isActive ? "text-rose-600" : "text-emerald-600"
-                          )}
-                          title={isActive ? "Deactivate user" : "Activate user"}
-                        >
-                          {isActive ? "Deactivate" : "Activate"}
-                        </button>
-                        <button
-                          onClick={() => setEditing(u)}
-                          className="text-xs text-brand-600 hover:underline font-medium"
-                        >
-                          Edit
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setEditing(u)}
+                        className="text-xs text-brand-600 hover:underline font-medium"
+                      >
+                        Edit
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -280,7 +259,7 @@ function UsersTab() {
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-500">
+                <td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-500">
                   No users match your search.
                 </td>
               </tr>
@@ -333,7 +312,9 @@ function UserModal({
   const [email, setEmail] = useState(user?.email ?? "");
   const [role, setRole] = useState(user?.role ?? DEFAULT_NEW_USER_ROLE);
   const [branch, setBranch] = useState(user?.branch ?? "Phnom Penh");
-  const [status, setStatus] = useState<StaffUser["status"]>(user?.status ?? "Active");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const submit = (e: React.FormEvent) => {
@@ -342,6 +323,12 @@ function UserModal({
     if (!email.trim()) return setError("Email is required");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       return setError("Enter a valid email address");
+    if (!editMode) {
+      if (!password) return setError("Password is required");
+      if (password.length < 6) return setError("Password must be at least 6 characters");
+    }
+    if (code && code.length !== 5)
+      return setError("Code must be exactly 5 characters");
 
     onSave({
       id: user?.id,
@@ -349,7 +336,9 @@ function UserModal({
       email: email.trim(),
       role,
       branch: branch.trim(),
-      status,
+      // Status is no longer set in the form — preserve the existing value on
+      // edit, default to "Active" for new users.
+      status: user?.status ?? "Active",
     });
   };
 
@@ -400,6 +389,60 @@ function UserModal({
                 className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>
+
+            {/* Password — required on create, optional on edit (means "set new"). */}
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">
+                Password {editMode ? "" : "*"}
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder={editMode ? "Leave blank to keep current password" : "At least 6 characters"}
+                  autoComplete="new-password"
+                  className="w-full pl-3 pr-9 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* User code — exactly 5 characters, width is sized to fit just 5. */}
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Code</label>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  value={code}
+                  onChange={e =>
+                    setCode(
+                      e.target.value
+                        .toUpperCase()
+                        .replace(/[^A-Z0-9]/g, "")
+                        .slice(0, 5)
+                    )
+                  }
+                  placeholder="ABC12"
+                  inputMode="text"
+                  maxLength={5}
+                  // Width sized to fit exactly 5 mono characters + padding.
+                  // text-center to keep partial codes visually centered in the slot.
+                  className="w-[7.5rem] px-3 py-2 border border-gray-200 rounded-md text-sm font-mono tracking-[0.4em] text-center uppercase focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+                <span className="text-[11px] text-gray-400">
+                  {code.length} / 5 · letters & digits
+                </span>
+              </div>
+            </div>
+
             <div>
               <label className="text-xs font-medium text-gray-600">Role</label>
               <select
@@ -432,28 +475,6 @@ function UserModal({
                   <option key={b} value={b}>{b}</option>
                 ))}
               </select>
-            </div>
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600">Status</label>
-              <div className="mt-1 flex gap-2">
-                {(["Active", "Inactive"] as const).map(s => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setStatus(s)}
-                    className={cn(
-                      "flex-1 px-3 py-2 text-sm rounded-md border transition",
-                      status === s
-                        ? s === "Active"
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30"
-                          : "border-gray-400 bg-gray-50 text-gray-700 ring-1 ring-gray-400/30"
-                        : "border-gray-200 text-gray-700 hover:border-gray-300"
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
 

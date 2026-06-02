@@ -16,6 +16,7 @@ import {
   Search,
   SlidersHorizontal,
   ChevronDown,
+  GripVertical,
   X,
   FileText,
   Check,
@@ -26,8 +27,6 @@ import {
   Files,
   Pencil,
   Globe,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 
 type StatusFilter = "all" | "active" | "draft";
@@ -60,6 +59,11 @@ export default function ProductsPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+
+  // Drag-and-drop reorder state — the id of the row currently being dragged
+  // and the id of the row it's hovering over (used for the drop-indicator).
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const detail = detailId ? products.find(p => p.id === detailId) ?? null : null;
 
@@ -126,6 +130,42 @@ export default function ProductsPage() {
 
   const handleUpdateStatus = (id: string, next: "active" | "draft") => {
     setProducts(prev => prev.map(p => (p.id === id ? { ...p, status: next } : p)));
+  };
+
+  /* Reorder top-level products (non-MWL and MWL parent) via drag-and-drop.
+   * MWL sub-products travel with their parent as one block and are never
+   * dragged on their own. `dragged` is dropped immediately before `target`
+   * (or to the very end when target is null). */
+  const moveTopLevelTo = (draggedId: string, targetId: string | null) => {
+    if (draggedId === targetId) return;
+    setProducts(prev => {
+      // Group into parent-plus-subs blocks so we move a whole family at once.
+      const blocks: LoanProduct[][] = [];
+      for (const p of prev) {
+        if (p.kind === "mwl-sub") {
+          const last = blocks[blocks.length - 1];
+          if (last && last[0].id === p.parentId) last.push(p);
+          else blocks.push([p]);
+        } else {
+          blocks.push([p]);
+        }
+      }
+      const srcIdx = blocks.findIndex(b => b[0].id === draggedId);
+      if (srcIdx === -1) return prev;
+      const [moved] = blocks.splice(srcIdx, 1);
+      if (targetId === null) {
+        blocks.push(moved);
+      } else {
+        const dstIdx = blocks.findIndex(b => b[0].id === targetId);
+        if (dstIdx === -1) {
+          // Target vanished — restore original position.
+          blocks.splice(srcIdx, 0, moved);
+        } else {
+          blocks.splice(dstIdx, 0, moved);
+        }
+      }
+      return blocks.flat();
+    });
   };
 
   return (
@@ -231,6 +271,9 @@ export default function ProductsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
+                <th className="w-16 px-3 py-3 text-left text-[12px] font-medium text-gray-500">
+                  #
+                </th>
                 {["Name", "Amount range", "Rate", "Term", "Active loans", "Status"].map(h => (
                   <th key={h} className="text-left px-6 py-3 text-[12px] font-medium text-gray-500">
                     {h}
@@ -240,7 +283,13 @@ export default function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {sortForGrouping(filtered, products).map(p => {
+              {(() => {
+                // Top-level (non-sub) IDs in their current global order — used
+                // to derive the 1-based position number shown in the # column.
+                const topLevelIds = products
+                  .filter(p => p.kind !== "mwl-sub")
+                  .map(p => p.id);
+                return sortForGrouping(filtered, products).map(p => {
                 const isParent = p.kind === "mwl-parent";
                 const isSub    = p.kind === "mwl-sub";
                 const country  = isSub
@@ -249,18 +298,80 @@ export default function ProductsPage() {
                 const childCount = isParent
                   ? products.filter(x => x.parentId === p.id).length
                   : 0;
+                const topIdx = isSub ? -1 : topLevelIds.indexOf(p.id);
+                const positionNumber = topIdx === -1 ? null : topIdx + 1;
+                const isDragging = draggedId === p.id;
+                const isDragOver = dragOverId === p.id && draggedId !== p.id && !isSub;
 
                 // Cell-level tone: sub-rows read as nested data, lighter weight.
                 const cellTone = isSub ? "text-gray-600" : "text-gray-700";
 
+                // Drag handlers only apply to top-level rows.
+                const dragProps = isSub
+                  ? {}
+                  : {
+                      draggable: true,
+                      onDragStart: (e: React.DragEvent) => {
+                        setDraggedId(p.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        // Some browsers need data to be set or drag aborts.
+                        e.dataTransfer.setData("text/plain", p.id);
+                      },
+                      onDragOver: (e: React.DragEvent) => {
+                        if (!draggedId || draggedId === p.id) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverId !== p.id) setDragOverId(p.id);
+                      },
+                      onDragLeave: () => {
+                        if (dragOverId === p.id) setDragOverId(null);
+                      },
+                      onDrop: (e: React.DragEvent) => {
+                        e.preventDefault();
+                        if (draggedId && draggedId !== p.id) {
+                          moveTopLevelTo(draggedId, p.id);
+                        }
+                        setDraggedId(null);
+                        setDragOverId(null);
+                      },
+                      onDragEnd: () => {
+                        setDraggedId(null);
+                        setDragOverId(null);
+                      },
+                    };
+
                 return (
                   <tr
                     key={p.id}
+                    {...dragProps}
                     className={cn(
-                      "border-b border-gray-100 last:border-0 hover:bg-gray-50/60",
-                      isSub && "bg-gray-50/30"
+                      "border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition",
+                      isSub && "bg-gray-50/30",
+                      isDragging && "opacity-40",
+                      // Subtle top accent on the row being dragged-over so the
+                      // drop target is obvious.
+                      isDragOver && "ring-2 ring-inset ring-brand-300 bg-brand-50/40"
                     )}
                   >
+                    {/* Reorder + position cell — drag handle and 1-based number
+                       for top-level products. Sub-products show an empty cell. */}
+                    <td className="w-16 px-3 py-3 align-middle">
+                      {!isSub && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            aria-label="Drag to reorder"
+                            title="Drag to reorder"
+                            className="p-0.5 text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing"
+                          >
+                            <GripVertical className="w-4 h-4" />
+                          </button>
+                          <span className="text-xs font-medium text-gray-500 tabular-nums">
+                            {positionNumber}
+                          </span>
+                        </div>
+                      )}
+                    </td>
                     {/* Name cell — indented + tree connector for sub-products */}
                     <td className={cn("py-3", isSub ? "pl-12 pr-6" : "px-6")}>
                       <div className="flex items-center gap-2 min-w-0">
@@ -324,7 +435,8 @@ export default function ProductsPage() {
                     </td>
                   </tr>
                 );
-              })}
+              });
+              })()}
             </tbody>
           </table>
         )}
@@ -1427,30 +1539,34 @@ function ToggleRow({
         </label>
         <button
           type="button"
+          role="switch"
+          aria-checked={shown}
           onClick={onToggle}
-          className={cn(
-            "inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider rounded-full px-2 py-0.5 border transition",
-            shown
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-              : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
-          )}
           title={shown ? "Hide this field" : "Show this field"}
-          aria-pressed={shown}
-        >
-          {shown ? (
-            <>
-              <Eye className="w-3 h-3" />
-              Shown
-            </>
-          ) : (
-            <>
-              <EyeOff className="w-3 h-3" />
-              Hidden
-            </>
+          className={cn(
+            "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
+            shown ? "bg-brand-600" : "bg-gray-300"
           )}
+        >
+          <span
+            className={cn(
+              "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+              shown ? "translate-x-[18px]" : "translate-x-0.5"
+            )}
+          />
         </button>
       </div>
-      {shown && <div className="mt-2">{children}</div>}
+      {/* Always render children — when toggled off, dim and disable instead
+       *   of hiding so the layout doesn't shift. */}
+      <div
+        className={cn(
+          "mt-2 transition-opacity",
+          !shown && "opacity-50 pointer-events-none select-none"
+        )}
+        aria-disabled={!shown}
+      >
+        {children}
+      </div>
     </div>
   );
 }

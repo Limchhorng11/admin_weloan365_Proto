@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
-import { PROMOTIONS, type Promotion, type PromotionStatus } from "@/lib/data";
+import { PROMOTIONS, type Promotion } from "@/lib/data";
 import { useRole } from "@/lib/role-context";
 import { cn } from "@/lib/utils";
 import {
@@ -240,7 +240,8 @@ function PromotionEditorModal({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
-  const [status, setStatus] = useState<PromotionStatus>("Active");
+  const [deadlineOn, setDeadlineOn] = useState(false);
+  const [deadline, setDeadline] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -252,12 +253,14 @@ function PromotionEditorModal({
       setTitle(initial.title);
       setDescription(initial.description);
       setImage(initial.image);
-      setStatus(initial.status);
+      setDeadlineOn(!!initial.deadline);
+      setDeadline(initial.deadline ?? "");
     } else {
       setTitle("");
       setDescription("");
       setImage("");
-      setStatus("Active");
+      setDeadlineOn(false);
+      setDeadline("");
     }
     setError(null);
   }, [open, initial]);
@@ -289,13 +292,17 @@ function PromotionEditorModal({
   const submit = () => {
     if (!title.trim()) return setError("Title is required.");
     if (!description.trim()) return setError("Description is required.");
+    if (deadlineOn && !deadline) return setError("Pick a deadline date or turn the deadline off.");
     const promo: Promotion = {
       id: initial?.id ?? nextId,
       title: title.trim(),
       description: description.trim(),
       image,
-      status,
+      // Status is no longer set in the form — preserve the existing value on
+      // edit, default to "Active" for new promotions.
+      status: initial?.status ?? "Active",
       date: initial?.date ?? new Date().toISOString().slice(0, 10),
+      deadline: deadlineOn ? deadline : undefined,
     };
     onSave(promo);
   };
@@ -410,26 +417,58 @@ function PromotionEditorModal({
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-gray-700">Status</label>
-            <div className="mt-1 flex gap-2">
-              {(["Active", "Inactive"] as const).map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setStatus(s)}
+          {/* Deadline — optional. Toggle to enable a date picker. Mirrors the
+              on/off switch + disabled-input pattern from the create-product form. */}
+          <div className="border border-gray-200 rounded-md">
+            <div
+              className={cn(
+                "flex items-center justify-between gap-3 px-3 py-2",
+                !deadlineOn && "bg-gray-50/60"
+              )}
+            >
+              <label
+                className={cn(
+                  "text-xs font-medium",
+                  deadlineOn ? "text-gray-700" : "text-gray-400"
+                )}
+              >
+                Set deadline
+              </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={deadlineOn}
+                onClick={() => setDeadlineOn(v => !v)}
+                title={deadlineOn ? "Disable deadline" : "Enable deadline"}
+                className={cn(
+                  "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
+                  deadlineOn ? "bg-brand-600" : "bg-gray-300"
+                )}
+              >
+                <span
                   className={cn(
-                    "flex-1 px-3 py-2 text-sm rounded-md border transition",
-                    status === s
-                      ? s === "Active"
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/30"
-                        : "border-gray-400 bg-gray-50 text-gray-700 ring-1 ring-gray-400/30"
-                      : "border-gray-200 text-gray-700 hover:border-gray-300"
+                    "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                    deadlineOn ? "translate-x-[18px]" : "translate-x-0.5"
                   )}
-                >
-                  {s}
-                </button>
-              ))}
+                />
+              </button>
+            </div>
+            <div
+              className={cn(
+                "px-3 pb-3 pt-1 transition-opacity",
+                !deadlineOn && "opacity-50 pointer-events-none select-none"
+              )}
+              aria-disabled={!deadlineOn}
+            >
+              <input
+                type="date"
+                value={deadline}
+                onChange={e => setDeadline(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+              <div className="text-[11px] text-gray-400 mt-1">
+                Optional — the promotion will be hidden from customers after this date.
+              </div>
             </div>
           </div>
         </div>

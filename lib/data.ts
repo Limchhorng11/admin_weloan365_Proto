@@ -75,6 +75,17 @@ export const CHART_DATA: { label: string; value: number; highlight?: boolean }[]
   { label: "Dec", value: 47000 },
 ];
 
+export type CustomerDevice = {
+  /** Device platform — used for the small icon in the list column. */
+  platform: "ios" | "android";
+  /** Marketed model name shown in the table (e.g. "iPhone 14", "Galaxy A53"). */
+  model: string;
+  /** Free-form label shown under the model in the customer detail page. */
+  os?: string;
+  /** Last time the customer used the mobile app from this device. */
+  lastSeen?: string;
+};
+
 export type Customer = {
   id: string;
   name: string;
@@ -84,17 +95,62 @@ export type Customer = {
   loans: number;
   joined: string;
   branch: string;
+  /** Devices the customer has signed in from. The first entry is the primary
+   *  (most recently used) device — that's what the list view surfaces. */
+  devices: CustomerDevice[];
 };
 
 export const CUSTOMERS: Customer[] = [
-  { id: "C-0421", name: "Sokha Chan",   phone: "+855 12 345 678", email: "sokha@mail.com",  kyc: "verified", loans: 2, joined: "2023-06-11", branch: "Phnom Penh — Central" },
-  { id: "C-0422", name: "Dara Meas",    phone: "+855 17 998 221", email: "dara@mail.com",   kyc: "verified", loans: 1, joined: "2024-01-03", branch: "Siem Reap" },
-  { id: "C-0423", name: "Vichet Lim",   phone: "+855 10 556 777", email: "vichet@mail.com", kyc: "verified", loans: 1, joined: "2025-02-28", branch: "Phnom Penh — Toul Kork" },
-  { id: "C-0424", name: "Pisey Ros",    phone: "+855 96 221 004", email: "pisey@mail.com",  kyc: "verified", loans: 1, joined: "2025-09-14", branch: "Battambang" },
-  { id: "C-0425", name: "Narith Kim",   phone: "+855 88 330 112", email: "narith@mail.com", kyc: "pending",  loans: 1, joined: "2024-11-05", branch: "Phnom Penh — Central" },
-  { id: "C-0426", name: "Bopha Sok",    phone: "+855 77 441 993", email: "bopha@mail.com",  kyc: "verified", loans: 1, joined: "2025-07-22", branch: "Kampong Cham" },
-  { id: "C-0427", name: "Rithy Pen",    phone: "+855 92 118 006", email: "rithy@mail.com",  kyc: "verified", loans: 1, joined: "2024-04-17", branch: "Siem Reap" },
-  { id: "C-0428", name: "Chenda Oum",   phone: "+855 86 772 554", email: "chenda@mail.com", kyc: "rejected", loans: 0, joined: "2026-04-17", branch: "Phnom Penh — Central" },
+  {
+    id: "C-0421", name: "Sokha Chan",   phone: "+855 12 345 678", email: "sokha@mail.com",  kyc: "verified", loans: 2, joined: "2023-06-11", branch: "Phnom Penh — Central",
+    devices: [
+      { platform: "ios",     model: "iPhone 14",            os: "iOS 17.4",    lastSeen: "2 min ago"  },
+      { platform: "android", model: "Galaxy Tab A8",        os: "Android 13",  lastSeen: "12 days ago" },
+    ],
+  },
+  {
+    id: "C-0422", name: "Dara Meas",    phone: "+855 17 998 221", email: "dara@mail.com",   kyc: "verified", loans: 1, joined: "2024-01-03", branch: "Siem Reap",
+    devices: [
+      { platform: "android", model: "Samsung Galaxy A53",   os: "Android 14",  lastSeen: "1 hr ago"   },
+    ],
+  },
+  {
+    id: "C-0423", name: "Vichet Lim",   phone: "+855 10 556 777", email: "vichet@mail.com", kyc: "verified", loans: 1, joined: "2025-02-28", branch: "Phnom Penh — Toul Kork",
+    devices: [
+      { platform: "android", model: "Huawei P50",           os: "HarmonyOS 3", lastSeen: "Yesterday"  },
+    ],
+  },
+  {
+    id: "C-0424", name: "Pisey Ros",    phone: "+855 96 221 004", email: "pisey@mail.com",  kyc: "verified", loans: 1, joined: "2025-09-14", branch: "Battambang",
+    devices: [
+      { platform: "ios",     model: "iPhone 13 Pro",        os: "iOS 17.3",    lastSeen: "3 hr ago"   },
+    ],
+  },
+  {
+    id: "C-0425", name: "Narith Kim",   phone: "+855 88 330 112", email: "narith@mail.com", kyc: "pending",  loans: 1, joined: "2024-11-05", branch: "Phnom Penh — Central",
+    devices: [
+      { platform: "android", model: "Xiaomi Redmi Note 12", os: "MIUI 14",     lastSeen: "5 days ago" },
+    ],
+  },
+  {
+    id: "C-0426", name: "Bopha Sok",    phone: "+855 77 441 993", email: "bopha@mail.com",  kyc: "verified", loans: 1, joined: "2025-07-22", branch: "Kampong Cham",
+    devices: [
+      { platform: "android", model: "Samsung Galaxy S22",   os: "Android 14",  lastSeen: "30 min ago" },
+    ],
+  },
+  {
+    id: "C-0427", name: "Rithy Pen",    phone: "+855 92 118 006", email: "rithy@mail.com",  kyc: "verified", loans: 1, joined: "2024-04-17", branch: "Siem Reap",
+    devices: [
+      { platform: "android", model: "Oppo A77",             os: "ColorOS 12",  lastSeen: "1 day ago"  },
+      { platform: "ios",     model: "iPhone SE (2nd gen)",  os: "iOS 16.7",    lastSeen: "2 months ago" },
+    ],
+  },
+  {
+    id: "C-0428", name: "Chenda Oum",   phone: "+855 86 772 554", email: "chenda@mail.com", kyc: "rejected", loans: 0, joined: "2026-04-17", branch: "Phnom Penh — Central",
+    devices: [
+      { platform: "ios",     model: "iPhone SE",            os: "iOS 17.4",    lastSeen: "Yesterday"  },
+    ],
+  },
 ];
 
 /**
@@ -856,6 +912,8 @@ export type Promotion = {
   image: string;
   status: PromotionStatus;
   date: string;
+  /** Optional end date (ISO YYYY-MM-DD) — when set, promo auto-expires on this day. */
+  deadline?: string;
 };
 
 export const PROMOTIONS: Promotion[] = [

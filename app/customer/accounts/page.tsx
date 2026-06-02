@@ -249,7 +249,7 @@ export default function CustomersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
-                {["ID", "Name", "Phone", "KYC", "Loans", "Branch"].map(h => (
+                {["ID", "Name", "Phone", "KYC", "Loans", "Branch", "Device"].map(h => (
                   <th key={h} className="text-left px-6 py-3 text-[12px] font-medium text-gray-500">
                     <span className="inline-flex items-center gap-1">
                       {h}
@@ -266,7 +266,7 @@ export default function CustomersPage() {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center text-sm text-gray-500">
+                  <td colSpan={9} className="px-6 py-16 text-center text-sm text-gray-500">
                     No customers match your filters.
                   </td>
                 </tr>
@@ -283,14 +283,36 @@ export default function CustomersPage() {
                     </td>
                     <td className="px-6 py-3.5 text-gray-700">{c.loans}</td>
                     <td className="px-6 py-3.5 text-gray-600">{c.branch}</td>
+                    <td className="px-6 py-3.5 text-gray-600">
+                      {c.devices.length > 0 ? (
+                        <span className="relative inline-block group cursor-default">
+                          <span>
+                            {c.devices[0].model.length > 7
+                              ? `${c.devices[0].model.slice(0, 7)}…`
+                              : c.devices[0].model}
+                          </span>
+                          {/* Styled hover tooltip — popup with the full model name */}
+                          <span
+                            role="tooltip"
+                            className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 z-20 whitespace-nowrap px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-medium opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition shadow-lg"
+                          >
+                            {c.devices[0].model}
+                            {/* Caret pointing down toward the text */}
+                            <span className="absolute left-1/2 -translate-x-1/2 top-full -mt-px w-2 h-2 bg-gray-900 rotate-45" />
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
                     <td className="px-6 py-3.5">
                       <Link
                         href={`/customer/accounts/${c.id}`}
                         className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[11px] font-medium hover:bg-amber-100"
-                        title="Open the customer's profile to send the PIN change request"
+                        title="Open the customer's profile to reset their PIN"
                       >
                         <KeyRound className="w-3 h-3" />
-                        Request change PIN from customer
+                        Reset PIN
                       </Link>
                     </td>
                     <td className="px-6 py-3.5 text-right">
@@ -356,3 +378,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+

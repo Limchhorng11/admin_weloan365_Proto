@@ -128,7 +128,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl w-full max-w-5xl h-[85vh] max-h-[800px] flex overflow-hidden shadow-2xl"
+        className="bg-white rounded-xl w-full max-w-6xl h-[85vh] max-h-[800px] flex overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Left nav */}
@@ -576,6 +576,36 @@ function MenuView() {
       ),
     }));
 
+  /* ----- Description editor draft state -----
+   * The expanded page's description is edited in a local draft so the operator
+   * can preview / append placeholder tokens before committing. "Save" copies
+   * the draft into the persistent flow data via updateDescription(). */
+  const [draftDesc, setDraftDesc] = useState<string>("");
+  const [justSaved, setJustSaved] = useState(false);
+
+  // Sync the draft whenever a different page is opened (or the tab switches).
+  useEffect(() => {
+    if (openIdx == null) {
+      setDraftDesc("");
+      setJustSaved(false);
+      return;
+    }
+    const p = flows[tab][openIdx];
+    setDraftDesc(p?.description ?? "");
+    setJustSaved(false);
+  }, [openIdx, tab, flows]);
+
+  const savedDesc = openIdx != null ? flows[tab][openIdx]?.description ?? "" : "";
+  const isDirty = openIdx != null && draftDesc !== savedDesc;
+
+  const saveDescription = () => {
+    if (openIdx == null) return;
+    updateDescription(openIdx, draftDesc);
+    setJustSaved(true);
+    // Clear the "Saved" badge after a couple of seconds.
+    setTimeout(() => setJustSaved(false), 1800);
+  };
+
   const TABS: { key: FlowKind; label: string }[] = [
     { key: "mwl", label: "MWL" },
     { key: "nonMwl", label: "NON-MWL" },
@@ -786,12 +816,20 @@ function MenuView() {
 
                     {hasMessage && (
                       <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-gray-400 px-1 mb-1 block">
-                          {p.messageLabel ?? "Message"}
-                        </label>
+                        <div className="flex items-center justify-between px-1 mb-1">
+                          <label className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                            {p.messageLabel ?? "Message"}
+                          </label>
+                          {/* Live unsaved/saved indicator next to the Save button. */}
+                          {isDirty ? (
+                            <span className="text-[11px] text-amber-600 font-medium">Unsaved changes</span>
+                          ) : justSaved ? (
+                            <span className="text-[11px] text-emerald-600 font-medium">Saved</span>
+                          ) : null}
+                        </div>
                         <textarea
-                          value={p.description}
-                          onChange={e => updateDescription(idx, e.target.value)}
+                          value={draftDesc}
+                          onChange={e => setDraftDesc(e.target.value)}
                           rows={4}
                           placeholder="Message shown to the customer on this page…"
                           className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white resize-y focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
@@ -802,13 +840,41 @@ function MenuView() {
                             <button
                               key={token}
                               type="button"
-                              onClick={() => updateDescription(idx, `${p.description ?? ""}${token}`)}
+                              onClick={() => setDraftDesc(d => `${d ?? ""}${token}`)}
                               className="text-[11px] font-mono px-1.5 py-0.5 rounded border border-gray-200 bg-white text-brand-700 hover:bg-brand-50"
                             >
                               {token}
                             </button>
                           ))}
                           <span className="text-[11px] text-gray-400">— filled in automatically.</span>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 mt-2 px-1">
+                          <button
+                            type="button"
+                            onClick={() => setDraftDesc(savedDesc)}
+                            disabled={!isDirty}
+                            className={cn(
+                              "px-3 py-1.5 text-xs font-medium rounded-md border transition",
+                              isDirty
+                                ? "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                                : "border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed"
+                            )}
+                          >
+                            Discard
+                          </button>
+                          <button
+                            type="button"
+                            onClick={saveDescription}
+                            disabled={!isDirty}
+                            className={cn(
+                              "px-3 py-1.5 text-xs font-medium rounded-md transition",
+                              isDirty
+                                ? "bg-brand-600 text-white hover:bg-brand-700"
+                                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            )}
+                          >
+                            Save
+                          </button>
                         </div>
                       </div>
                     )}
@@ -1500,15 +1566,9 @@ function ReferralView() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <H2>Referral Program</H2>
-          <P>Customers enter a 5-digit Credit Officer code at signup. Track conversions per officer.</P>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs text-gray-500">Program status</span>
-          <Toggle checked />
-        </div>
+      <div>
+        <H2>Referral Program</H2>
+        <P>Customers enter a 5-digit Credit Officer code at signup. Track conversions per officer.</P>
       </div>
 
       {/* KPI strip */}
@@ -1520,22 +1580,15 @@ function ReferralView() {
 
       {/* CO codes table */}
       <Card>
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <div className="font-medium text-gray-900">Credit Officer codes</div>
-            <div className="text-xs text-gray-500 mt-0.5">One unique 5-digit code per officer.</div>
-          </div>
-          {!readOnly && (
-            <button className="px-3 py-1 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
-              Issue new code
-            </button>
-          )}
+        <div className="mb-3">
+          <div className="font-medium text-gray-900">Credit Officer codes</div>
+          <div className="text-xs text-gray-500 mt-0.5">One unique 5-digit code per officer.</div>
         </div>
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                {["Code", "Officer", "Branch", "Referrals", "Apps", "Disbursed", "Status", ""].map(h => (
+                {["Code", "Officer", "Branch", "Apps", "Disbursed"].map(h => (
                   <th key={h} className="text-left px-4 py-2 text-[12px] font-medium text-gray-500">
                     {h}
                   </th>
@@ -1561,42 +1614,14 @@ function ReferralView() {
                     <div className="text-xs text-gray-500">{r.role}</div>
                   </td>
                   <td className="px-4 py-2.5 text-gray-600">{r.branch}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{r.referrals}</td>
                   <td className="px-4 py-2.5 text-gray-600">{r.applications}</td>
                   <td className="px-4 py-2.5 font-medium text-gray-900">{r.disbursed}</td>
-                  <td className="px-4 py-2.5">
-                    <span
-                      className={cn(
-                        "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium",
-                        r.status === "Active"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-gray-100 text-gray-600"
-                      )}
-                    >
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    {!readOnly && (
-                      <button className="text-xs text-brand-600 hover:underline font-medium">
-                        Regenerate
-                      </button>
-                    )}
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
-
-      {!readOnly && (
-        <div className="flex justify-end">
-          <button className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
-            Save changes
-          </button>
-        </div>
-      )}
     </div>
   );
 }
