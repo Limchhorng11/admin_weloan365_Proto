@@ -61,7 +61,7 @@ function CategoryBadge({ id }: { id: PostCategoryId }) {
 
 export default function PostsPage() {
   const { can, user } = useRole();
-  const canEdit = can("setting.edit");
+  const canEdit = can("post.manage");
 
   const [list, setList]       = useState<Post[]>(POSTS);
   const [query, setQuery]     = useState("");

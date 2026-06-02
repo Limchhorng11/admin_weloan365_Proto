@@ -5,6 +5,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Smartphone,
   Users,
   LayoutGrid,
@@ -362,66 +363,460 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+/* ---------- Apply Loan Setting (per-page, field-level editor) ---------- */
+
+type FlowField = { name: string; show: boolean; required?: boolean };
+/** a page can group its fields into named sections (e.g. Step 1 = "Tell us about you" + "Choose your branch") */
+type FlowSection = { name: string; show: boolean; fields: FlowField[] };
+type FlowPage = {
+  name: string;
+  show: boolean;
+  system?: boolean;
+  fields: FlowField[];
+  /** when present, fields are grouped into sections instead of the flat `fields` list */
+  sections?: FlowSection[];
+  /** editable confirmation / SMS / intro message shown to the customer on this page */
+  description?: string;
+  /** section title for the message editor (e.g. "Confirmation message") */
+  messageLabel?: string;
+  /** placeholder tokens offered for this message; auto-filled for the customer */
+  placeholders?: string[];
+};
+type FlowKind = "mwl" | "nonMwl";
+
+const DEFAULT_PLACEHOLDERS = ["{name}", "{product}", "{phone}"];
+
+/** field builders — keep the seed data readable */
+const req = (name: string): FlowField => ({ name, show: true, required: true });
+const opt = (name: string): FlowField => ({ name, show: true });
+
+const MWL_PAGES: FlowPage[] = [
+  { name: "Choose destination", show: true, fields: [
+    opt("Republic of Korea — EPS · up to $15,000 / 30 months"),
+    opt("Japan — SSW / Technical intern · up to $12,000 / 36 months"),
+    opt("Singapore — Work Permit / S Pass · up to $10,000 / 24 months"),
+  ] },
+  { name: "Borrower Quick Information Submission", show: true, fields: [], sections: [
+    { name: "Tell us about you", show: true, fields: [
+      req("Full name"), req("Mobile number"), req("Province / Capital"),
+      req("Current occupation"), req("Requested amount"), req("Loan purpose"),
+    ] },
+    { name: "Choose your branch", show: true, fields: [
+      req("Select branch"), opt("Staff referral code"),
+    ] },
+  ] },
+  { name: "Borrower Employment Information", show: true, fields: [
+    req("Job position"), req("Employer / company name"), req("Destination country"),
+    req("Destination city"), req("Start date"), req("End date"),
+    req("Salary currency"), req("Monthly salary"),
+  ] },
+  { name: "Input referral", show: true, fields: [ opt("Staff referral code") ] },
+  { name: "Borrower MWL Agency information", show: true, fields: [
+    req("Registered agency"), opt("Agency code"), opt("Licence"),
+    opt("Contact person"), opt("Phone"), opt("Address"),
+  ] },
+  { name: "Borrower Loan Request Information", show: true, fields: [
+    req("Loan purpose"), req("Repayment method"), req("Amount"),
+    req("Loan term"), opt("Monthly interest"),
+  ] },
+  { name: "Borrower Bank Account", show: true, fields: [
+    req("Bank"), req("Account holder name"), req("Account number"),
+    req("Currency"), req("Branch name"),
+  ] },
+  { name: "Review & Confirm", show: true, fields: [] },
+  { name: "Add Guarantor", show: true, fields: [
+    req("Full name"), req("Mobile number"), req("NID number"),
+    req("Relationship"), req("Eligibility checklist"),
+  ] },
+  { name: "Guarantor System Send SMS/Link", show: true, system: true, fields: [],
+    messageLabel: "SMS / link message",
+    placeholders: ["{name}", "{product}", "{link}"],
+    description:
+      "Hi {name}, you have been added as a guarantor for a {product} application. " +
+      "Tap the secure link to confirm your details: {link}" },
+  { name: "Guarantor Receives SMS/Link", show: true, system: true, fields: [] },
+  { name: "Guarantor Confirm OTP", show: true, system: true, fields: [] },
+  { name: "Guarantor Verify Face With ID Card", show: true, system: true, fields: [] },
+  { name: "Borrower Confirm Review Guarantor", show: true, fields: [] },
+  { name: "Final Submission", show: true, system: true, fields: [] },
+  { name: "Application submitted", show: true, system: true, fields: [],
+    messageLabel: "Confirmation message",
+    description:
+      "Thank you, {name}. Your {product} application has been submitted. " +
+      "Our loan officer will contact you at {phone} within 1 business day." },
+];
+
+/** Non-MWL (quick / domestic) flow — for an existing customer: request → documents → received. */
+const NON_MWL_PAGES: FlowPage[] = [
+  { name: "Request Loan", show: true, fields: [
+    req("What's it for? (loan purpose)"), req("Amount"), req("Currency"),
+    opt("Payment table"),
+  ] },
+  { name: "Documents (optional)", show: true, fields: [
+    opt("Supported document upload"), opt("Referral code"),
+  ] },
+  { name: "Request received", show: true, system: true, fields: [],
+    messageLabel: "Confirmation message",
+    description:
+      "Thank you, {name}. Your loan request for {product} has been submitted. " +
+      "Our loan officer will contact you at {phone} within 1 business day." },
+];
+
+function SwitchToggle({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={onChange}
+      className={cn(
+        "relative w-10 h-5 rounded-full transition flex-shrink-0",
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+        checked ? "bg-brand-600" : "bg-gray-200"
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-0.5 left-0.5 bg-white rounded-full h-4 w-4 transition",
+          checked && "translate-x-5"
+        )}
+      />
+    </button>
+  );
+}
+
 function MenuView() {
-  const STEPS: { name: string; show: boolean; disabled?: boolean }[] = [
-    { name: "Borrower Quick Information Submission", show: true },
-    { name: "Borrower choice branch",                show: true },
-    { name: "Borrower Employment Information",       show: true },
-    { name: "Input referral",                        show: true },
-    { name: "Borrower MWL Agency information",       show: true },
-    { name: "Borrower Loan Request Information",     show: true },
-    { name: "Borrower Bank Account",                 show: true },
-    { name: "Review & Confirm",                      show: true },
-    { name: "Add Guarantor",                         show: false, disabled: true },
-    { name: "Guarantor System Send SMS/Link",        show: false, disabled: true },
-    { name: "Guarantor Receives SMS/Link",           show: false, disabled: true },
-    { name: "Guarantor Confirm OTP",                 show: true },
-    { name: "Guarantor Verify Face With ID Card",    show: true },
-    { name: "Borrower Confirm Review Guarantor",     show: true },
-    { name: "Final Submission",                      show: true },
-    { name: "Application submitted",                 show: true },
+  const [flows, setFlows] = useState<Record<FlowKind, FlowPage[]>>({
+    mwl: MWL_PAGES,
+    nonMwl: NON_MWL_PAGES,
+  });
+  const [tab, setTab] = useState<FlowKind>("mwl");
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+
+  const pages = flows[tab];
+  const enabledCount = pages.filter(p => p.show).length;
+
+  const switchTab = (k: FlowKind) => {
+    setTab(k);
+    setOpenIdx(null);
+  };
+
+  const togglePage = (idx: number) =>
+    setFlows(prev => ({
+      ...prev,
+      [tab]: prev[tab].map((p, i) => (i === idx ? { ...p, show: !p.show } : p)),
+    }));
+
+  const toggleField = (pageIdx: number, fieldIdx: number) =>
+    setFlows(prev => ({
+      ...prev,
+      [tab]: prev[tab].map((p, i) =>
+        i === pageIdx
+          ? {
+              ...p,
+              fields: p.fields.map((f, j) =>
+                j === fieldIdx ? { ...f, show: !f.show } : f
+              ),
+            }
+          : p
+      ),
+    }));
+
+  const toggleSection = (pageIdx: number, secIdx: number) =>
+    setFlows(prev => ({
+      ...prev,
+      [tab]: prev[tab].map((p, i) =>
+        i === pageIdx
+          ? {
+              ...p,
+              sections: p.sections?.map((s, k) =>
+                k === secIdx ? { ...s, show: !s.show } : s
+              ),
+            }
+          : p
+      ),
+    }));
+
+  const toggleSectionField = (pageIdx: number, secIdx: number, fieldIdx: number) =>
+    setFlows(prev => ({
+      ...prev,
+      [tab]: prev[tab].map((p, i) =>
+        i === pageIdx
+          ? {
+              ...p,
+              sections: p.sections?.map((s, k) =>
+                k === secIdx
+                  ? {
+                      ...s,
+                      fields: s.fields.map((f, j) =>
+                        j === fieldIdx ? { ...f, show: !f.show } : f
+                      ),
+                    }
+                  : s
+              ),
+            }
+          : p
+      ),
+    }));
+
+  const updateDescription = (pageIdx: number, value: string) =>
+    setFlows(prev => ({
+      ...prev,
+      [tab]: prev[tab].map((p, i) =>
+        i === pageIdx ? { ...p, description: value } : p
+      ),
+    }));
+
+  const TABS: { key: FlowKind; label: string }[] = [
+    { key: "mwl", label: "MWL" },
+    { key: "nonMwl", label: "NON-MWL" },
   ];
-  const enabledCount = STEPS.filter(s => s.show && !s.disabled).length;
+
   return (
     <div className="space-y-5">
       <div>
         <H2>Apply Loan Setting</H2>
-        <P>Toggle off any step to skip it in the customer-app loan application flow.</P>
+        <P>
+          Configure the customer-app loan application flow. Toggle a page to skip it,
+          or expand a page to show / hide its individual fields.
+        </P>
       </div>
+
+      {/* Flow tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => switchTab(t.key)}
+            className={cn(
+              "px-3 py-2 text-sm border-b-2 -mb-px flex items-center gap-2",
+              tab === t.key
+                ? "border-brand-600 text-brand-700 font-medium"
+                : "border-transparent text-gray-600 hover:text-gray-900"
+            )}
+          >
+            {t.label}
+            <span
+              className={cn(
+                "text-[10px] font-medium rounded-full px-1.5 py-0.5",
+                tab === t.key ? "bg-brand-100 text-brand-700" : "bg-gray-100 text-gray-500"
+              )}
+            >
+              {flows[t.key].length}
+            </span>
+          </button>
+        ))}
+      </div>
+
       <Card className="!p-0">
-        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <div className="font-medium text-gray-900 text-sm">Application steps</div>
-            <div className="text-xs text-gray-500 mt-0.5">
-              {STEPS.length} steps · {enabledCount} enabled
-            </div>
+        <div className="px-5 py-3 border-b border-gray-200">
+          <div className="font-medium text-gray-900 text-sm">
+            {tab === "mwl" ? "MWL application pages" : "Non-MWL application pages"}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            {pages.length} pages · {enabledCount} enabled
           </div>
         </div>
-        <div className="px-5 py-2 max-h-[460px] overflow-y-auto scrollbar-thin">
-          <div className="divide-y divide-gray-100">
-            {STEPS.map((m, idx) => (
+
+        <div className="px-3 py-2.5 max-h-[460px] overflow-y-auto scrollbar-thin space-y-1.5">
+          {pages.map((p, idx) => {
+            const open = openIdx === idx;
+            const allFields = p.sections ? p.sections.flatMap(s => s.fields) : p.fields;
+            const totalFields = allFields.length;
+            const fieldsShown = allFields.filter(f => f.show).length;
+            const hasMessage = p.description !== undefined;
+            const canExpand = p.show && (totalFields > 0 || hasMessage);
+            return (
               <div
-                key={m.name}
+                key={p.name}
                 className={cn(
-                  "flex items-center justify-between py-2.5 text-sm",
-                  m.disabled && "opacity-60"
+                  "rounded-lg border transition",
+                  p.show ? "border-gray-200" : "border-gray-100 bg-gray-50/60 opacity-70"
                 )}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-2.5 px-3 py-2.5">
                   <span className="w-6 h-6 rounded-md bg-gray-100 text-gray-500 text-[11px] font-medium flex items-center justify-center flex-shrink-0">
                     {idx + 1}
                   </span>
-                  <span className="font-medium text-gray-900 truncate">{m.name}</span>
-                  {m.disabled && (
-                    <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                      Disabled
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => canExpand && setOpenIdx(open ? null : idx)}
+                    disabled={!canExpand}
+                    className={cn(
+                      "flex-1 min-w-0 flex items-center gap-2 text-left",
+                      canExpand ? "cursor-pointer" : "cursor-default"
+                    )}
+                  >
+                    <span className="font-medium text-gray-900 text-sm truncate">{p.name}</span>
+                    {p.system && (
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                        Auto
+                      </span>
+                    )}
+                    {hasMessage && (
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded flex-shrink-0">
+                        Message
+                      </span>
+                    )}
+                    {totalFields > 0 && (
+                      <span className="text-[11px] text-gray-400 flex-shrink-0">
+                        {fieldsShown}/{totalFields} fields
+                      </span>
+                    )}
+                    {canExpand && (
+                      <ChevronDown
+                        className={cn(
+                          "w-4 h-4 text-gray-400 transition flex-shrink-0",
+                          open && "rotate-180 text-brand-600"
+                        )}
+                      />
+                    )}
+                  </button>
+                  <SwitchToggle
+                    checked={p.show}
+                    disabled={p.system}
+                    onChange={() => togglePage(idx)}
+                  />
                 </div>
-                <Toggle checked={m.show} disabled={m.disabled} />
+
+                {open && (
+                  <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/50 rounded-b-lg space-y-3">
+                    {p.sections ? (
+                      <div className="space-y-3">
+                        {p.sections.map((s, si) => (
+                          <div key={s.name}>
+                            <div className="flex items-center justify-between px-1 mb-1">
+                              <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                                {s.name}
+                              </div>
+                              <SwitchToggle
+                                checked={s.show}
+                                onChange={() => toggleSection(idx, si)}
+                              />
+                            </div>
+                            <div
+                              className={cn(
+                                "divide-y divide-gray-100 rounded-md border border-gray-100 bg-white px-2",
+                                !s.show && "opacity-50"
+                              )}
+                            >
+                              {s.fields.map((f, j) => (
+                                <div
+                                  key={f.name}
+                                  className="flex items-center justify-between py-2 px-1"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span
+                                      className={cn(
+                                        "text-sm truncate",
+                                        f.show && s.show
+                                          ? "text-gray-800"
+                                          : "text-gray-400 line-through"
+                                      )}
+                                    >
+                                      {f.name}
+                                    </span>
+                                    {f.required && (
+                                      <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
+                                        Required
+                                      </span>
+                                    )}
+                                  </div>
+                                  <SwitchToggle
+                                    checked={f.show}
+                                    disabled={!s.show}
+                                    onChange={() => toggleSectionField(idx, si, j)}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        <div className="text-[11px] text-gray-400 px-1">
+                          Turn a section off to hide it and all its fields. &ldquo;Required&rdquo; is a label only — any field can be hidden.
+                        </div>
+                      </div>
+                    ) : p.fields.length > 0 ? (
+                      <div>
+                        <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 px-1 mb-1">
+                          Fields
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {p.fields.map((f, j) => (
+                            <div
+                              key={f.name}
+                              className="flex items-center justify-between py-2 px-1"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className={cn(
+                                    "text-sm truncate",
+                                    f.show ? "text-gray-800" : "text-gray-400 line-through"
+                                  )}
+                                >
+                                  {f.name}
+                                </span>
+                                {f.required && (
+                                  <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
+                                    Required
+                                  </span>
+                                )}
+                              </div>
+                              <SwitchToggle
+                                checked={f.show}
+                                onChange={() => toggleField(idx, j)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-[11px] text-gray-400 px-1 mt-1.5">
+                          &ldquo;Required&rdquo; is a label only — any field can be hidden.
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {hasMessage && (
+                      <div>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-gray-400 px-1 mb-1 block">
+                          {p.messageLabel ?? "Message"}
+                        </label>
+                        <textarea
+                          value={p.description}
+                          onChange={e => updateDescription(idx, e.target.value)}
+                          rows={4}
+                          placeholder="Message shown to the customer on this page…"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white resize-y focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                        />
+                        <div className="flex flex-wrap items-center gap-1.5 px-1 mt-1.5">
+                          <span className="text-[11px] text-gray-400">Insert:</span>
+                          {(p.placeholders ?? DEFAULT_PLACEHOLDERS).map(token => (
+                            <button
+                              key={token}
+                              type="button"
+                              onClick={() => updateDescription(idx, `${p.description ?? ""}${token}`)}
+                              className="text-[11px] font-mono px-1.5 py-0.5 rounded border border-gray-200 bg-white text-brand-700 hover:bg-brand-50"
+                            >
+                              {token}
+                            </button>
+                          ))}
+                          <span className="text-[11px] text-gray-400">— filled in automatically.</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </Card>
     </div>

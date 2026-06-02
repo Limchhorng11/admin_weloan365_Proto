@@ -687,6 +687,7 @@ export type PermissionCategory =
   | "Repayment"
   | "Loan Portfolio"
   | "Reports"
+  | "Content & Engagement"
   | "User & Role"
   | "Settings"
   | "Audit";
@@ -713,6 +714,11 @@ export const PERMISSIONS: Permission[] = [
 
   { key: "report.view",   label: "View reports",   category: "Reports" },
   { key: "report.export", label: "Export reports", category: "Reports" },
+
+  { key: "consultation.view", label: "Consultations",  category: "Content & Engagement" },
+  { key: "feedback.view",     label: "Feedback & Rate", category: "Content & Engagement" },
+  { key: "post.manage",       label: "Blog Posts",      category: "Content & Engagement" },
+  { key: "promotion.manage",  label: "Promotion",       category: "Content & Engagement" },
 
   { key: "user.view",   label: "View staff users", category: "User & Role" },
   { key: "user.create", label: "Create user",      category: "User & Role" },
@@ -760,6 +766,7 @@ export const ROLES: Role[] = [
       "payment.view", "payment.record",
       "portfolio.view", "portfolio.restructure",
       "report.view", "report.export",
+      "consultation.view", "feedback.view", "post.manage", "promotion.manage",
       "user.view",
       "audit.view",
     ],
@@ -777,6 +784,7 @@ export const ROLES: Role[] = [
       "payment.view",
       "portfolio.view",
       "report.view",
+      "consultation.view", "feedback.view",
     ],
     userCount: 1,
     isSystem: true,
@@ -791,6 +799,7 @@ export const ROLES: Role[] = [
       "loan.view",
       "payment.view", "payment.record",
       "report.view",
+      "consultation.view", "feedback.view", "post.manage", "promotion.manage",
     ],
     userCount: 2,
     isSystem: true,

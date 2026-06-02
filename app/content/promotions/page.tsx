@@ -18,7 +18,7 @@ import {
 
 export default function PromotionsPage() {
   const { can } = useRole();
-  const canEdit = can("setting.edit");
+  const canEdit = can("promotion.manage");
 
   const [list, setList] = useState<Promotion[]>(PROMOTIONS);
   const [query, setQuery] = useState("");

@@ -509,39 +509,21 @@ type RoleTemplate = {
   permissions: string[];
 };
 
-/** Every permission key — keeps the "Full access" template in sync as permissions evolve. */
+/** Every permission key — used when a default role grants all permissions ("*"). */
 const ALL_PERMISSION_KEYS = PERMISSIONS.map(p => p.key);
 
-const TEMPLATES: RoleTemplate[] = [
-  {
-    name: "Super Admin",
-    description: "Full access — manage users, roles, and all settings.",
-    stage: "general",
-    approvalLimit: null,
-    permissions: ALL_PERMISSION_KEYS,
-  },
-  {
-    name: "Credit Officer",
-    description: "Loan review — onboards customers and reviews loan applications.",
-    stage: "review",
-    approvalLimit: 0,
-    permissions: ["customer.view", "customer.create", "customer.edit", "customer.kyc", "loan.view", "loan.create", "loan.review", "report.view"],
-  },
-  {
-    name: "Finance Officer",
-    description: "Repayment — records and tracks customer loan repayments.",
-    stage: "general",
-    approvalLimit: 0,
-    permissions: ["customer.view", "loan.view", "payment.record", "payment.view"],
-  },
-  {
-    name: "Support",
-    description: "Customer support — assists customers with their accounts and applications.",
-    stage: "general",
-    approvalLimit: 0,
-    permissions: ["customer.view", "customer.create", "customer.edit", "loan.view", "payment.view", "report.view"],
-  },
-];
+/**
+ * The create-role template list follows the default system roles, so there is a
+ * single source of truth: edit a role's permissions in ROLES and the matching
+ * template updates automatically.
+ */
+const TEMPLATES: RoleTemplate[] = ROLES.filter(r => r.isSystem).map(r => ({
+  name: r.name,
+  description: r.description,
+  stage: "general",
+  approvalLimit: r.approvalLimit,
+  permissions: r.permissions === "*" ? ALL_PERMISSION_KEYS : [...r.permissions],
+}));
 
 function slugify(s: string) {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");

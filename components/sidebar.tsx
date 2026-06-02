@@ -42,14 +42,14 @@ const NAV: { section: string; items: NavItem[] }[] = [
         permission: "customer.view",
         children: [
           { label: "All Accounts", href: "/customer/accounts", icon: UserCircle2, permission: "customer.view" },
-          { label: "Consultations", href: "/customer/consultations", icon: MessageSquareText, permission: "customer.view" },
-          { label: "Feedback & Rate", href: "/customer/feedback", icon: Star, permission: "customer.view" },
+          { label: "Consultations", href: "/customer/consultations", icon: MessageSquareText, permission: "consultation.view" },
+          { label: "Feedback & Rate", href: "/customer/feedback", icon: Star, permission: "feedback.view" },
         ],
       },
       { label: "Loan Application", href: "/customer/applications", icon: FileText, permission: "loan.view" },
       { label: "Loan Product", href: "/loan-product", icon: Package, permission: "loan.view" },
-      { label: "Blog Posts", href: "/content/posts", icon: Newspaper },
-      { label: "Promotion", href: "/content/promotions", icon: Megaphone },
+      { label: "Blog Posts", href: "/content/posts", icon: Newspaper, permission: "post.manage" },
+      { label: "Promotion", href: "/content/promotions", icon: Megaphone, permission: "promotion.manage" },
     ],
   },
 ];
