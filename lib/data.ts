@@ -737,55 +737,78 @@ export type Permission = {
   sensitive?: boolean;
 };
 
+/* Permission categories — ordered to mirror the left sidebar so admins
+ * pick permissions in the same mental map they navigate the app:
+ *
+ *   OVERVIEW  → Overview
+ *   WORK      → Customer (Accounts / Consultations / Feedback) →
+ *               Loan Application → Loan Product → Blog Posts → Promotion
+ *   OTHERS    → Setting
+ *
+ * Each section's permissions are granular enough that an admin can compose
+ * any reasonable real-world role without editing code. */
 export type PermissionCategory =
-  | "Customer"
+  | "Overview"
+  | "Customer — All Accounts"
+  | "Customer — Consultations"
+  | "Customer — Feedback & Rate"
   | "Loan Application"
-  | "Repayment"
-  | "Loan Portfolio"
-  | "Reports"
-  | "Content & Engagement"
-  | "User & Role"
-  | "Settings"
-  | "Audit";
+  | "Loan Product"
+  | "Blog Posts"
+  | "Promotion"
+  | "Setting";
 
 export const PERMISSIONS: Permission[] = [
-  { key: "customer.view",     label: "View customers",         category: "Customer" },
-  { key: "customer.create",   label: "Create customer",        category: "Customer" },
-  { key: "customer.edit",     label: "Edit customer profile",  category: "Customer" },
-  { key: "customer.kyc",      label: "Run KYC / CBC",          category: "Customer" },
+  /* ---------- OVERVIEW ---------- */
+  { key: "report.view",   label: "View Report & Analyze dashboard", category: "Overview" },
+  { key: "report.export", label: "Export reports",                  category: "Overview" },
 
-  { key: "loan.view",         label: "View applications",      category: "Loan Application" },
-  { key: "loan.create",       label: "Create application",     category: "Loan Application" },
-  { key: "loan.review",       label: "Review application",     category: "Loan Application" },
-  { key: "loan.approve",      label: "Approve application",    category: "Loan Application", sensitive: true },
-  { key: "loan.reject",       label: "Reject application",     category: "Loan Application" },
+  /* ---------- CUSTOMER — All Accounts ---------- */
+  { key: "customer.view",      label: "View customer accounts",   category: "Customer — All Accounts" },
+  { key: "customer.pin_reset", label: "Reset customer PIN",       category: "Customer — All Accounts", sensitive: true },
 
-  { key: "payment.record",    label: "Record repayment",       category: "Repayment" },
-  { key: "payment.view",      label: "View payment history",   category: "Repayment" },
-  { key: "payment.reverse",   label: "Reverse payment",        category: "Repayment", sensitive: true },
+  /* ---------- CUSTOMER — Consultations ---------- */
+  { key: "consultation.view",   label: "View consultation requests", category: "Customer — Consultations" },
+  { key: "consultation.assign", label: "Assign / reassign officer",  category: "Customer — Consultations" },
+  { key: "consultation.reply",  label: "Reply to customer",          category: "Customer — Consultations" },
+  { key: "consultation.close",  label: "Mark consultation closed",   category: "Customer — Consultations" },
 
-  { key: "portfolio.view",        label: "View loan portfolio",        category: "Loan Portfolio" },
-  { key: "portfolio.restructure", label: "Restructure loan",           category: "Loan Portfolio", sensitive: true },
-  { key: "portfolio.writeoff",    label: "Write-off loan",             category: "Loan Portfolio", sensitive: true },
+  /* ---------- CUSTOMER — Feedback & Rate ---------- */
+  { key: "feedback.view",  label: "View customer feedback", category: "Customer — Feedback & Rate" },
+  { key: "feedback.reply", label: "Reply to feedback",      category: "Customer — Feedback & Rate" },
 
-  { key: "report.view",   label: "View reports",   category: "Reports" },
-  { key: "report.export", label: "Export reports", category: "Reports" },
+  /* ---------- LOAN APPLICATION ---------- */
+  { key: "loan.view",        label: "View applications",          category: "Loan Application" },
+  { key: "loan.review",      label: "Review application",         category: "Loan Application" },
+  { key: "loan.approve",     label: "Accept application",         category: "Loan Application", sensitive: true },
+  { key: "loan.reject",      label: "Reject application",         category: "Loan Application" },
+  { key: "loan.reassign",    label: "Reassign Person in Charge",  category: "Loan Application" },
+  { key: "loan.restructure", label: "Decide re-structure request", category: "Loan Application", sensitive: true },
+  { key: "payment.view",     label: "View repayment history",     category: "Loan Application" },
+  { key: "payment.record",   label: "Record repayment",           category: "Loan Application" },
 
-  { key: "consultation.view", label: "Consultations",  category: "Content & Engagement" },
-  { key: "feedback.view",     label: "Feedback & Rate", category: "Content & Engagement" },
-  { key: "post.manage",       label: "Blog Posts",      category: "Content & Engagement" },
-  { key: "promotion.manage",  label: "Promotion",       category: "Content & Engagement" },
+  /* ---------- LOAN PRODUCT ---------- */
+  { key: "product.view",     label: "View products",                 category: "Loan Product" },
+  { key: "product.create",   label: "Create product",                category: "Loan Product" },
+  { key: "product.edit",     label: "Edit product",                  category: "Loan Product" },
+  { key: "product.reorder",  label: "Reorder products (drag-drop)",  category: "Loan Product" },
+  { key: "product.activate", label: "Activate / deactivate product", category: "Loan Product", sensitive: true },
 
-  { key: "user.view",   label: "View staff users", category: "User & Role" },
-  { key: "user.create", label: "Create user",      category: "User & Role" },
-  { key: "user.edit",   label: "Edit user",        category: "User & Role" },
-  { key: "role.edit",   label: "Manage roles & permissions", category: "User & Role", sensitive: true },
+  /* ---------- BLOG POSTS ---------- */
+  { key: "post.view",   label: "View posts", category: "Blog Posts" },
+  { key: "post.manage", label: "Create / edit / publish / delete posts", category: "Blog Posts", sensitive: true },
 
-  { key: "setting.view", label: "View settings", category: "Settings" },
-  { key: "setting.edit", label: "Edit settings", category: "Settings", sensitive: true },
+  /* ---------- PROMOTION ---------- */
+  { key: "promotion.view",   label: "View promotions",                   category: "Promotion" },
+  { key: "promotion.manage", label: "Create / edit / delete promotions", category: "Promotion", sensitive: true },
 
-  { key: "audit.view",   label: "View audit log",   category: "Audit" },
-  { key: "audit.export", label: "Export audit log", category: "Audit" },
+  /* ---------- SETTING ---------- */
+  { key: "setting.view",  label: "View settings",              category: "Setting" },
+  { key: "setting.edit",  label: "Edit settings",              category: "Setting", sensitive: true },
+  { key: "user.view",     label: "View staff users",           category: "Setting" },
+  { key: "user.create",   label: "Create user",                category: "Setting", sensitive: true },
+  { key: "user.edit",     label: "Edit user",                  category: "Setting" },
+  { key: "role.edit",     label: "Manage roles & permissions", category: "Setting", sensitive: true },
 ];
 
 export type Role = {
@@ -817,14 +840,17 @@ export const ROLES: Role[] = [
     description: "Senior loan officer — reviews and approves loans up to the senior limit.",
     approvalLimit: 50000,
     permissions: [
-      "customer.view", "customer.create", "customer.edit", "customer.kyc",
-      "loan.view", "loan.create", "loan.review", "loan.approve", "loan.reject",
-      "payment.view", "payment.record",
-      "portfolio.view", "portfolio.restructure",
       "report.view", "report.export",
-      "consultation.view", "feedback.view", "post.manage", "promotion.manage",
+      "customer.view",
+      "consultation.view", "consultation.assign", "consultation.reply", "consultation.close",
+      "feedback.view", "feedback.reply",
+      "loan.view", "loan.review", "loan.approve", "loan.reject",
+      "loan.reassign", "loan.restructure",
+      "payment.view", "payment.record",
+      "product.view",
+      "post.view", "post.manage",
+      "promotion.view", "promotion.manage",
       "user.view",
-      "audit.view",
     ],
     userCount: 3,
     isSystem: true,
@@ -835,12 +861,15 @@ export const ROLES: Role[] = [
     description: "Originate and review loan applications. Cannot approve.",
     approvalLimit: 0,
     permissions: [
-      "customer.view", "customer.create", "customer.edit", "customer.kyc",
-      "loan.view", "loan.create", "loan.review",
-      "payment.view",
-      "portfolio.view",
       "report.view",
-      "consultation.view", "feedback.view",
+      "customer.view",
+      "consultation.view", "consultation.reply",
+      "feedback.view",
+      "loan.view", "loan.review",
+      "payment.view",
+      "product.view",
+      "post.view",
+      "promotion.view",
     ],
     userCount: 1,
     isSystem: true,
@@ -851,11 +880,13 @@ export const ROLES: Role[] = [
     description: "Assist customers with their accounts, applications, and repayments.",
     approvalLimit: 0,
     permissions: [
-      "customer.view", "customer.create", "customer.edit",
+      "customer.view", "customer.pin_reset",
+      "consultation.view", "consultation.reply", "consultation.close",
+      "feedback.view", "feedback.reply",
       "loan.view",
       "payment.view", "payment.record",
-      "report.view",
-      "consultation.view", "feedback.view", "post.manage", "promotion.manage",
+      "post.view", "post.manage",
+      "promotion.view", "promotion.manage",
     ],
     userCount: 2,
     isSystem: true,

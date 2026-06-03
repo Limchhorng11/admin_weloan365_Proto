@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { TableToolbar } from "@/components/table-toolbar";
 import { StatusBadge } from "@/components/status-badge";
-import { CONSULTATIONS, CUSTOMERS, USERS } from "@/lib/data";
+import { CONSULTATIONS, CUSTOMERS, USERS, FEEDBACK } from "@/lib/data";
 import { useRole } from "@/lib/role-context";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +16,7 @@ import {
   CheckCircle2,
   Paperclip,
   MessageCircle,
+  MessageSquare,
   Search,
   Check,
   Crown,
@@ -27,51 +27,118 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const PAGE_SIZE = 3;
+const PAGE_SIZE = 8;
 
 type Consult = (typeof CONSULTATIONS)[number];
 type Officer = (typeof USERS)[number];
+type Feedback = (typeof FEEDBACK)[number];
+type Resp = { message: string; sentAt: string };
+
+type FilterKind = "all" | "consultations" | "feedback";
+
+type Item =
+  | { kind: "consultation"; id: string; ts: number; data: Consult }
+  | { kind: "feedback";     id: string; ts: number; data: Feedback };
+
+/* Parse "2026-04-21 09:12" or "2026-04-21" into a sortable timestamp. */
+function parseTs(s: string): number {
+  if (!s) return 0;
+  const isoish = s.includes(" ") ? s.replace(" ", "T") : s;
+  const n = Date.parse(isoish);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/* Truncate a long preview to ~80 chars with an ellipsis. */
+function clip(s: string, max = 80): string {
+  if (!s) return "";
+  return s.length > max ? `${s.slice(0, max).trimEnd()}…` : s;
+}
 
 export default function ConsultationsPage() {
   const { user } = useRole();
 
+  /* ----- Consultation state ----- */
   const [list, setList] = useState<Consult[]>(CONSULTATIONS);
   const [openId, setOpenId] = useState<string | null>(null);
-  // ID of consultation we're currently picking an officer for, or null.
   const [pickerFor, setPickerFor] = useState<string | null>(null);
-
   const active = openId ? list.find(c => c.id === openId) ?? null : null;
   const pickerConsult = pickerFor ? list.find(c => c.id === pickerFor) ?? null : null;
 
-  const unassignedCount = list.filter(c => c.officer === "Unassigned").length;
+  /* ----- Feedback state ----- */
+  const [responses, setResponses] = useState<Record<string, Resp>>({});
+  const [openFeedbackId, setOpenFeedbackId] = useState<string | null>(null);
+  const activeFeedback = openFeedbackId ? FEEDBACK.find(f => f.id === openFeedbackId) ?? null : null;
 
-  /* ---------- pagination ---------- */
+  const submitResponse = (id: string, message: string) => {
+    const now = new Date();
+    const sentAt = `${now.toISOString().slice(0, 10)} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setResponses(prev => ({ ...prev, [id]: { message, sentAt } }));
+    setOpenFeedbackId(null);
+  };
+
+  /* ----- Unified items list (consultations + feedback, newest first) ----- */
+  const items = useMemo<Item[]>(() => {
+    const cs: Item[] = list.map(c => ({
+      kind: "consultation",
+      id: c.id,
+      ts: parseTs(c.requested),
+      data: c,
+    }));
+    const fs: Item[] = FEEDBACK.map(f => ({
+      kind: "feedback",
+      id: f.id,
+      ts: parseTs(f.date),
+      data: f,
+    }));
+    return [...cs, ...fs].sort((a, b) => b.ts - a.ts);
+  }, [list]);
+
+  const counts = useMemo(
+    () => ({
+      all: items.length,
+      consultations: items.filter(i => i.kind === "consultation").length,
+      feedback: items.filter(i => i.kind === "feedback").length,
+    }),
+    [items]
+  );
+
+  const unassignedCount = list.filter(c => c.officer === "Unassigned").length;
+  const unrepliedCount = FEEDBACK.filter(f => !responses[f.id]).length;
+
+  /* ----- Filter ----- */
+  const [filter, setFilter] = useState<FilterKind>("all");
+  const filtered = useMemo(() => {
+    if (filter === "all") return items;
+    return items.filter(i =>
+      filter === "consultations" ? i.kind === "consultation" : i.kind === "feedback"
+    );
+  }, [items, filter]);
+
+  /* ----- Pagination ----- */
   const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => setPage(1), [filter]);
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
   const paginated = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return list.slice(start, start + PAGE_SIZE);
-  }, [list, page]);
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
-  const firstIdx = list.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const lastIdx = Math.min(page * PAGE_SIZE, list.length);
+  const firstIdx = filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastIdx = Math.min(page * PAGE_SIZE, filtered.length);
 
+  /* ----- Consultation mutators ----- */
   const closeConsultation = (id: string) =>
     setList(prev => prev.map(c => (c.id === id ? { ...c, status: "closed" } : c)));
 
-  // Revert a closed consultation back to open so the operator can keep working on it.
   const reopenConsultation = (id: string) =>
     setList(prev =>
       prev.map(c =>
         c.id === id
-          ? {
-              ...c,
-              status: c.officer === "Unassigned" ? "pending" : "open",
-            }
+          ? { ...c, status: c.officer === "Unassigned" ? "pending" : "open" }
           : c
       )
     );
@@ -83,7 +150,6 @@ export default function ConsultationsPage() {
           ? {
               ...c,
               officer,
-              // when a real officer is assigned, move from pending → open
               status:
                 officer !== "Unassigned" && c.status === "pending" ? "open" : c.status,
             }
@@ -94,91 +160,80 @@ export default function ConsultationsPage() {
   return (
     <div className="space-y-6 max-w-[1400px]">
       <PageHeader
-        title="Consultation Requests"
-        subtitle={`${list.length} requests · ${unassignedCount} unassigned`}
+        title="Customer Messages"
+        subtitle={`${items.length} messages · ${unassignedCount} unassigned · ${unrepliedCount} unreplied`}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
-        <TableToolbar />
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200">
-              {["Customer", "Topic", "Requested", "Status", "Officer"].map(h => (
-                <th
-                  key={h}
-                  className="text-left px-6 py-3 text-[12px] font-medium text-gray-500"
-                >
-                  {h}
-                </th>
-              ))}
-              <th className="px-6 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map(c => {
-              const isMine    = c.officer === user.name;
-              const unassigned = c.officer === "Unassigned";
-              const isClosed   = c.status === "closed";
-              return (
-                <tr
-                  key={c.id}
-                  className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60"
-                >
-                  <td className="px-6 py-3.5 font-medium text-gray-900">{c.customer}</td>
-                  <td className="px-6 py-3.5 text-gray-700">{c.topic}</td>
-                  <td className="px-6 py-3.5 text-gray-600 text-xs">{c.requested}</td>
-                  <td className="px-6 py-3.5">
-                    <StatusBadge
-                      status={
-                        c.status === "open"
-                          ? "Open"
-                          : c.status === "closed"
-                          ? "Closed"
-                          : "Pending"
-                      }
-                    />
-                  </td>
-                  <td className="px-6 py-3.5">
-                    {unassigned ? (
-                      <span className="text-gray-400 italic">Unassigned</span>
-                    ) : isMine ? (
-                      <span className="inline-flex items-center gap-1 text-brand-700 font-medium">
-                        {c.officer}
-                        <span className="text-[10px] font-medium bg-brand-50 text-brand-700 rounded-full px-1.5 py-0.5">
-                          You
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-gray-600">{c.officer}</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-3.5 text-right">
-                    <div className="inline-flex items-center gap-3">
-                      {!isClosed && (
-                        // Single action — opens the officer picker for any role.
-                        // Self-claim is still possible via the "Assign to me"
-                        // shortcut inside the picker.
-                        <button
-                          onClick={() => setPickerFor(c.id)}
-                          className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium"
-                        >
-                          <Briefcase className="w-3.5 h-3.5" />
-                          {unassigned ? "Assign to person" : "Reassign to person"}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setOpenId(c.id)}
-                        className="text-xs text-brand-600 hover:underline font-medium"
-                      >
-                        Open
-                      </button>
-                    </div>
+        {/* Filter chips */}
+        <div className="flex items-center gap-1.5 px-6 py-4 border-b border-gray-200">
+          <FilterChip
+            label="All"
+            count={counts.all}
+            active={filter === "all"}
+            onClick={() => setFilter("all")}
+          />
+          <FilterChip
+            label="Consultations"
+            count={counts.consultations}
+            badge={unassignedCount > 0 ? `${unassignedCount} unassigned` : undefined}
+            active={filter === "consultations"}
+            onClick={() => setFilter("consultations")}
+          />
+          <FilterChip
+            label="Feedback"
+            count={counts.feedback}
+            badge={unrepliedCount > 0 ? `${unrepliedCount} unreplied` : undefined}
+            active={filter === "feedback"}
+            onClick={() => setFilter("feedback")}
+          />
+        </div>
+
+        {/* Unified table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                {["Type", "Customer", "Subject", "Preview", "Date", "Status"].map(h => (
+                  <th
+                    key={h}
+                    className="text-left px-6 py-3 text-[12px] font-medium text-gray-500"
+                  >
+                    {h}
+                  </th>
+                ))}
+                <th className="px-6 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-500">
+                    No messages in this view.
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ) : (
+                paginated.map(item =>
+                  item.kind === "consultation" ? (
+                    <ConsultRow
+                      key={`c-${item.id}`}
+                      c={item.data}
+                      currentUserName={user.name}
+                      onOpen={() => setOpenId(item.id)}
+                    />
+                  ) : (
+                    <FeedbackRow
+                      key={`f-${item.id}`}
+                      f={item.data}
+                      responded={!!responses[item.id]}
+                      onOpen={() => setOpenFeedbackId(item.id)}
+                    />
+                  )
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Pagination */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 text-sm text-gray-500">
@@ -187,7 +242,7 @@ export default function ConsultationsPage() {
             <span className="font-medium text-gray-700">
               {firstIdx}-{lastIdx}
             </span>{" "}
-            of <span className="font-medium text-gray-700">{list.length}</span>
+            of <span className="font-medium text-gray-700">{filtered.length}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500">
@@ -235,8 +290,6 @@ export default function ConsultationsPage() {
             setOpenId(null);
           }
         }}
-        // "Assign to person" / "Reassign to person" — close this modal
-        // and hand off to the same officer picker the list uses.
         onPickAssignee={() => {
           if (active) {
             setPickerFor(active.id);
@@ -255,7 +308,191 @@ export default function ConsultationsPage() {
           setPickerFor(null);
         }}
       />
+
+      <ResponseModal
+        feedback={activeFeedback}
+        existing={activeFeedback ? responses[activeFeedback.id] : undefined}
+        onClose={() => setOpenFeedbackId(null)}
+        onSubmit={msg => activeFeedback && submitResponse(activeFeedback.id, msg)}
+      />
     </div>
+  );
+}
+
+/* ---------- filter chip ---------- */
+
+function FilterChip({
+  label,
+  count,
+  active,
+  badge,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  badge?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition",
+        active
+          ? "border-brand-500 bg-brand-50 text-brand-700"
+          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+      )}
+    >
+      <span>{label}</span>
+      <span
+        className={cn(
+          "text-[11px] font-medium rounded-full px-1.5 py-0.5",
+          active ? "bg-brand-100 text-brand-700" : "bg-gray-100 text-gray-500"
+        )}
+      >
+        {count}
+      </span>
+      {badge && (
+        <span className="text-[10px] font-medium uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-1.5 py-0.5">
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/* ---------- unified table rows ---------- */
+
+function TypeChip({ kind }: { kind: "consultation" | "feedback" }) {
+  const isConsult = kind === "consultation";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider",
+        isConsult
+          ? "bg-brand-50 text-brand-700 border border-brand-100"
+          : "bg-gray-100 text-gray-600 border border-gray-200"
+      )}
+    >
+      {isConsult ? (
+        <MessageCircle className="w-2.5 h-2.5" />
+      ) : (
+        <MessageSquare className="w-2.5 h-2.5" />
+      )}
+      {isConsult ? "Consult" : "Feedback"}
+    </span>
+  );
+}
+
+function ConsultRow({
+  c,
+  currentUserName,
+  onOpen,
+}: {
+  c: Consult;
+  currentUserName: string;
+  onOpen: () => void;
+}) {
+  const isMine = c.officer === currentUserName;
+  return (
+    <tr
+      className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60 cursor-pointer"
+      onClick={onOpen}
+    >
+      <td className="px-6 py-3.5 align-middle">
+        <TypeChip kind="consultation" />
+      </td>
+      <td className="px-6 py-3.5 font-medium text-gray-900">
+        <div className="flex items-center gap-1.5">
+          {c.customer}
+          {isMine && (
+            <span className="text-[10px] font-medium bg-brand-50 text-brand-700 rounded-full px-1.5 py-0.5">
+              You
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="px-6 py-3.5 text-gray-700">{c.topic}</td>
+      <td className="px-6 py-3.5 text-gray-600 max-w-[320px]">
+        <div className="truncate">{clip(c.note ?? "", 80)}</div>
+      </td>
+      <td className="px-6 py-3.5 text-gray-600 text-xs whitespace-nowrap">{c.requested}</td>
+      <td className="px-6 py-3.5">
+        <StatusBadge
+          status={
+            c.status === "open"
+              ? "Open"
+              : c.status === "closed"
+              ? "Closed"
+              : "Pending"
+          }
+        />
+      </td>
+      <td className="px-6 py-3.5 text-right">
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          className="text-xs text-brand-600 hover:underline font-medium"
+        >
+          Open
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function FeedbackRow({
+  f,
+  responded,
+  onOpen,
+}: {
+  f: Feedback;
+  responded: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <tr
+      className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60 cursor-pointer"
+      onClick={onOpen}
+    >
+      <td className="px-6 py-3.5 align-middle">
+        <TypeChip kind="feedback" />
+      </td>
+      <td className="px-6 py-3.5 font-medium text-gray-900">{f.customer}</td>
+      <td className="px-6 py-3.5 text-gray-700">Feedback</td>
+      <td className="px-6 py-3.5 text-gray-600 max-w-[320px]">
+        <div className="truncate">{clip(f.text, 80)}</div>
+      </td>
+      <td className="px-6 py-3.5 text-gray-600 text-xs whitespace-nowrap">{f.date}</td>
+      <td className="px-6 py-3.5">
+        {responded ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">
+            <CheckCircle2 className="w-3 h-3" />
+            Replied
+          </span>
+        ) : (
+          <span className="inline-flex items-center text-[11px] font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-2 py-0.5">
+            No reply
+          </span>
+        )}
+      </td>
+      <td className="px-6 py-3.5 text-right">
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline font-medium"
+        >
+          <Pencil className="w-3 h-3" />
+          {responded ? "Edit reply" : "Reply"}
+        </button>
+      </td>
+    </tr>
   );
 }
 
@@ -796,6 +1033,144 @@ function OfficerPickerModal({
             className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
           >
             Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ====================================================================
+   Response modal — reply/edit reply to a customer feedback entry.
+   ==================================================================== */
+
+function ResponseModal({
+  feedback,
+  existing,
+  onClose,
+  onSubmit,
+}: {
+  feedback: Feedback | null;
+  existing?: Resp;
+  onClose: () => void;
+  onSubmit: (message: string) => void;
+}) {
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (feedback) {
+      setMessage(existing?.message ?? "");
+    }
+  }, [feedback, existing]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && feedback) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [feedback, onClose]);
+
+  if (!feedback) return null;
+
+  const trimmedLen = message.trim().length;
+  const canSend = trimmedLen > 0 && trimmedLen <= 280;
+  const isEdit = !!existing;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
+          <div className="min-w-0">
+            <div className="text-base font-semibold text-gray-900">
+              {isEdit ? "Edit response" : "Reply to feedback"}
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              The reply will be delivered to{" "}
+              <span className="font-medium text-gray-700">{feedback.customer}</span>&apos;s mobile app.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-4">
+          {/* Original feedback */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-700 text-[10px] font-semibold flex items-center justify-center">
+                  {feedback.customer.split(" ").map(s => s[0]).join("")}
+                </div>
+                <div className="text-sm font-medium text-gray-900">{feedback.customer}</div>
+              </div>
+              <div className="text-[11px] text-gray-500 font-mono">{feedback.id} · {feedback.date}</div>
+            </div>
+            <div className="text-sm text-gray-700 mt-1">{feedback.text}</div>
+          </div>
+
+          {/* Reply textarea */}
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-gray-700">Your response</label>
+              <span className={cn(
+                "text-[11px]",
+                trimmedLen > 280 ? "text-red-600" : "text-gray-400"
+              )}>
+                {trimmedLen} / 280
+              </span>
+            </div>
+            <textarea
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              rows={5}
+              maxLength={280}
+              placeholder="Thank you for your feedback. We'll look into this and follow up shortly..."
+              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            />
+            <div className="text-[11px] text-gray-400 mt-1">
+              Sent as a push notification + in-app message in the customer mobile app.
+            </div>
+          </div>
+
+          {existing && (
+            <div className="text-[11px] text-emerald-700 inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-md">
+              <CheckCircle2 className="w-3 h-3" />
+              Previously sent on {existing.sentAt}
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => canSend && onSubmit(message.trim())}
+            disabled={!canSend}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md",
+              canSend
+                ? "bg-brand-600 text-white hover:bg-brand-700"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+            )}
+          >
+            <Send className="w-3.5 h-3.5" />
+            {isEdit ? "Update response" : "Send response"}
           </button>
         </div>
       </div>

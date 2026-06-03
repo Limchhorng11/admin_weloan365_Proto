@@ -75,7 +75,7 @@ export default function CustomerDetailPage({
               <MessageCircle className="w-4 h-4 text-gray-500" />
               Send message
             </button>
-            {can("customer.edit") && (
+            {can("customer.pin_reset") && (
               <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700">
                 <KeyRound className="w-4 h-4 text-gray-500" />
                 Change password for customer

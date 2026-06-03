@@ -14,7 +14,6 @@ import {
   PanelLeft,
   ChevronDown,
   MessageSquareText,
-  Star,
   UserCircle2,
   type LucideIcon,
 } from "lucide-react";
@@ -23,7 +22,15 @@ import { LATEST_VERSION } from "./app-version";
 import { SettingsModal } from "./settings-modal";
 import { useRole } from "@/lib/role-context";
 
-type Leaf = { label: string; href: string; icon?: LucideIcon; permission?: string };
+type Leaf = {
+  label: string;
+  href: string;
+  icon?: LucideIcon;
+  permission?: string;
+  /** Extra paths that should also highlight this nav item (e.g. when one
+   *  sidebar entry hosts multiple in-page tabs across two routes). */
+  matchHrefs?: string[];
+};
 type NavItem =
   | { label: string; href: string; icon: LucideIcon; permission?: string; children?: never }
   | { label: string; icon: LucideIcon; children: Leaf[]; permission?: string; href?: never };
@@ -42,8 +49,10 @@ const NAV: { section: string; items: NavItem[] }[] = [
         permission: "customer.view",
         children: [
           { label: "All Accounts", href: "/customer/accounts", icon: UserCircle2, permission: "customer.view" },
-          { label: "Consultations", href: "/customer/consultations", icon: MessageSquareText, permission: "consultation.view" },
-          { label: "Feedback & Rate", href: "/customer/feedback", icon: Star, permission: "feedback.view" },
+          // Consultations + Feedback & Rate are merged behind a single
+          // "Messages" entry. Inside the page, in-page tabs switch between
+          // the two views; the sidebar shows just one item.
+          { label: "Messages", href: "/customer/consultations", icon: MessageSquareText, permission: "consultation.view" },
         ],
       },
       { label: "Loan Application", href: "/customer/applications", icon: FileText, permission: "loan.view" },
@@ -78,7 +87,14 @@ export function Sidebar() {
     const state: Record<string, boolean> = { Customer: true };
     NAV.forEach(g =>
       g.items.forEach(it => {
-        if ("children" in it && it.children?.some(c => pathname.startsWith(c.href))) {
+        if (
+          "children" in it &&
+          it.children?.some(
+            c =>
+              pathname.startsWith(c.href) ||
+              c.matchHrefs?.some(h => pathname.startsWith(h))
+          )
+        ) {
           state[it.label] = true;
         }
       })
@@ -89,12 +105,16 @@ export function Sidebar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(defaultExpanded);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const isActive = (href?: string) =>
-    !href
-      ? false
-      : href === "/"
+  const matchesPath = (href: string) =>
+    href === "/"
       ? pathname === "/"
       : pathname === href || pathname.startsWith(href + "/");
+
+  const isActive = (href?: string, matchHrefs?: string[]) => {
+    if (!href) return false;
+    if (matchesPath(href)) return true;
+    return matchHrefs?.some(matchesPath) ?? false;
+  };
 
   const toggle = (label: string) =>
     setExpanded(e => ({ ...e, [label]: !(e[label] ?? false) }));
@@ -102,7 +122,7 @@ export function Sidebar() {
   const renderItem = (item: NavItem) => {
     if ("children" in item && item.children) {
       const open = expanded[item.label] ?? false;
-      const hasActive = item.children.some(c => isActive(c.href));
+      const hasActive = item.children.some(c => isActive(c.href, c.matchHrefs));
       return (
         <div key={item.label}>
           <button
@@ -128,7 +148,7 @@ export function Sidebar() {
                   href={child.href}
                   className={cn(
                     "flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px]",
-                    isActive(child.href)
+                    isActive(child.href, child.matchHrefs)
                       ? "bg-brand-50 text-brand-700 font-medium"
                       : "text-gray-600 hover:bg-gray-100"
                   )}

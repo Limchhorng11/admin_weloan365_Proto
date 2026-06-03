@@ -23,9 +23,8 @@ type MenuKey = "notif" | "user" | null;
 
 const TITLES: { match: string; title: string }[] = [
   { match: "/customer/accounts",      title: "Customers" },
-  { match: "/customer/consultations", title: "Consultations" },
+  { match: "/customer/consultations", title: "Customer Messages" },
   { match: "/customer/applications",  title: "Loan Applications" },
-  { match: "/customer/feedback",      title: "Feedback & Rate" },
   { match: "/loan-product",           title: "Loan Products" },
   { match: "/content/posts",          title: "Blog Posts" },
   { match: "/chat",                   title: "Chat" },
