@@ -5,6 +5,11 @@ export type RestructureRequest = {
   reason: string;
   requestedChange: string;
   phone: string;
+  /** Officer's verdict on the request.
+   *   "pending"  — submitted, awaiting decision (default for new requests)
+   *   "approved" — accepted
+   *   "declined" — rejected (renders as "Re-structure request failed") */
+  decision?: "pending" | "approved" | "declined";
 };
 
 export type Application = {
@@ -55,6 +60,7 @@ export const APPLICATIONS: Application[] = [
       reason: "Business slow-down this quarter — need a temporary grace period before resuming full installments.",
       requestedChange: "3-month payment holiday, then resume at original schedule.",
       phone: "+855 92 118 006",
+      decision: "declined",
     },
   },
   { id: "APP-10299", cid: "C-0425", name: "Narith Kim",  product: "Micro Loan (ML)",  amount: 4000,  term: 12, rate: 15.0, score: 640, branch: "Phnom Penh — Central",  range: "$4,000",  sent: "Apr 16, 2026", officer: "Laybun N.",  status: "Rejected" },
@@ -713,15 +719,21 @@ export type StaffUser = {
   branch: string;
   status: StaffUserStatus;
   lastActive: string;
+  /** 5-char referral code given to customers (CO referral program). When
+   *  present, the user appears in Settings → Referral → Credit Officer codes. */
+  code?: string;
+  /** Lightweight referral metrics — populated for demo seed users so the
+   *  CO codes table has realistic numbers. New users start at zero. */
+  referralStats?: { referrals: number; applications: number; disbursed: number };
 };
 
 export const USERS: StaffUser[] = [
-  { id: "U-01", name: "Laybun N.",    email: "laybunnavitou@kosign.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago" },
-  { id: "U-02", name: "Sophea K.",    email: "sophea.k@kosign.com.kh",      role: "Senior Officer",        branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago"  },
-  { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@kosign.com.kh",     role: "Senior Officer",        branch: "Battambang",  status: "Active",   lastActive: "Today"     },
-  { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@kosign.com.kh",   role: "Customer Service",      branch: "HQ",          status: "Active",   lastActive: "Today"     },
-  { id: "U-05", name: "Kosal M.",     email: "kosal.m@kosign.com.kh",       role: "Admin",                 branch: "HQ",          status: "Inactive", lastActive: "30 d ago"  },
-  { id: "U-06", name: "Pisey C.",     email: "pisey.c@kosign.com.kh",       role: "Customer Service",      branch: "Phnom Penh",  status: "Active",   lastActive: "10 min ago"},
+  { id: "U-01", name: "Laybun N.",    email: "laybunnavitou@kosign.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago",  code: "10247", referralStats: { referrals: 28, applications: 19, disbursed: 11 } },
+  { id: "U-02", name: "Sophea K.",    email: "sophea.k@kosign.com.kh",      role: "Senior Officer",        branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago",   code: "10248", referralStats: { referrals: 41, applications: 32, disbursed: 21 } },
+  { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@kosign.com.kh",     role: "Senior Officer",        branch: "Battambang",  status: "Active",   lastActive: "Today",      code: "10312", referralStats: { referrals: 14, applications:  9, disbursed:  5 } },
+  { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@kosign.com.kh",   role: "Customer Service",      branch: "HQ",          status: "Active",   lastActive: "Today",      code: "10402", referralStats: { referrals:  9, applications:  4, disbursed:  2 } },
+  { id: "U-05", name: "Kosal M.",     email: "kosal.m@kosign.com.kh",       role: "Admin",                 branch: "HQ",          status: "Inactive", lastActive: "30 d ago",   code: "10502", referralStats: { referrals:  0, applications:  0, disbursed:  0 } },
+  { id: "U-06", name: "Pisey C.",     email: "pisey.c@kosign.com.kh",       role: "Customer Service",      branch: "Phnom Penh",  status: "Active",   lastActive: "10 min ago", code: "10401", referralStats: { referrals:  6, applications:  3, disbursed:  1 } },
   { id: "U-07", name: "Mengsrun H.",  email: "mengsrun.h@kosign.com.kh",    role: "Senior Officer",        branch: "HQ",          status: "Active",   lastActive: "Yesterday" },
 ];
 
@@ -945,6 +957,9 @@ export type Promotion = {
   date: string;
   /** Optional end date (ISO YYYY-MM-DD) — when set, promo auto-expires on this day. */
   deadline?: string;
+  /** Staff user who created / last edited this promotion. Mirrors the
+   *  `author` field on blog posts so the table can show accountability. */
+  author: string;
 };
 
 export const PROMOTIONS: Promotion[] = [
@@ -955,6 +970,8 @@ export const PROMOTIONS: Promotion[] = [
     image: "",
     status: "Active",
     date: "2026-04-10",
+    deadline: "2026-04-30",
+    author: "Sophea K.",
   },
   {
     id: "PM-002",
@@ -963,6 +980,7 @@ export const PROMOTIONS: Promotion[] = [
     image: "",
     status: "Active",
     date: "2026-03-22",
+    author: "Laybun N.",
   },
   {
     id: "PM-003",
@@ -971,6 +989,8 @@ export const PROMOTIONS: Promotion[] = [
     image: "",
     status: "Active",
     date: "2026-02-14",
+    deadline: "2026-12-31",
+    author: "Sophea K.",
   },
   {
     id: "PM-004",
@@ -979,5 +999,6 @@ export const PROMOTIONS: Promotion[] = [
     image: "",
     status: "Inactive",
     date: "2026-01-05",
+    author: "Admin",
   },
 ];

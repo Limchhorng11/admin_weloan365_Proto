@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/lib/role-context";
+import { StatusBadge } from "./status-badge";
 import {
   USERS,
   ROLES,
@@ -211,7 +212,7 @@ function UsersTab() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              {["User", "Role", "Branch", ""].map((h, i) => (
+              {["User", "Role", "Branch", "Status", ""].map((h, i) => (
                 <th
                   key={i}
                   className="text-left px-5 py-2 text-[12px] font-medium text-gray-500"
@@ -227,14 +228,13 @@ function UsersTab() {
               return (
                 <tr key={u.id} className="border-t border-gray-100">
                   <td className="px-5 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 text-xs font-semibold flex items-center justify-center">
-                        {u.name.split(" ").map(s => s[0]).join("")}
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900">{u.name}</div>
-                        <div className="text-xs text-gray-500">{u.email}</div>
-                      </div>
+                    <div className="font-medium text-gray-900">{u.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {u.code ? (
+                        <span className="font-mono tracking-wider">{u.code}</span>
+                      ) : (
+                        <span className="italic text-gray-400">No code</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-5 py-3">
@@ -244,6 +244,9 @@ function UsersTab() {
                     </div>
                   </td>
                   <td className="px-5 py-3 text-gray-600">{u.branch}</td>
+                  <td className="px-5 py-3">
+                    <StatusBadge status={u.status} />
+                  </td>
                   <td className="px-5 py-3 text-right">
                     {can("user.edit") && (
                       <button
@@ -259,7 +262,7 @@ function UsersTab() {
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-500">
+                <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-500">
                   No users match your search.
                 </td>
               </tr>
@@ -314,7 +317,10 @@ function UserModal({
   const [branch, setBranch] = useState(user?.branch ?? "Phnom Penh");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(user?.code ?? "");
+  // Status as an on/off toggle — Active = on, Inactive = off.
+  // Editing inherits the user's current status; creating defaults to Active.
+  const [active, setActive] = useState<boolean>(user?.status !== "Inactive");
   const [error, setError] = useState<string | null>(null);
 
   const submit = (e: React.FormEvent) => {
@@ -336,9 +342,12 @@ function UserModal({
       email: email.trim(),
       role,
       branch: branch.trim(),
-      // Status is no longer set in the form — preserve the existing value on
-      // edit, default to "Active" for new users.
-      status: user?.status ?? "Active",
+      status: active ? "Active" : "Inactive",
+      // Persist the 5-char referral code (or strip it if cleared). When set,
+      // the user appears in Settings → Referral → Credit Officer codes.
+      code: code.trim() ? code.trim() : undefined,
+      // Preserve existing referral stats on edit; new users start blank.
+      referralStats: user?.referralStats,
     });
   };
 
@@ -475,6 +484,46 @@ function UserModal({
                   <option key={b} value={b}>{b}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Status — on/off switch row, full-width inside the grid. */}
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Status</label>
+              <div className="mt-1 flex items-center justify-between gap-3 px-3 py-2.5 border border-gray-200 rounded-md bg-white">
+                <div className="min-w-0">
+                  <div
+                    className={cn(
+                      "text-sm font-medium",
+                      active ? "text-emerald-700" : "text-gray-500"
+                    )}
+                  >
+                    {active ? "Active" : "Inactive"}
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    {active
+                      ? "User can sign in and perform actions allowed by their role."
+                      : "User is blocked from signing in. Existing sessions stay valid until expiry."}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={active}
+                  onClick={() => setActive(v => !v)}
+                  title={active ? "Deactivate user" : "Activate user"}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
+                    active ? "bg-brand-600" : "bg-gray-300"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                      active ? "translate-x-[18px]" : "translate-x-0.5"
+                    )}
+                  />
+                </button>
+              </div>
             </div>
           </div>
 

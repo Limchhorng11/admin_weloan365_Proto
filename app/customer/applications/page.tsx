@@ -222,10 +222,31 @@ export default function ApplicationsPage() {
                       </td>
                       <td className="px-6 py-3.5">
                         {hasRestructure ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-50 border border-brand-200 text-brand-700">
-                            <RotateCcw className="w-2.5 h-2.5" />
-                            Re-structure request
-                          </span>
+                          (() => {
+                            const decision = r.restructureRequest?.decision ?? "pending";
+                            if (decision === "approved") {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 border border-emerald-200 text-emerald-700">
+                                  <CheckCircle2 className="w-2.5 h-2.5" />
+                                  Accepted
+                                </span>
+                              );
+                            }
+                            if (decision === "declined") {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 border border-red-200 text-red-700">
+                                  <XCircle className="w-2.5 h-2.5" />
+                                  Re-structure request failed
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-50 border border-brand-200 text-brand-700">
+                                <RotateCcw className="w-2.5 h-2.5" />
+                                Re-structure request
+                              </span>
+                            );
+                          })()
                         ) : (
                           <span className="text-xs text-gray-300">—</span>
                         )}

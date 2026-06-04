@@ -34,7 +34,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BRANCHES, type Branch } from "@/lib/data";
+import { BRANCHES, USERS, type Branch } from "@/lib/data";
 import { UsersRolesView } from "./users-roles-view";
 import { StatusBadge } from "./status-badge";
 import { useRole } from "@/lib/role-context";
@@ -1545,7 +1545,11 @@ function ReferralView() {
   const { can } = useRole();
   const readOnly = !can("setting.edit");
 
+  /* Derive the CO codes table from the central USERS list — any user that has
+   * a 5-char code on their profile shows up here. Inactive users render in a
+   * disabled style so the operator can see why a code stopped working. */
   type CodeRow = {
+    id: string;
     code: string;
     name: string;
     role: string;
@@ -1553,16 +1557,20 @@ function ReferralView() {
     referrals: number;
     applications: number;
     disbursed: number;
-    status: "Active" | "Disabled";
+    disabled: boolean;
   };
 
-  const CO_CODES: CodeRow[] = [
-    { code: "10247", name: "Laybun N.",   role: "Credit Officer",        branch: "Phnom Penh", referrals: 28, applications: 19, disbursed: 11, status: "Active"   },
-    { code: "10248", name: "Sophea K.",   role: "Senior Officer",   branch: "Siem Reap",  referrals: 41, applications: 32, disbursed: 21, status: "Active"   },
-    { code: "10312", name: "Ratanak L.",  role: "Senior Officer",   branch: "Battambang", referrals: 14, applications:  9, disbursed:  5, status: "Active"   },
-    { code: "10401", name: "Pisey C.",    role: "Customer Service", branch: "Phnom Penh", referrals:  6, applications:  3, disbursed:  1, status: "Active"   },
-    { code: "10502", name: "Mengsrun H.", role: "Senior Officer",   branch: "HQ",         referrals:  0, applications:  0, disbursed:  0, status: "Disabled" },
-  ];
+  const CO_CODES: CodeRow[] = USERS.filter(u => !!u.code).map(u => ({
+    id: u.id,
+    code: u.code as string,
+    name: u.name,
+    role: u.role,
+    branch: u.branch,
+    referrals: u.referralStats?.referrals ?? 0,
+    applications: u.referralStats?.applications ?? 0,
+    disbursed: u.referralStats?.disbursed ?? 0,
+    disabled: u.status !== "Active",
+  }));
 
   return (
     <div className="space-y-5">
@@ -1596,28 +1604,72 @@ function ReferralView() {
               </tr>
             </thead>
             <tbody>
-              {CO_CODES.map(r => (
-                <tr key={r.code} className="border-t border-gray-100">
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-medium text-gray-900 tracking-wider">{r.code}</span>
-                      <button
-                        className="text-gray-400 hover:text-gray-700"
-                        aria-label={`Copy code ${r.code}`}
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+              {CO_CODES.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-500">
+                    No referral codes assigned yet. Add a code to a user in Users & Roles → Add user.
                   </td>
-                  <td className="px-4 py-2.5">
-                    <div className="font-medium text-gray-900">{r.name}</div>
-                    <div className="text-xs text-gray-500">{r.role}</div>
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-600">{r.branch}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{r.applications}</td>
-                  <td className="px-4 py-2.5 font-medium text-gray-900">{r.disbursed}</td>
                 </tr>
-              ))}
+              ) : (
+                CO_CODES.map(r => (
+                  <tr
+                    key={r.id}
+                    className={cn(
+                      "border-t border-gray-100",
+                      r.disabled && "bg-gray-50/60 opacity-60"
+                    )}
+                    title={r.disabled ? "User is Inactive — referral code is disabled" : undefined}
+                  >
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "font-mono font-medium tracking-wider",
+                            r.disabled
+                              ? "text-gray-400 line-through"
+                              : "text-gray-900"
+                          )}
+                        >
+                          {r.code}
+                        </span>
+                        <button
+                          disabled={r.disabled}
+                          className={cn(
+                            r.disabled
+                              ? "text-gray-300 cursor-not-allowed"
+                              : "text-gray-400 hover:text-gray-700"
+                          )}
+                          aria-label={`Copy code ${r.code}`}
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        {r.disabled && <StatusBadge status="Inactive" />}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div
+                        className={cn(
+                          "font-medium",
+                          r.disabled ? "text-gray-500" : "text-gray-900"
+                        )}
+                      >
+                        {r.name}
+                      </div>
+                      <div className="text-xs text-gray-500">{r.role}</div>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600">{r.branch}</td>
+                    <td className="px-4 py-2.5 text-gray-600">{r.applications}</td>
+                    <td
+                      className={cn(
+                        "px-4 py-2.5",
+                        r.disabled ? "text-gray-500" : "font-medium text-gray-900"
+                      )}
+                    >
+                      {r.disbursed}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

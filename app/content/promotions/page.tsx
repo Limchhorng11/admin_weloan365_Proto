@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 export default function PromotionsPage() {
-  const { can } = useRole();
+  const { can, user } = useRole();
   const canEdit = can("promotion.manage");
 
   const [list, setList] = useState<Promotion[]>(PROMOTIONS);
@@ -123,7 +123,7 @@ export default function PromotionsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
-                {["Promotion", "Status", "Date"].map(h => (
+                {["Promotion", "Author", "Status", "Date", "End date"].map(h => (
                   <th
                     key={h}
                     className="text-left px-6 py-3 text-[12px] font-medium text-gray-500"
@@ -153,10 +153,18 @@ export default function PromotionsPage() {
                       </div>
                     </div>
                   </td>
+                  <td className="px-6 py-3.5 text-gray-700 text-xs">{p.author}</td>
                   <td className="px-6 py-3.5">
                     <StatusBadge status={p.status} />
                   </td>
                   <td className="px-6 py-3.5 text-gray-600 text-xs">{p.date}</td>
+                  <td className="px-6 py-3.5 text-xs">
+                    {p.deadline ? (
+                      <span className="text-gray-700">{p.deadline}</span>
+                    ) : (
+                      <span className="text-gray-300 italic">No deadline</span>
+                    )}
+                  </td>
                   <td className="px-6 py-3.5 text-right">
                     {canEdit && (
                       <div className="inline-flex items-center gap-3">
@@ -188,6 +196,7 @@ export default function PromotionsPage() {
         open={editorOpen}
         initial={editing}
         nextId={nextId}
+        authorName={user.name}
         onClose={() => {
           setEditorOpen(false);
           setEditing(null);
@@ -226,12 +235,14 @@ function PromotionEditorModal({
   open,
   initial,
   nextId,
+  authorName,
   onClose,
   onSave,
 }: {
   open: boolean;
   initial: Promotion | null;
   nextId: string;
+  authorName: string;
   onClose: () => void;
   onSave: (p: Promotion) => void;
 }) {
@@ -303,6 +314,9 @@ function PromotionEditorModal({
       status: initial?.status ?? "Active",
       date: initial?.date ?? new Date().toISOString().slice(0, 10),
       deadline: deadlineOn ? deadline : undefined,
+      // Preserve the original author on edit; set the current user on create
+      // (mirrors the blog-post editor behavior).
+      author: initial?.author ?? authorName,
     };
     onSave(promo);
   };
@@ -415,6 +429,17 @@ function PromotionEditorModal({
                 onChange={onFileChange}
               />
             </div>
+          </div>
+
+          {/* Author — read-only; stamped from the current user on create,
+              preserved on edit. Mirrors the blog-post editor's Author field. */}
+          <div>
+            <label className="text-xs font-medium text-gray-700">Author</label>
+            <input
+              value={initial?.author ?? authorName}
+              readOnly
+              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-600"
+            />
           </div>
 
           {/* Deadline — optional. Toggle to enable a date picker. Mirrors the

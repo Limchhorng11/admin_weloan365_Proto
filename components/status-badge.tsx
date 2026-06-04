@@ -18,6 +18,8 @@ const TONES: Record<string, string> = {
   Failed:                 "bg-red-50 text-red-700",
   Open:                   "bg-amber-50 text-amber-700",
   Closed:                 "bg-gray-100 text-gray-600",
+  Replied:                "bg-emerald-50 text-emerald-700",
+  "No reply":             "bg-gray-100 text-gray-600",
 };
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {

@@ -52,7 +52,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
           // Consultations + Feedback & Rate are merged behind a single
           // "Messages" entry. Inside the page, in-page tabs switch between
           // the two views; the sidebar shows just one item.
-          { label: "Messages", href: "/customer/consultations", icon: MessageSquareText, permission: "consultation.view" },
+          { label: "Consult & Feedback", href: "/customer/consultations", icon: MessageSquareText, permission: "consultation.view" },
         ],
       },
       { label: "Loan Application", href: "/customer/applications", icon: FileText, permission: "loan.view" },

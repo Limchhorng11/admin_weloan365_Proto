@@ -469,16 +469,7 @@ function FeedbackRow({
       </td>
       <td className="px-6 py-3.5 text-gray-600 text-xs whitespace-nowrap">{f.date}</td>
       <td className="px-6 py-3.5">
-        {responded ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">
-            <CheckCircle2 className="w-3 h-3" />
-            Replied
-          </span>
-        ) : (
-          <span className="inline-flex items-center text-[11px] font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-2 py-0.5">
-            No reply
-          </span>
-        )}
+        <StatusBadge status={responded ? "Replied" : "No reply"} />
       </td>
       <td className="px-6 py-3.5 text-right">
         <button

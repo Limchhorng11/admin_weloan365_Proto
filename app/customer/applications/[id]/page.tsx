@@ -1212,8 +1212,11 @@ function OfficerTab({ a }: { a: Application }) {
 /* ---------- tab: Re-structure (peer of Person in Charge) ---------- */
 
 function RestructureTab({ a }: { a: Application }) {
+  // Seed the local decision from the stored request so the pill colour
+  // matches the list view on first render (e.g. an already-declined request
+  // opens with the red "Re-structure request failed" badge).
   const [decision, setDecision] = useState<"pending" | "approved" | "declined">(
-    "pending"
+    a.restructureRequest?.decision ?? "pending"
   );
 
   const isApproved = a.status === "Approved";
@@ -1265,28 +1268,36 @@ function RestructureTab({ a }: { a: Application }) {
               Submitted on {req.requestedAt} · {a.product} · ${a.amount.toLocaleString()} · {a.term}m
             </div>
           </div>
-          {decision !== "pending" && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium",
-                decision === "approved"
-                  ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
-                  : "bg-red-50 border border-red-200 text-red-700"
-              )}
-            >
-              {decision === "approved" ? (
-                <>
-                  <CheckCircle2 className="w-3 h-3" />
-                  Approved
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-3 h-3" />
-                  Declined
-                </>
-              )}
-            </span>
-          )}
+          {/* Status pill — always visible. Shows the current state of the
+              re-structure request: pending (brand), accepted (emerald),
+              or request failed (red, when the officer declines). */}
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium",
+              decision === "pending"
+                ? "bg-brand-50 border border-brand-200 text-brand-700"
+                : decision === "approved"
+                ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                : "bg-red-50 border border-red-200 text-red-700"
+            )}
+          >
+            {decision === "pending" ? (
+              <>
+                <RotateCcw className="w-3 h-3" />
+                Re-structure request
+              </>
+            ) : decision === "approved" ? (
+              <>
+                <CheckCircle2 className="w-3 h-3" />
+                Accepted
+              </>
+            ) : (
+              <>
+                <XCircle className="w-3 h-3" />
+                Re-structure request failed
+              </>
+            )}
+          </span>
         </div>
 
         {/* Reason + requested change */}
@@ -1353,7 +1364,7 @@ function RestructureTab({ a }: { a: Application }) {
             )}
           >
             <CheckCircle2 className="w-4 h-4" />
-            Approve re-structure
+            Accept
           </button>
         </div>
       </div>
