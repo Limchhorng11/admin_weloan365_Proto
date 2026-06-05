@@ -101,14 +101,32 @@ export type Customer = {
   loans: number;
   joined: string;
   branch: string;
+  /** Personal / KYC information — shared by the customer detail page and the
+   *  loan application detail page so both show identical data for the customer. */
+  nationalId: string;
+  dob: string;
+  address: string;
+  occupation: string;
+  monthlyIncome: number;
+  bankAccount: string;
   /** Devices the customer has signed in from. The first entry is the primary
    *  (most recently used) device — that's what the list view surfaces. */
   devices: CustomerDevice[];
+  /** Account lifecycle status.
+   *   "active"    — normal customer (default when omitted)
+   *   "suspended" — customer deleted their account from the mobile app; the
+   *                 record stays for compliance / loan history but no admin
+   *                 actions (Reset PIN, etc.) are available on it. */
+  accountStatus?: "active" | "suspended";
+  /** ISO date (YYYY-MM-DD) when the customer self-deleted their account.
+   *  Only set when `accountStatus === "suspended"`. */
+  deletedAt?: string;
 };
 
 export const CUSTOMERS: Customer[] = [
   {
     id: "C-0421", name: "Sokha Chan",   phone: "+855 12 345 678", email: "sokha@mail.com",  kyc: "verified", loans: 2, joined: "2023-06-11", branch: "Phnom Penh — Central",
+    nationalId: "200112 ••• 4521", dob: "1993-08-12", address: "#123, St. 271, Sangkat BKK1, Phnom Penh", occupation: "Retail supervisor", monthlyIncome: 850, bankAccount: "ABA •••• 1284",
     devices: [
       { platform: "ios",     model: "iPhone 14",            os: "iOS 17.4",    lastSeen: "2 min ago"  },
       { platform: "android", model: "Galaxy Tab A8",        os: "Android 13",  lastSeen: "12 days ago" },
@@ -116,45 +134,57 @@ export const CUSTOMERS: Customer[] = [
   },
   {
     id: "C-0422", name: "Dara Meas",    phone: "+855 17 998 221", email: "dara@mail.com",   kyc: "verified", loans: 1, joined: "2024-01-03", branch: "Siem Reap",
+    nationalId: "200456 ••• 7782", dob: "1990-03-25", address: "#45, Wat Bo Road, Siem Reap", occupation: "Shop owner", monthlyIncome: 1200, bankAccount: "ACLEDA •••• 9921",
     devices: [
       { platform: "android", model: "Samsung Galaxy A53",   os: "Android 14",  lastSeen: "1 hr ago"   },
     ],
   },
   {
     id: "C-0423", name: "Vichet Lim",   phone: "+855 10 556 777", email: "vichet@mail.com", kyc: "verified", loans: 1, joined: "2025-02-28", branch: "Phnom Penh — Toul Kork",
+    nationalId: "199823 ••• 1190", dob: "1995-11-02", address: "#56, St. 289, Toul Kork, Phnom Penh", occupation: "Delivery driver", monthlyIncome: 700, bankAccount: "Wing •••• 3345",
     devices: [
       { platform: "android", model: "Huawei P50",           os: "HarmonyOS 3", lastSeen: "Yesterday"  },
     ],
   },
+  // Row 4 — Chenda self-deleted her account from the mobile app on 2026-04-26.
+  // We keep the record (compliance + audit) but the row reads as muted in the UI
+  // and admin actions like Reset PIN are disabled.
+  {
+    id: "C-0428", name: "Chenda Oum",   phone: "+855 86 772 554", email: "chenda@mail.com", kyc: "rejected", loans: 0, joined: "2026-04-17", branch: "Phnom Penh — Central",
+    nationalId: "200298 ••• 6620", dob: "1998-05-19", address: "#9, St. 105, Phnom Penh", occupation: "Student", monthlyIncome: 0, bankAccount: "—",
+    devices: [
+      { platform: "ios",     model: "iPhone SE",            os: "iOS 17.4",    lastSeen: "Yesterday"  },
+    ],
+    accountStatus: "suspended",
+    deletedAt: "2026-04-26",
+  },
   {
     id: "C-0424", name: "Pisey Ros",    phone: "+855 96 221 004", email: "pisey@mail.com",  kyc: "verified", loans: 1, joined: "2025-09-14", branch: "Battambang",
+    nationalId: "199567 ••• 4410", dob: "1992-07-30", address: "#78, St. 3, Svay Por, Battambang", occupation: "Teacher", monthlyIncome: 950, bankAccount: "ABA •••• 5567",
     devices: [
       { platform: "ios",     model: "iPhone 13 Pro",        os: "iOS 17.3",    lastSeen: "3 hr ago"   },
     ],
   },
   {
     id: "C-0425", name: "Narith Kim",   phone: "+855 88 330 112", email: "narith@mail.com", kyc: "pending",  loans: 1, joined: "2024-11-05", branch: "Phnom Penh — Central",
+    nationalId: "200034 ••• 8810", dob: "1994-01-15", address: "#212, St. 271, Phnom Penh", occupation: "Factory worker", monthlyIncome: 600, bankAccount: "ACLEDA •••• 2210",
     devices: [
       { platform: "android", model: "Xiaomi Redmi Note 12", os: "MIUI 14",     lastSeen: "5 days ago" },
     ],
   },
   {
     id: "C-0426", name: "Bopha Sok",    phone: "+855 77 441 993", email: "bopha@mail.com",  kyc: "verified", loans: 1, joined: "2025-07-22", branch: "Kampong Cham",
+    nationalId: "199789 ••• 3301", dob: "1991-09-08", address: "#10, Preah Monivong Blvd, Kampong Cham", occupation: "Market vendor", monthlyIncome: 800, bankAccount: "Wing •••• 7788",
     devices: [
       { platform: "android", model: "Samsung Galaxy S22",   os: "Android 14",  lastSeen: "30 min ago" },
     ],
   },
   {
     id: "C-0427", name: "Rithy Pen",    phone: "+855 92 118 006", email: "rithy@mail.com",  kyc: "verified", loans: 1, joined: "2024-04-17", branch: "Siem Reap",
+    nationalId: "199345 ••• 5567", dob: "1989-12-21", address: "#33, Wat Bo Road, Siem Reap", occupation: "Tour guide", monthlyIncome: 1100, bankAccount: "ABA •••• 4456",
     devices: [
       { platform: "android", model: "Oppo A77",             os: "ColorOS 12",  lastSeen: "1 day ago"  },
       { platform: "ios",     model: "iPhone SE (2nd gen)",  os: "iOS 16.7",    lastSeen: "2 months ago" },
-    ],
-  },
-  {
-    id: "C-0428", name: "Chenda Oum",   phone: "+855 86 772 554", email: "chenda@mail.com", kyc: "rejected", loans: 0, joined: "2026-04-17", branch: "Phnom Penh — Central",
-    devices: [
-      { platform: "ios",     model: "iPhone SE",            os: "iOS 17.4",    lastSeen: "Yesterday"  },
     ],
   },
 ];
@@ -246,6 +276,8 @@ export function countryCodeFor(name: string): string {
   return letters.length === 2 ? letters : (letters + "X").slice(0, 2);
 }
 
+export type LoanProductStatus = "active" | "inactive" | "draft";
+
 export type LoanProduct = {
   id: string;
   name: string;
@@ -255,7 +287,7 @@ export type LoanProduct = {
   rateMax: number;
   termMin: number;
   termMax: number;
-  status: "active" | "draft";
+  status: LoanProductStatus;
   loans: number;
   /** Public-facing description (CMS body). Markdown-ish plain text. */
   description: string;

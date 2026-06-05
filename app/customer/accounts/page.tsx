@@ -13,12 +13,20 @@ import {
   SlidersHorizontal,
   ChevronDown,
   Check,
-  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 5;
-type KycFacet = "all" | "verified" | "pending" | "rejected";
+// KYC filter exposes only the two actionable states the admin needs to triage:
+//   - Verified → onboarding done, customer is ready to apply
+//   - Pending  → onboarding in progress, may need a nudge
+// "Rejected" is intentionally not a filter facet — those accounts are typically
+// suspended or being remediated and are handled via the suspended-row treatment.
+type KycFacet = "all" | "verified" | "pending";
+// Account-state filter — single-toggle facet: "all" is the default everyday
+// view; "suspended" is the compliance / audit lens. Active isn't a separate
+// bucket because it's already the implicit baseline of "all".
+type AccountFacet = "all" | "suspended";
 
 export default function CustomersPage() {
   // The mock data is the source of truth — no add/edit on this page anymore.
@@ -27,6 +35,7 @@ export default function CustomersPage() {
   /* ---------- toolbar state ---------- */
   const [query, setQuery] = useState("");
   const [filterKyc, setFilterKyc] = useState<KycFacet>("all");
+  const [filterAccount, setFilterAccount] = useState<AccountFacet>("all");
   const [filterBranch, setFilterBranch] = useState<string>("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -55,6 +64,10 @@ export default function CustomersPage() {
     const q = query.trim().toLowerCase();
     return customers.filter(c => {
       if (filterKyc !== "all" && c.kyc !== filterKyc) return false;
+      // Account-status facet — treat a missing accountStatus as "active"
+      // (default for the vast majority of seeded customers).
+      const accountState = c.accountStatus ?? "active";
+      if (filterAccount !== "all" && accountState !== filterAccount) return false;
       if (filterBranch !== "all" && c.branch !== filterBranch) return false;
       if (!q) return true;
       return (
@@ -64,10 +77,12 @@ export default function CustomersPage() {
         c.branch.toLowerCase().includes(q)
       );
     });
-  }, [customers, query, filterKyc, filterBranch]);
+  }, [customers, query, filterKyc, filterAccount, filterBranch]);
 
   const activeFilterCount =
-    (filterKyc !== "all" ? 1 : 0) + (filterBranch !== "all" ? 1 : 0);
+    (filterKyc !== "all" ? 1 : 0) +
+    (filterAccount !== "all" ? 1 : 0) +
+    (filterBranch !== "all" ? 1 : 0);
 
   /* ---------- pagination ---------- */
   const [page, setPage] = useState(1);
@@ -89,10 +104,11 @@ export default function CustomersPage() {
   // Whenever a filter or query changes, return to page 1.
   useEffect(() => {
     setPage(1);
-  }, [query, filterKyc, filterBranch]);
+  }, [query, filterKyc, filterAccount, filterBranch]);
 
   const clearFilters = () => {
     setFilterKyc("all");
+    setFilterAccount("all");
     setFilterBranch("all");
   };
 
@@ -114,7 +130,7 @@ export default function CustomersPage() {
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Search..."
+                placeholder="Search phone number"
                 className="pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 w-56"
               />
             </div>
@@ -184,7 +200,6 @@ export default function CustomersPage() {
                         { v: "all", label: "All statuses" },
                         { v: "verified", label: "Verified" },
                         { v: "pending", label: "Pending" },
-                        { v: "rejected", label: "Rejected" },
                       ] as { v: KycFacet; label: string }[]).map(o => {
                         const on = filterKyc === o.v;
                         return (
@@ -197,6 +212,41 @@ export default function CustomersPage() {
                             )}
                           >
                             <span>{o.label}</span>
+                            {on && <Check className="w-3.5 h-3.5 text-brand-600" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Account status — single-toggle facet. "All" is the
+                      default everyday view; flipping to Suspended isolates the
+                      deleted accounts for compliance review. */}
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <div className="text-[11px] font-medium text-gray-500 mb-2">Account status</div>
+                    <div className="space-y-1">
+                      {([
+                        { v: "all", label: "All" },
+                        { v: "suspended", label: "Inactive" },
+                      ] as { v: AccountFacet; label: string }[]).map(o => {
+                        const on = filterAccount === o.v;
+                        return (
+                          <button
+                            key={o.v}
+                            onClick={() => setFilterAccount(o.v)}
+                            className={cn(
+                              "w-full text-left flex items-center justify-between px-2 py-1.5 rounded text-sm",
+                              on ? "bg-brand-50 text-brand-700" : "text-gray-700 hover:bg-gray-50"
+                            )}
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              {/* Red dot echoes the Suspended badge tone in the
+                                  table; "All" gets no dot since it has no tone. */}
+                              {o.v === "suspended" && (
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500" />
+                              )}
+                              {o.label}
+                            </span>
                             {on && <Check className="w-3.5 h-3.5 text-brand-600" />}
                           </button>
                         );
@@ -257,7 +307,7 @@ export default function CustomersPage() {
                     </span>
                   </th>
                 ))}
-                <th className="text-left px-6 py-3 text-[12px] font-medium text-gray-500">
+                <th className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap">
                   Security
                 </th>
                 <th className="px-6 py-3" />
@@ -271,60 +321,102 @@ export default function CustomersPage() {
                   </td>
                 </tr>
               ) : (
-                paginated.map(c => (
-                  <tr key={c.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                    <td className="px-6 py-3.5 text-gray-700 font-mono text-xs">{c.id}</td>
-                    <td className="px-6 py-3.5 text-gray-900 font-medium">{c.name}</td>
-                    <td className="px-6 py-3.5 text-gray-600">{c.phone}</td>
-                    <td className="px-6 py-3.5">
-                      <StatusBadge
-                        status={c.kyc === "verified" ? "Verified" : c.kyc === "pending" ? "Pending" : "Rejected"}
-                      />
-                    </td>
-                    <td className="px-6 py-3.5 text-gray-700">{c.loans}</td>
-                    <td className="px-6 py-3.5 text-gray-600">{c.branch}</td>
-                    <td className="px-6 py-3.5 text-gray-600">
-                      {c.devices.length > 0 ? (
-                        <span className="relative inline-block group cursor-default">
-                          <span>
-                            {c.devices[0].model.length > 7
-                              ? `${c.devices[0].model.slice(0, 7)}…`
-                              : c.devices[0].model}
-                          </span>
-                          {/* Styled hover tooltip — popup with the full model name */}
-                          <span
-                            role="tooltip"
-                            className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 z-20 whitespace-nowrap px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-medium opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition shadow-lg"
-                          >
-                            {c.devices[0].model}
-                            {/* Caret pointing down toward the text */}
-                            <span className="absolute left-1/2 -translate-x-1/2 top-full -mt-px w-2 h-2 bg-gray-900 rotate-45" />
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-300">—</span>
+                paginated.map(c => {
+                  const suspended = c.accountStatus === "suspended";
+                  return (
+                    <tr
+                      key={c.id}
+                      className={cn(
+                        "border-b border-gray-100 last:border-0 hover:bg-gray-50/60",
+                        // Suspended customers stay in the list for history /
+                        // compliance but read as muted, untouchable rows.
+                        suspended && "bg-gray-50/40 opacity-70"
                       )}
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <Link
-                        href={`/customer/accounts/${c.id}`}
-                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[11px] font-medium hover:bg-amber-100"
-                        title="Open the customer's profile to reset their PIN"
+                      title={
+                        suspended
+                          ? `Account deleted by customer on ${c.deletedAt ?? "—"}`
+                          : undefined
+                      }
+                    >
+                      <td className="px-6 py-3.5 text-gray-700 font-mono text-xs">{c.id}</td>
+                      <td
+                        className={cn(
+                          "px-6 py-3.5 font-medium",
+                          suspended ? "text-gray-500 line-through" : "text-gray-900"
+                        )}
                       >
-                        <KeyRound className="w-3 h-3" />
-                        Reset PIN
-                      </Link>
-                    </td>
-                    <td className="px-6 py-3.5 text-right">
-                      <Link
-                        href={`/customer/accounts/${c.id}`}
-                        className="text-xs text-brand-600 hover:underline font-medium"
-                      >
-                        Detail
-                      </Link>
-                    </td>
-                  </tr>
-                ))
+                        {c.name}
+                      </td>
+                      {/* Phone stays visible even when suspended — admins may
+                          still need to contact the customer (e.g. to confirm the
+                          deletion was intentional, or to follow up on an
+                          outstanding loan). All other PII columns are dashed. */}
+                      <td className="px-6 py-3.5 text-gray-600">{c.phone}</td>
+                      <td className="px-6 py-3.5">
+                        {suspended ? (
+                          <span className="text-gray-300">—</span>
+                        ) : (
+                          <StatusBadge
+                            status={c.kyc === "verified" ? "Verified" : c.kyc === "pending" ? "Pending" : "Rejected"}
+                          />
+                        )}
+                      </td>
+                      <td className="px-6 py-3.5 text-gray-700">{c.loans}</td>
+                      <td className="px-6 py-3.5 text-gray-600">
+                        {suspended ? <span className="text-gray-300">—</span> : c.branch}
+                      </td>
+                      <td className="px-6 py-3.5 text-gray-600">
+                        {suspended ? (
+                          <span className="text-gray-300">—</span>
+                        ) : c.devices.length > 0 ? (
+                          <span className="relative inline-block group cursor-default">
+                            <span>
+                              {c.devices[0].model.length > 7
+                                ? `${c.devices[0].model.slice(0, 7)}…`
+                                : c.devices[0].model}
+                            </span>
+                            {/* Styled hover tooltip — popup with the full model name */}
+                            <span
+                              role="tooltip"
+                              className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 z-20 whitespace-nowrap px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-medium opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition shadow-lg"
+                            >
+                              {c.devices[0].model}
+                              {/* Caret pointing down toward the text */}
+                              <span className="absolute left-1/2 -translate-x-1/2 top-full -mt-px w-2 h-2 bg-gray-900 rotate-45" />
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3.5">
+                        {suspended ? (
+                          <StatusBadge status="Inactive" />
+                        ) : (
+                          <StatusBadge status="Change pin" />
+                        )}
+                      </td>
+                      <td className="px-6 py-3.5 text-right">
+                        {/* Suspended and active rows both link to the customer's
+                            profile via "Detail" — the destination page can
+                            render an audit / restore view when the account is
+                            suspended, but the affordance label stays consistent
+                            across the whole table. */}
+                        <Link
+                          href={`/customer/accounts/${c.id}`}
+                          className="text-xs text-brand-600 hover:underline font-medium"
+                          title={
+                            suspended
+                              ? "Open the audit record for this deleted account"
+                              : undefined
+                          }
+                        >
+                          Detail
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

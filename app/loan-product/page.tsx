@@ -29,22 +29,17 @@ import {
   Globe,
 } from "lucide-react";
 
-type StatusFilter = "all" | "active" | "draft";
+type StatusFilter = "all" | "active" | "inactive" | "draft";
 
+// Single-axis filter. Amount and rate ranges were removed because the catalog
+// has at most ~10 products at a time — easier to scan than to range-filter, and
+// admins were almost never using those inputs in practice.
 type Filters = {
   status: StatusFilter;
-  amountMin: string;
-  amountMax: string;
-  rateMin: string;
-  rateMax: string;
 };
 
 const EMPTY_FILTERS: Filters = {
   status: "all",
-  amountMin: "",
-  amountMax: "",
-  rateMin: "",
-  rateMax: "",
 };
 
 export default function ProductsPage() {
@@ -70,19 +65,9 @@ export default function ProductsPage() {
   // Apply filters + search
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const aMin = filters.amountMin ? +filters.amountMin : null;
-    const aMax = filters.amountMax ? +filters.amountMax : null;
-    const rMin = filters.rateMin   ? +filters.rateMin   : null;
-    const rMax = filters.rateMax   ? +filters.rateMax   : null;
     return products.filter(p => {
       if (q && !`${p.name} ${p.id} ${p.description}`.toLowerCase().includes(q)) return false;
       if (filters.status !== "all" && p.status !== filters.status) return false;
-      // Amount filter: product's range overlaps with [aMin..aMax]
-      if (aMin !== null && p.max < aMin) return false;
-      if (aMax !== null && p.min > aMax) return false;
-      // Rate filter: product's rate range overlaps with [rMin..rMax]
-      if (rMin !== null && p.rateMax < rMin) return false;
-      if (rMax !== null && p.rateMin > rMax) return false;
       return true;
     });
   }, [products, query, filters]);
@@ -100,10 +85,7 @@ export default function ProductsPage() {
     return `LP-${String(max + 1).padStart(2, "0")}`;
   }, [products]);
 
-  const activeFilterCount =
-    (filters.status !== "all" ? 1 : 0) +
-    (filters.amountMin || filters.amountMax ? 1 : 0) +
-    (filters.rateMin   || filters.rateMax   ? 1 : 0);
+  const activeFilterCount = filters.status !== "all" ? 1 : 0;
 
   // Accepts one product (Non-MWL flow) or many (MWL flow saves the parent
   // and one sub-product per selected country in a single call).
@@ -128,7 +110,7 @@ export default function ProductsPage() {
     setCreateOpen(true);
   };
 
-  const handleUpdateStatus = (id: string, next: "active" | "draft") => {
+  const handleUpdateStatus = (id: string, next: "active" | "inactive" | "draft") => {
     setProducts(prev => prev.map(p => (p.id === id ? { ...p, status: next } : p)));
   };
 
@@ -223,22 +205,18 @@ export default function ProductsPage() {
             <span className="text-[11px] text-gray-500">Filters:</span>
             {filters.status !== "all" && (
               <Chip
-                label={`Status: ${filters.status === "active" ? "Active" : "Draft"}`}
+                label={`Status: ${
+                  filters.status === "active"
+                    ? "Active"
+                    : filters.status === "inactive"
+                    ? "Inactive"
+                    : "Draft"
+                }`}
                 onClear={() => setFilters(f => ({ ...f, status: "all" }))}
               />
             )}
-            {(filters.amountMin || filters.amountMax) && (
-              <Chip
-                label={`Amount: $${filters.amountMin || "0"} – $${filters.amountMax || "∞"}`}
-                onClear={() => setFilters(f => ({ ...f, amountMin: "", amountMax: "" }))}
-              />
-            )}
-            {(filters.rateMin || filters.rateMax) && (
-              <Chip
-                label={`Rate: ${filters.rateMin || "0"}% – ${filters.rateMax || "∞"}%`}
-                onClear={() => setFilters(f => ({ ...f, rateMin: "", rateMax: "" }))}
-              />
-            )}
+            {/* Only the Status chip can appear here now — amount and rate
+                range filters were removed. */}
             <button
               onClick={() => setFilters(EMPTY_FILTERS)}
               className="text-[11px] text-brand-600 hover:underline font-medium ml-1"
@@ -423,7 +401,15 @@ export default function ProductsPage() {
                     </td>
                     <td className={cn("px-6 py-3", cellTone)}>{p.loans}</td>
                     <td className="px-6 py-3">
-                      <StatusBadge status={p.status === "active" ? "Active" : "Draft"} />
+                      <StatusBadge
+                        status={
+                          p.status === "active"
+                            ? "Active"
+                            : p.status === "inactive"
+                            ? "Inactive"
+                            : "Draft"
+                        }
+                      />
                     </td>
                     <td className="px-6 py-3 text-right">
                       <button
@@ -532,13 +518,9 @@ function FilterPopover({
   onChange: (f: Filters) => void;
   activeCount: number;
 }) {
-  // Local draft state — only commits to parent on Apply
-  const [draft, setDraft] = useState<Filters>(filters);
+  // No draft buffering anymore — with only one facet left (Status), changes
+  // commit to the parent immediately so the table re-filters on click.
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (open) setDraft(filters);
-  }, [open, filters]);
 
   useEffect(() => {
     if (!open) return;
@@ -555,14 +537,6 @@ function FilterPopover({
       document.removeEventListener("keydown", onKey);
     };
   }, [open, onOpenChange]);
-
-  const apply = () => {
-    onChange(draft);
-    onOpenChange(false);
-  };
-  const reset = () => {
-    setDraft(EMPTY_FILTERS);
-  };
 
   return (
     <div ref={ref} className="relative">
@@ -586,118 +560,36 @@ function FilterPopover({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[340px] bg-white border border-gray-200 rounded-lg shadow-xl z-30">
+        <div className="absolute right-0 top-full mt-2 w-[260px] bg-white border border-gray-200 rounded-lg shadow-xl z-30">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="font-semibold text-sm text-gray-900">Filter products</div>
             <div className="text-[11px] text-gray-500 mt-0.5">
-              Filter products by status, amount, or rate range.
+              Filter by lifecycle status.
             </div>
           </div>
 
-          <div className="p-4 space-y-4">
-            {/* Status */}
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2">
-                Status
-              </div>
-              <div className="flex items-center gap-1">
-                {(["all", "active", "draft"] as const).map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setDraft(d => ({ ...d, status: s }))}
-                    className={cn(
-                      "flex-1 px-2 py-1.5 text-xs rounded-md border capitalize",
-                      draft.status === s
-                        ? "bg-brand-50 border-brand-300 text-brand-700 font-medium"
-                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                    )}
-                  >
-                    {s === "all" ? "All" : s}
-                  </button>
-                ))}
-              </div>
+          <div className="p-4">
+            {/* Status — single facet. Clicking a chip applies immediately;
+                no Apply / Reset footer is needed. */}
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2">
+              Status
             </div>
-
-            {/* Amount */}
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2">
-                Amount range (USD)
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="Min"
-                    value={draft.amountMin}
-                    onChange={e => setDraft(d => ({ ...d, amountMin: e.target.value }))}
-                    className="w-full pl-6 pr-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                  />
-                </div>
-                <span className="text-gray-400 text-xs">to</span>
-                <div className="relative flex-1">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="Max"
-                    value={draft.amountMax}
-                    onChange={e => setDraft(d => ({ ...d, amountMax: e.target.value }))}
-                    className="w-full pl-6 pr-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                  />
-                </div>
-              </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(["all", "active", "inactive", "draft"] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => onChange({ status: s })}
+                  className={cn(
+                    "px-2 py-1.5 text-xs rounded-md border capitalize",
+                    filters.status === s
+                      ? "bg-brand-50 border-brand-300 text-brand-700 font-medium"
+                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  {s === "all" ? "All" : s}
+                </button>
+              ))}
             </div>
-
-            {/* Rate */}
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2">
-                Rate range (APR)
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.1"
-                    placeholder="Min"
-                    value={draft.rateMin}
-                    onChange={e => setDraft(d => ({ ...d, rateMin: e.target.value }))}
-                    className="w-full pl-2 pr-6 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                  />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
-                </div>
-                <span className="text-gray-400 text-xs">to</span>
-                <div className="relative flex-1">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.1"
-                    placeholder="Max"
-                    value={draft.rateMax}
-                    onChange={e => setDraft(d => ({ ...d, rateMax: e.target.value }))}
-                    className="w-full pl-2 pr-6 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                  />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50/60 rounded-b-lg">
-            <button
-              onClick={reset}
-              className="text-xs font-medium text-gray-600 hover:text-gray-900"
-            >
-              Reset
-            </button>
-            <button
-              onClick={apply}
-              className="px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700"
-            >
-              Apply
-            </button>
           </div>
         </div>
       )}
@@ -765,7 +657,12 @@ function CreateProductModal({
   const [residenceRule, setResidenceRule] = useState("");
   const [incomeRule, setIncomeRule] = useState("");
   const [collateralRule, setCollateralRule] = useState("");
-  const [status, setStatus] = useState<"active" | "draft">("draft");
+  // status carries the persisted value of LoanProduct.status. The new
+  // `activeNow` toggle is the form-level Active/Inactive switch that the
+  // primary save button (Save / Update now) uses; "Save as draft" always
+  // bypasses the toggle and forces status = "draft".
+  const [status, setStatus] = useState<"active" | "inactive" | "draft">("draft");
+  const [activeNow, setActiveNow] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // Per-row "show in form" toggle. Hidden rows render as a collapsed label
@@ -818,6 +715,7 @@ function CreateProductModal({
       setIncomeRule(parsed.income);
       setCollateralRule(parsed.collateral);
       setStatus(editing.status);
+      setActiveNow(editing.status === "active");
       setShown({
         loanSize: editing.min > 0 || editing.max > 0,
         interest: editing.rateMin > 0 || editing.rateMax > 0,
@@ -848,6 +746,9 @@ function CreateProductModal({
       setIncomeRule("");
       setCollateralRule("");
       setStatus("draft");
+      // Default the toggle to Active on create so the primary "Save" button
+      // publishes the product unless the admin explicitly flips it.
+      setActiveNow(true);
       setShown({
         loanSize: true,
         interest: true,
@@ -933,7 +834,13 @@ function CreateProductModal({
       rateMax: shown.interest ? +rateMax : 0,
       termMin: shown.loanTerm ? +termMin : 0,
       termMax: shown.loanTerm ? +termMax : 0,
-      status: (publish ? "active" : "draft") as "active" | "draft",
+      // "Save as draft" → always draft.
+      // Primary "Save" / "Update now" → uses the Active/Inactive toggle.
+      status: (publish
+        ? activeNow
+          ? "active"
+          : "inactive"
+        : "draft") as "active" | "inactive" | "draft",
       loans: editing?.loans ?? 0,
       description: description.trim(),
       // Compose the 4 structured eligibility rows back to the existing field.
@@ -1361,8 +1268,36 @@ function CreateProductModal({
         </div>
 
         <div className="px-6 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
-          <div className="text-xs text-gray-500">
-            Status: <span className="font-medium">{status === "active" ? "Active" : "Draft"}</span>
+          {/* Status — Active/Inactive toggle. Drives the primary save button's
+              saved status. "Save as draft" bypasses this and forces draft. */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Status</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={activeNow}
+              onClick={() => setActiveNow(v => !v)}
+              title={activeNow ? "Switch to Inactive" : "Switch to Active"}
+              className={cn(
+                "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
+                activeNow ? "bg-brand-600" : "bg-gray-300"
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                  activeNow ? "translate-x-[18px]" : "translate-x-0.5"
+                )}
+              />
+            </button>
+            <span
+              className={cn(
+                "text-xs font-medium",
+                activeNow ? "text-emerald-700" : "text-gray-500"
+              )}
+            >
+              {activeNow ? "Active" : "Inactive"}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1371,17 +1306,22 @@ function CreateProductModal({
             >
               Cancel
             </button>
-            <button
-              onClick={() => submit(false)}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
-            >
-              {isEdit ? "Save as draft" : "Save as draft"}
-            </button>
+            {/* "Save as draft" is a create-flow affordance only. Once a product
+                exists the lifecycle is controlled by the Active/Inactive toggle —
+                editing a product shouldn't re-park it back into Draft. */}
+            {!isEdit && (
+              <button
+                onClick={() => submit(false)}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
+              >
+                Save as draft
+              </button>
+            )}
             <button
               onClick={() => submit(true)}
               className="px-3 py-1.5 text-sm font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700"
             >
-              {isEdit ? "Save changes" : "Publish & activate"}
+              {isEdit ? "Update now" : "Save"}
             </button>
           </div>
         </div>
@@ -1584,7 +1524,7 @@ function DetailProductModal({
   product: LoanProduct | null;
   onClose: () => void;
   canEdit: boolean;
-  onUpdateStatus: (id: string, next: "active" | "draft") => void;
+  onUpdateStatus: (id: string, next: "active" | "inactive" | "draft") => void;
   onEdit: (p: LoanProduct) => void;
 }) {
   useEffect(() => {
@@ -1633,7 +1573,15 @@ function DetailProductModal({
               <div className="text-xs font-mono text-gray-500">{product.id}</div>
               <div className="text-lg font-semibold text-gray-900">{product.name}</div>
               <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
-                <StatusBadge status={product.status === "active" ? "Active" : "Draft"} />
+                <StatusBadge
+                  status={
+                    product.status === "active"
+                      ? "Active"
+                      : product.status === "inactive"
+                      ? "Inactive"
+                      : "Draft"
+                  }
+                />
                 <span>·</span>
                 <span>{product.loans} active loans</span>
                 {product.kind === "mwl-parent" && (
@@ -1782,7 +1730,7 @@ function DetailProductModal({
               {product.status === "active" ? (
                 <button
                   onClick={() => {
-                    onUpdateStatus(product.id, "draft");
+                    onUpdateStatus(product.id, "inactive");
                     onClose();
                   }}
                   className="px-3 py-1.5 text-sm font-medium text-amber-700 border border-amber-200 rounded-md hover:bg-amber-50"

@@ -24,7 +24,7 @@ import {
   Search,
   Phone,
 } from "lucide-react";
-import { APPLICATIONS, USERS, type Application, type ApplicationStatus } from "@/lib/data";
+import { APPLICATIONS, CUSTOMERS, USERS, type Application, type ApplicationStatus } from "@/lib/data";
 import { StatusBadge } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/lib/role-context";
@@ -551,6 +551,9 @@ function Box({ label, value, tone }: { label: string; value: string; tone?: "gre
 /* ---------- tab: KYC / Docs / CBC ---------- */
 
 function KycTab({ a }: { a: Application }) {
+  // Pull personal information from the linked customer record so the customer
+  // detail page and this loan application detail always show the same data.
+  const customer = CUSTOMERS.find(c => c.id === a.cid);
   const docs = [
     { name: "National ID",      status: "verified" as const },
     { name: "Payslip",          status: "verified" as const },
@@ -569,16 +572,19 @@ function KycTab({ a }: { a: Application }) {
         <div>
           <SectionLabel>Personal information (KYC)</SectionLabel>
           <dl className="divide-y divide-gray-100">
-            <Row label="Full name" value={a.name} />
+            <Row label="Full name" value={customer?.name ?? a.name} />
             <Row label="Customer ID" value={<span className="font-mono text-xs">{a.cid}</span>} />
-            <Row label="National ID" value="200112 ••• 4521" />
-            <Row label="Date of birth" value="1993-08-12" />
-            <Row label="Address" value="Phnom Penh, Cambodia" />
-            <Row label="Occupation" value="Retail supervisor" />
-            <Row label="Monthly income" value="$850" />
+            <Row label="National ID" value={customer?.nationalId ?? "—"} />
+            <Row label="Date of birth" value={customer?.dob ?? "—"} />
+            <Row label="Address" value={customer?.address ?? "—"} />
+            <Row label="Occupation" value={customer?.occupation ?? "—"} />
+            <Row
+              label="Monthly income"
+              value={customer ? `$${customer.monthlyIncome.toLocaleString()}` : "—"}
+            />
             <Row
               label="Bank account"
-              value={<span className="font-mono text-xs">ABA •••• 1284</span>}
+              value={<span className="font-mono text-xs">{customer?.bankAccount ?? "—"}</span>}
             />
             <Row
               label="Referral"
