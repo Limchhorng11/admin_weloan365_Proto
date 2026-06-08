@@ -92,6 +92,27 @@ export type CustomerDevice = {
   lastSeen?: string;
 };
 
+/** Structured profile captured in the customer mobile app, grouped by type. */
+export type CustomerProfile = {
+  /** Residential address (Cambodia administrative hierarchy). */
+  address: {
+    cityProvince: string;
+    district: string;
+    commune: string;
+    village: string;
+    houseStreet: string;
+  };
+  /** Employment / income details. */
+  employment: {
+    type: string;
+    companyName: string;
+    businessType: string;
+    businessNature: string;
+    incomeSource: string;
+    incomeRange: string;
+  };
+};
+
 export type Customer = {
   id: string;
   name: string;
@@ -109,6 +130,8 @@ export type Customer = {
   occupation: string;
   monthlyIncome: number;
   bankAccount: string;
+  /** Full mobile-app profile, grouped by type (address + employment). */
+  profile: CustomerProfile;
   /** Devices the customer has signed in from. The first entry is the primary
    *  (most recently used) device — that's what the list view surfaces. */
   devices: CustomerDevice[];
@@ -127,6 +150,10 @@ export const CUSTOMERS: Customer[] = [
   {
     id: "C-0421", name: "Sokha Chan",   phone: "+855 12 345 678", email: "sokha@mail.com",  kyc: "verified", loans: 2, joined: "2023-06-11", branch: "Phnom Penh — Central",
     nationalId: "200112 ••• 4521", dob: "1993-08-12", address: "#123, St. 271, Sangkat BKK1, Phnom Penh", occupation: "Retail supervisor", monthlyIncome: 850, bankAccount: "ABA •••• 1284",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Chamkarmon", commune: "Sangkat BKK 1", village: "Phum 1", houseStreet: "No. 123 · St. 271" },
+      employment: { type: "Employed", companyName: "Lucky Supermarket", businessType: "Retail Trade", businessNature: "Supermarket", incomeSource: "Salary", incomeRange: "$500 – $1,000 / month" },
+    },
     devices: [
       { platform: "ios",     model: "iPhone 14",            os: "iOS 17.4",    lastSeen: "2 min ago"  },
       { platform: "android", model: "Galaxy Tab A8",        os: "Android 13",  lastSeen: "12 days ago" },
@@ -135,6 +162,10 @@ export const CUSTOMERS: Customer[] = [
   {
     id: "C-0422", name: "Dara Meas",    phone: "+855 17 998 221", email: "dara@mail.com",   kyc: "verified", loans: 1, joined: "2024-01-03", branch: "Siem Reap",
     nationalId: "200456 ••• 7782", dob: "1990-03-25", address: "#45, Wat Bo Road, Siem Reap", occupation: "Shop owner", monthlyIncome: 1200, bankAccount: "ACLEDA •••• 9921",
+    profile: {
+      address: { cityProvince: "Siem Reap", district: "Krong Siem Reap", commune: "Sangkat Sala Kamreuk", village: "Phum Wat Bo", houseStreet: "No. 45 · Wat Bo Road" },
+      employment: { type: "Self-employed", companyName: "Dara Grocery", businessType: "Retail Trade", businessNature: "Grocery & General Goods", incomeSource: "Business Revenue", incomeRange: "$1,000 – $1,500 / month" },
+    },
     devices: [
       { platform: "android", model: "Samsung Galaxy A53",   os: "Android 14",  lastSeen: "1 hr ago"   },
     ],
@@ -142,6 +173,10 @@ export const CUSTOMERS: Customer[] = [
   {
     id: "C-0423", name: "Vichet Lim",   phone: "+855 10 556 777", email: "vichet@mail.com", kyc: "verified", loans: 1, joined: "2025-02-28", branch: "Phnom Penh — Toul Kork",
     nationalId: "199823 ••• 1190", dob: "1995-11-02", address: "#56, St. 289, Toul Kork, Phnom Penh", occupation: "Delivery driver", monthlyIncome: 700, bankAccount: "Wing •••• 3345",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Toul Kork", commune: "Sangkat Boeung Kak 1", village: "Phum 5", houseStreet: "No. 56 · St. 289" },
+      employment: { type: "Employed", companyName: "Nham24", businessType: "Logistics & Delivery", businessNature: "Food Delivery", incomeSource: "Salary", incomeRange: "$500 – $1,000 / month" },
+    },
     devices: [
       { platform: "android", model: "Huawei P50",           os: "HarmonyOS 3", lastSeen: "Yesterday"  },
     ],
@@ -152,6 +187,10 @@ export const CUSTOMERS: Customer[] = [
   {
     id: "C-0428", name: "Chenda Oum",   phone: "+855 86 772 554", email: "chenda@mail.com", kyc: "rejected", loans: 0, joined: "2026-04-17", branch: "Phnom Penh — Central",
     nationalId: "200298 ••• 6620", dob: "1998-05-19", address: "#9, St. 105, Phnom Penh", occupation: "Student", monthlyIncome: 0, bankAccount: "—",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Daun Penh", commune: "Sangkat Wat Phnom", village: "Phum 2", houseStreet: "No. 9 · St. 105" },
+      employment: { type: "Student", companyName: "—", businessType: "—", businessNature: "—", incomeSource: "Family Support", incomeRange: "Under $500 / month" },
+    },
     devices: [
       { platform: "ios",     model: "iPhone SE",            os: "iOS 17.4",    lastSeen: "Yesterday"  },
     ],
@@ -161,6 +200,10 @@ export const CUSTOMERS: Customer[] = [
   {
     id: "C-0424", name: "Pisey Ros",    phone: "+855 96 221 004", email: "pisey@mail.com",  kyc: "verified", loans: 1, joined: "2025-09-14", branch: "Battambang",
     nationalId: "199567 ••• 4410", dob: "1992-07-30", address: "#78, St. 3, Svay Por, Battambang", occupation: "Teacher", monthlyIncome: 950, bankAccount: "ABA •••• 5567",
+    profile: {
+      address: { cityProvince: "Battambang", district: "Krong Battambang", commune: "Sangkat Svay Por", village: "Phum 3", houseStreet: "No. 78 · St. 3" },
+      employment: { type: "Employed", companyName: "Battambang High School", businessType: "Education", businessNature: "Public School", incomeSource: "Salary", incomeRange: "$500 – $1,000 / month" },
+    },
     devices: [
       { platform: "ios",     model: "iPhone 13 Pro",        os: "iOS 17.3",    lastSeen: "3 hr ago"   },
     ],
@@ -168,6 +211,10 @@ export const CUSTOMERS: Customer[] = [
   {
     id: "C-0425", name: "Narith Kim",   phone: "+855 88 330 112", email: "narith@mail.com", kyc: "pending",  loans: 1, joined: "2024-11-05", branch: "Phnom Penh — Central",
     nationalId: "200034 ••• 8810", dob: "1994-01-15", address: "#212, St. 271, Phnom Penh", occupation: "Factory worker", monthlyIncome: 600, bankAccount: "ACLEDA •••• 2210",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Chamkarmon", commune: "Sangkat Tonle Bassac", village: "Phum 4", houseStreet: "No. 212 · St. 271" },
+      employment: { type: "Employed", companyName: "Grand Twins Garment", businessType: "Manufacturing", businessNature: "Garment Factory", incomeSource: "Salary", incomeRange: "$500 – $1,000 / month" },
+    },
     devices: [
       { platform: "android", model: "Xiaomi Redmi Note 12", os: "MIUI 14",     lastSeen: "5 days ago" },
     ],
@@ -175,6 +222,10 @@ export const CUSTOMERS: Customer[] = [
   {
     id: "C-0426", name: "Bopha Sok",    phone: "+855 77 441 993", email: "bopha@mail.com",  kyc: "verified", loans: 1, joined: "2025-07-22", branch: "Kampong Cham",
     nationalId: "199789 ••• 3301", dob: "1991-09-08", address: "#10, Preah Monivong Blvd, Kampong Cham", occupation: "Market vendor", monthlyIncome: 800, bankAccount: "Wing •••• 7788",
+    profile: {
+      address: { cityProvince: "Kampong Cham", district: "Krong Kampong Cham", commune: "Sangkat Kampong Cham", village: "Phum 1", houseStreet: "No. 10 · Preah Monivong Blvd" },
+      employment: { type: "Self-employed", companyName: "Bopha Stall", businessType: "Retail Trade", businessNature: "Fresh Market Vendor", incomeSource: "Business Revenue", incomeRange: "$500 – $1,000 / month" },
+    },
     devices: [
       { platform: "android", model: "Samsung Galaxy S22",   os: "Android 14",  lastSeen: "30 min ago" },
     ],
@@ -182,6 +233,10 @@ export const CUSTOMERS: Customer[] = [
   {
     id: "C-0427", name: "Rithy Pen",    phone: "+855 92 118 006", email: "rithy@mail.com",  kyc: "verified", loans: 1, joined: "2024-04-17", branch: "Siem Reap",
     nationalId: "199345 ••• 5567", dob: "1989-12-21", address: "#33, Wat Bo Road, Siem Reap", occupation: "Tour guide", monthlyIncome: 1100, bankAccount: "ABA •••• 4456",
+    profile: {
+      address: { cityProvince: "Siem Reap", district: "Krong Siem Reap", commune: "Sangkat Svay Dangkum", village: "Phum Wat Bo", houseStreet: "No. 33 · Wat Bo Road" },
+      employment: { type: "Self-employed", companyName: "Angkor Smile Tours", businessType: "Tourism", businessNature: "Tour Services", incomeSource: "Business Revenue", incomeRange: "$1,000 – $1,500 / month" },
+    },
     devices: [
       { platform: "android", model: "Oppo A77",             os: "ColorOS 12",  lastSeen: "1 day ago"  },
       { platform: "ios",     model: "iPhone SE (2nd gen)",  os: "iOS 16.7",    lastSeen: "2 months ago" },
@@ -309,6 +364,9 @@ export type LoanProduct = {
   country?: string;
   /** For mwl-sub: the parent's product id. */
   parentId?: string;
+  /** Optional product media — an uploaded image or video (data URL in the prototype). */
+  media?: string;
+  mediaType?: "image" | "video";
 };
 
 export const PRODUCTS: LoanProduct[] = [
@@ -552,13 +610,24 @@ export const CONSULTATIONS = [
   },
 ];
 
-export const FEEDBACK = [
-  { id: "FB-028", customer: "Sokha Chan",  rating: 5, text: "Outstanding service, will recommend to family.",  date: "2026-04-21" },
+export type Feedback = {
+  id: string;
+  customer: string;
+  rating: number;
+  text: string;
+  date: string;
+  /** Officer reply, if any — drives the "Replied / No reply" status shared by
+   *  the Consult & Feedback inbox and the customer detail page. */
+  response?: string;
+};
+
+export const FEEDBACK: Feedback[] = [
+  { id: "FB-028", customer: "Sokha Chan",  rating: 5, text: "Outstanding service, will recommend to family.",  date: "2026-04-21", response: "Thank you for the kind words, Sokha — we're delighted you had a great experience!" },
   { id: "FB-027", customer: "Pisey Ros",   rating: 5, text: "Fast approval, friendly officer.",                date: "2026-04-20" },
   { id: "FB-026", customer: "Dara Meas",   rating: 4, text: "Process was clear but took a few extra days.",    date: "2026-04-19" },
   { id: "FB-025", customer: "Vichet Lim",  rating: 5, text: "Loved the new app — very easy to track payments.",date: "2026-04-19" },
   { id: "FB-024", customer: "Sokha Chan",  rating: 4, text: "Good experience overall.",                        date: "2026-04-18" },
-  { id: "FB-023", customer: "Narith Kim",  rating: 2, text: "Rejection reason was not clear.",                 date: "2026-04-18" },
+  { id: "FB-023", customer: "Narith Kim",  rating: 2, text: "Rejection reason was not clear.",                 date: "2026-04-18", response: "Sorry the reason wasn't clear — we've sent a detailed explanation in the app." },
   { id: "FB-022", customer: "Bopha Sok",   rating: 5, text: "App is easy to use, payments smooth.",            date: "2026-04-17" },
   { id: "FB-021", customer: "Rithy Pen",   rating: 4, text: "Helpful staff, smooth disbursement.",             date: "2026-04-16" },
   { id: "FB-020", customer: "Chenda Oum",  rating: 3, text: "Average. Hoped for a faster response on chat.",   date: "2026-04-15" },
@@ -567,12 +636,12 @@ export const FEEDBACK = [
   { id: "FB-017", customer: "Vichet Lim",  rating: 5, text: "Quick KYC verification.",                         date: "2026-04-08" },
   { id: "FB-016", customer: "Dara Meas",   rating: 3, text: "Interest rate slightly higher than competitors.", date: "2026-04-05" },
   { id: "FB-015", customer: "Bopha Sok",   rating: 5, text: "Birthday discount was a nice touch!",             date: "2026-04-02" },
-  { id: "FB-014", customer: "Narith Kim",  rating: 1, text: "Long wait time for review.",                      date: "2026-03-28" },
+  { id: "FB-014", customer: "Narith Kim",  rating: 1, text: "Long wait time for review.",                      date: "2026-03-28", response: "Apologies for the wait — we've added reviewers to speed things up." },
   { id: "FB-013", customer: "Rithy Pen",   rating: 4, text: "Smooth onboarding, branch staff were polite.",    date: "2026-03-25" },
   { id: "FB-012", customer: "Pisey Ros",   rating: 5, text: "ABA Pay integration works great.",                date: "2026-03-22" },
   { id: "FB-011", customer: "Vichet Lim",  rating: 4, text: "Push notifications are helpful reminders.",       date: "2026-03-18" },
-  { id: "FB-010", customer: "Chenda Oum",  rating: 2, text: "App crashed twice while uploading documents.",    date: "2026-03-14" },
-  { id: "FB-009", customer: "Sokha Chan",  rating: 5, text: "Best loan experience so far.",                    date: "2026-03-10" },
+  { id: "FB-010", customer: "Chenda Oum",  rating: 2, text: "App crashed twice while uploading documents.",    date: "2026-03-14", response: "Thanks for reporting this — the upload crash is fixed in the latest update." },
+  { id: "FB-009", customer: "Sokha Chan",  rating: 5, text: "Best loan experience so far.",                    date: "2026-03-10", response: "That means a lot — thank you, Sokha!" },
   { id: "FB-008", customer: "Dara Meas",   rating: 4, text: "Branch locator would be more useful with map.",   date: "2026-03-05" },
   { id: "FB-007", customer: "Bopha Sok",   rating: 3, text: "Statement download could include CSV format.",    date: "2026-02-28" },
   { id: "FB-006", customer: "Rithy Pen",   rating: 5, text: "Renewal was painless.",                           date: "2026-02-22" },
@@ -804,7 +873,7 @@ export type PermissionCategory =
 
 export const PERMISSIONS: Permission[] = [
   /* ---------- OVERVIEW ---------- */
-  { key: "report.view",   label: "View Report & Analyze dashboard", category: "Overview" },
+  { key: "report.view",   label: "View Dashboard",                  category: "Overview" },
   { key: "report.export", label: "Export reports",                  category: "Overview" },
 
   /* ---------- CUSTOMER — All Accounts ---------- */

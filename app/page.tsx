@@ -1,7 +1,5 @@
 import Link from "next/link";
 import {
-  Calendar,
-  ChevronDown,
   CircleDollarSign,
   CheckCircle2,
   FileX,
@@ -14,6 +12,7 @@ import {
 import { BarChart } from "@/components/bar-chart";
 import { KpiCard } from "@/components/kpi-card";
 import { StatusBadge } from "@/components/status-badge";
+import { DateRangeMenu } from "@/components/date-range-menu";
 import { APPLICATIONS, CHART_DATA } from "@/lib/data";
 
 export default function DashboardPage() {
@@ -24,11 +23,7 @@ export default function DashboardPage() {
         <h1 className="text-[26px] font-semibold tracking-tight text-gray-900">
           Welcome back, Laybun!
         </h1>
-        <button className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700">
-          <Calendar className="w-4 h-4 text-gray-500" />
-          <span>This Month</span>
-          <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-        </button>
+        <DateRangeMenu />
       </div>
 
       {/* Chart + KPI grid */}

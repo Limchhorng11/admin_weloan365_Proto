@@ -38,7 +38,7 @@ type NavItem =
 const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "Overview",
-    items: [{ label: "Report & Analyze", href: "/", icon: LayoutDashboard }],
+    items: [{ label: "Dashboard", href: "/", icon: LayoutDashboard }],
   },
   {
     section: "Work",

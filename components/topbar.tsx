@@ -249,9 +249,9 @@ function UserMenu() {
         </div>
       </div>
       <div className="py-1">
-        <MenuLink icon={User}        label="My profile" />
-        <MenuLink icon={Settings}    label="Account settings" />
-        <MenuLink icon={HelpCircle}  label="Help & support" />
+        <MenuLink icon={User}        label="My profile" href="/profile" />
+        <MenuLink icon={Settings}    label="Account settings" href="/account-settings" />
+        <MenuLink icon={HelpCircle}  label="Help & support" href="/help" />
       </div>
       <div className="border-t border-gray-100 py-1">
         <Link
@@ -269,14 +269,25 @@ function UserMenu() {
 function MenuLink({
   icon: Icon,
   label,
+  href,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  href?: string;
 }) {
-  return (
-    <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-gray-700 flex items-center gap-2.5">
+  const cls =
+    "w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-gray-700 flex items-center gap-2.5";
+  const inner = (
+    <>
       <Icon className="w-4 h-4 text-gray-500" />
       {label}
-    </button>
+    </>
+  );
+  return href ? (
+    <Link href={href} className={cls}>
+      {inner}
+    </Link>
+  ) : (
+    <button className={cls}>{inner}</button>
   );
 }

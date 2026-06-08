@@ -27,6 +27,9 @@ import {
   Files,
   Pencil,
   Globe,
+  Upload,
+  Image as ImageIcon,
+  Film,
 } from "lucide-react";
 
 type StatusFilter = "all" | "active" | "inactive" | "draft";
@@ -643,7 +646,13 @@ function CreateProductModal({
   const isEdit = !!editing;
 
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [descItems, setDescItems] = useState<string[]>([]);
+  const [descInput, setDescInput] = useState("");
+  const [media, setMedia] = useState("");
+  const [mediaType, setMediaType] = useState<"image" | "video">("image");
+  const mediaRef = useRef<HTMLInputElement>(null);
+  const [descDrag, setDescDrag] = useState<number | null>(null);
+  const [descOver, setDescOver] = useState<number | null>(null);
   const [min, setMin] = useState("");
   const [max, setMax] = useState("");
   const [rateMin, setRateMin] = useState("");
@@ -697,7 +706,17 @@ function CreateProductModal({
       setCountries([]); // editing a single product, not adding new sub-products
       setCountryInput("");
       setName(editing.name);
-      setDescription(editing.description);
+      setDescItems(
+        editing.description
+          ? editing.description
+              .split(/\r?\n/)
+              .map(s => s.replace(/^[•\-]\s*/, "").trim())
+              .filter(Boolean)
+          : []
+      );
+      setDescInput("");
+      setMedia(editing.media ?? "");
+      setMediaType(editing.mediaType ?? "image");
       setMin(String(editing.min));
       setMax(String(editing.max));
       // Interest + Loan Term are single-value in the form — show the max
@@ -733,7 +752,10 @@ function CreateProductModal({
       setCountries([]);
       setCountryInput("");
       setName("");
-      setDescription("");
+      setDescItems([]);
+      setDescInput("");
+      setMedia("");
+      setMediaType("image");
       setMin("");
       setMax("");
       setRateMin("");
@@ -783,7 +805,7 @@ function CreateProductModal({
     // create-MWL (which derives the name from the parent and the country).
     if ((isEdit || kind === "non-mwl") && !name.trim())
       return "Product name is required.";
-    if (!description.trim()) return "Description is required.";
+    if (descItems.length === 0) return "Add at least one description point.";
     // Only validate ranges for rows the admin chose to include.
     if (shown.loanSize) {
       const minN = +min, maxN = +max;
@@ -842,7 +864,7 @@ function CreateProductModal({
           : "inactive"
         : "draft") as "active" | "inactive" | "draft",
       loans: editing?.loans ?? 0,
-      description: description.trim(),
+      description: descItems.map(s => `• ${s}`).join("\n"),
       // Compose the 4 structured eligibility rows back to the existing field.
       eligibility: composeEligibility(),
       // Benefits field is no longer in the form — preserve existing value when
@@ -857,6 +879,8 @@ function CreateProductModal({
         shown.repaymentMethod && repaymentMethod.trim()
           ? repaymentMethod.trim()
           : undefined,
+      media: media || undefined,
+      mediaType: media ? mediaType : undefined,
     };
 
     // EDIT mode — replace the existing product, keep its id/kind/parent/country.
@@ -920,6 +944,45 @@ function CreateProductModal({
 
   const removeCountry = (name: string) =>
     setCountries(prev => prev.filter(c => c !== name));
+
+  const addDescItem = () => {
+    const v = descInput.trim();
+    if (!v) return;
+    setDescItems(prev => [...prev, v]);
+    setDescInput("");
+  };
+
+  const removeDescItem = (i: number) =>
+    setDescItems(prev => prev.filter((_, idx) => idx !== i));
+
+  const moveDescItem = (from: number, to: number) => {
+    if (from === to) return;
+    setDescItems(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const onMediaPick = () => mediaRef.current?.click();
+  const onMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      setError("Please choose an image or a video file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setMedia(String(reader.result || ""));
+      setMediaType(isVideo ? "video" : "image");
+    };
+    reader.readAsDataURL(file);
+    setError(null);
+  };
 
   return (
     <div
@@ -1009,6 +1072,72 @@ function CreateProductModal({
 
           {/* Basic Information */}
           <Section icon={FileText} title="Basic Information" hint="Customer-facing copy. Shown in the mobile app and web portal.">
+            <Field
+              label="Image or video"
+              hint="Shown on the product page in the customer app. PNG, JPG, GIF or MP4."
+            >
+              {media ? (
+                <div>
+                  {mediaType === "video" ? (
+                    <video
+                      src={media}
+                      controls
+                      className="w-full max-h-56 rounded-md border border-gray-200 bg-black object-contain"
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={media}
+                      alt="product media preview"
+                      className="w-full max-h-56 object-cover rounded-md border border-gray-200"
+                    />
+                  )}
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+                      {mediaType === "video" ? (
+                        <Film className="w-3.5 h-3.5" />
+                      ) : (
+                        <ImageIcon className="w-3.5 h-3.5" />
+                      )}
+                      {mediaType === "video" ? "Video" : "Image"}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={onMediaPick}
+                        className="text-xs text-brand-600 hover:underline font-medium"
+                      >
+                        Replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMedia("")}
+                        className="text-xs text-red-600 hover:underline font-medium"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onMediaPick}
+                  className="w-full h-36 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-brand-700 transition"
+                >
+                  <Upload className="w-5 h-5" />
+                  <span className="text-xs font-medium">Click to upload image or video</span>
+                  <span className="text-[10px] text-gray-400">PNG, JPG, GIF or MP4</span>
+                </button>
+              )}
+              <input
+                ref={mediaRef}
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={onMediaChange}
+              />
+            </Field>
             {isEdit || kind === "non-mwl" ? (
               <Field label="Product name *">
                 <input
@@ -1031,16 +1160,89 @@ function CreateProductModal({
             )}
             <Field
               label="Description *"
-              hint={`Markdown supported. ${description.length} characters.`}
+              hint={`${descItems.length} point${descItems.length === 1 ? "" : "s"}. Type a point and press Enter to add.`}
             >
-              <textarea
-                rows={5}
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Describe the product, target customer, and what makes it different. This text shows in the customer app's product catalog."
-                className="form-input resize-none"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  value={descInput}
+                  onChange={e => setDescInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addDescItem();
+                    }
+                  }}
+                  placeholder="e.g. Rate from 9% APR"
+                  className="form-input flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={addDescItem}
+                  disabled={!descInput.trim()}
+                  className={cn(
+                    "px-3 py-2 text-sm font-medium rounded-md border",
+                    descInput.trim()
+                      ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
+                      : "border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed"
+                  )}
+                >
+                  Add
+                </button>
+              </div>
+              {descItems.length > 0 && (
+                <ul className="mt-2 space-y-1.5">
+                  {descItems.map((item, i) => (
+                    <li
+                      key={i}
+                      draggable
+                      onDragStart={e => {
+                        setDescDrag(i);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", String(i));
+                      }}
+                      onDragOver={e => {
+                        if (descDrag === null || descDrag === i) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (descOver !== i) setDescOver(i);
+                      }}
+                      onDragLeave={() => {
+                        if (descOver === i) setDescOver(null);
+                      }}
+                      onDrop={e => {
+                        e.preventDefault();
+                        if (descDrag !== null && descDrag !== i) moveDescItem(descDrag, i);
+                        setDescDrag(null);
+                        setDescOver(null);
+                      }}
+                      onDragEnd={() => {
+                        setDescDrag(null);
+                        setDescOver(null);
+                      }}
+                      className={cn(
+                        "flex items-center justify-between gap-2 rounded-md border bg-gray-50/60 px-2.5 py-2 transition",
+                        descOver === i ? "border-brand-300 ring-1 ring-brand-500/20" : "border-gray-200",
+                        descDrag === i && "opacity-50"
+                      )}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <GripVertical className="w-4 h-4 text-gray-300 cursor-grab flex-shrink-0" />
+                        <span className="text-sm text-gray-700">{item}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeDescItem(i)}
+                        className="text-gray-400 hover:text-red-600 flex-shrink-0"
+                        aria-label="Remove point"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Field>
+
           </Section>
 
           {/* MWL-only: free-form destination country list. Admin types a country

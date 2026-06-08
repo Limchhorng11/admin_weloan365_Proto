@@ -65,7 +65,11 @@ export default function ConsultationsPage() {
   const pickerConsult = pickerFor ? list.find(c => c.id === pickerFor) ?? null : null;
 
   /* ----- Feedback state ----- */
-  const [responses, setResponses] = useState<Record<string, Resp>>({});
+  const [responses, setResponses] = useState<Record<string, Resp>>(() =>
+    Object.fromEntries(
+      FEEDBACK.filter(f => f.response).map(f => [f.id, { message: f.response!, sentAt: f.date }])
+    )
+  );
   const [openFeedbackId, setOpenFeedbackId] = useState<string | null>(null);
   const activeFeedback = openFeedbackId ? FEEDBACK.find(f => f.id === openFeedbackId) ?? null : null;
 

@@ -194,8 +194,16 @@ export default function CustomerDetailPage({
               <ul className="space-y-3 max-h-64 overflow-y-auto scrollbar-thin pr-1">
                 {custFeedback.map(fb => (
                   <li key={fb.id}>
-                    <div className="text-[11px] text-gray-400">{fb.date}</div>
-                    <div className="text-xs text-gray-600 mt-0.5">{fb.text}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <StatusBadge status={fb.response ? "Replied" : "No reply"} />
+                      <span className="text-[11px] text-gray-400">{fb.date}</span>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">{fb.text}</div>
+                    {fb.response && (
+                      <div className="text-[11px] text-gray-500 mt-1 pl-2 border-l-2 border-gray-200">
+                        <span className="font-medium text-gray-600">Reply:</span> {fb.response}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

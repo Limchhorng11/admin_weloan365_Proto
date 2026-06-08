@@ -187,7 +187,7 @@ export default function ApplicationsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
-                  {["ID", "Customer", "Branch", "Loan range", "Applied", "Status", "Remark"].map(h => (
+                  {["ID", "Customer", "Product", "Branch", "Loan range", "Applied", "Status", "Remark"].map(h => (
                     <th
                       key={h}
                       className="text-left px-6 py-3 text-[12px] font-medium text-gray-500"
@@ -214,6 +214,7 @@ export default function ApplicationsPage() {
                     >
                       <td className="px-6 py-3.5 text-gray-700 font-mono text-xs">{r.id}</td>
                       <td className="px-6 py-3.5 text-gray-900 font-medium">{r.name}</td>
+                      <td className="px-6 py-3.5 text-gray-700">{r.product}</td>
                       <td className="px-6 py-3.5 text-gray-600">{r.branch}</td>
                       <td className="px-6 py-3.5 text-gray-700">{r.range}</td>
                       <td className="px-6 py-3.5 text-gray-600">{r.sent}</td>
@@ -226,23 +227,23 @@ export default function ApplicationsPage() {
                             const decision = r.restructureRequest?.decision ?? "pending";
                             if (decision === "approved") {
                               return (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 border border-emerald-200 text-emerald-700">
-                                  <CheckCircle2 className="w-2.5 h-2.5" />
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 border border-emerald-200 text-emerald-700 whitespace-nowrap">
+                                  <CheckCircle2 className="w-2.5 h-2.5 flex-shrink-0" />
                                   Accepted
                                 </span>
                               );
                             }
                             if (decision === "declined") {
                               return (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 border border-red-200 text-red-700">
-                                  <XCircle className="w-2.5 h-2.5" />
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 border border-red-200 text-red-700 whitespace-nowrap">
+                                  <XCircle className="w-2.5 h-2.5 flex-shrink-0" />
                                   Re-structure request failed
                                 </span>
                               );
                             }
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-50 border border-brand-200 text-brand-700">
-                                <RotateCcw className="w-2.5 h-2.5" />
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-50 border border-brand-200 text-brand-700 whitespace-nowrap">
+                                <RotateCcw className="w-2.5 h-2.5 flex-shrink-0" />
                                 Re-structure request
                               </span>
                             );

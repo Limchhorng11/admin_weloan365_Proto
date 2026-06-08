@@ -318,47 +318,121 @@ function Field({
 /* ---------- views ---------- */
 
 function AppSettingView() {
+  const [adminCurrent, setAdminCurrent] = useState("0.2.0");
+  const [adminLatest, setAdminLatest] = useState("0.3.1");
+  const [iosVer, setIosVer] = useState("2.1.4");
+  const [androidVer, setAndroidVer] = useState("2.1.3");
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
+  // "Alert now" only activates after the admin saves the version changes.
+  const [committed, setCommitted] = useState(false);
+
+  const versionsFilled = iosVer.trim() !== "" && androidVer.trim() !== "";
+
+  const save = () => {
+    setEditing(false);
+    setCommitted(true);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2200);
+  };
+
+  const startEdit = () => {
+    setEditing(true);
+    setCommitted(false);
+  };
+
   return (
     <div className="space-y-5">
       <div>
         <H2>Customer App Version</H2>
-        <P>Manage the customer mobile app&apos;s release and minimum supported version.</P>
+        <P>Manage the customer mobile app&apos;s version information.</P>
       </div>
       <Card>
         <div className="font-medium text-gray-900 mb-3">Admin console version</div>
         <div className="space-y-2.5 text-sm">
-          <Row label="Current version" value="v0.2.0" />
-          <Row label="Latest version"  value="v0.3.1" />
-          <Row label="Release channel" value="Stable" />
+          <VersionRow label="Current version" value={adminCurrent} onChange={setAdminCurrent} prefix editing={editing} />
+          <VersionRow label="Latest version"  value={adminLatest}  onChange={setAdminLatest} prefix editing={editing} />
         </div>
       </Card>
       <Card>
         <div className="font-medium text-gray-900 mb-3">Customer app version</div>
         <div className="space-y-2.5 text-sm">
-          <Row label="Current version (iOS)" value="2.1.4" />
-          <Row label="Current version (Android)" value="2.1.3" />
-          <Row label="Minimum supported" value="2.0.0" />
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-            <div>
-              <div className="font-medium text-gray-900">Force update</div>
-              <div className="text-xs text-gray-500">Require users below min version to update</div>
-            </div>
-            <Toggle checked />
-          </div>
+          <VersionRow label="Current version (iOS)" value={iosVer} onChange={setIosVer} editing={editing} />
+          <VersionRow label="Current version (Android)" value={androidVer} onChange={setAndroidVer} editing={editing} />
         </div>
 
-        {/* Customer-update alert */}
-        <CustomerUpdateAlert />
+        {/* Customer-update alert — "Alert now" enables only after Save changes */}
+        <CustomerUpdateAlert ready={committed && versionsFilled} />
       </Card>
+
+      <div className="flex items-center justify-end gap-3">
+        {saved && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Saved
+          </span>
+        )}
+        {editing ? (
+          <button
+            onClick={save}
+            className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+          >
+            Save changes
+          </button>
+        ) : (
+          <button
+            onClick={startEdit}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700 font-medium"
+          >
+            <Pencil className="w-4 h-4 text-gray-500" />
+            Edit
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+/** A labelled version field. Shows plain text normally; an input (digits + dots) when editing. */
+function VersionRow({
+  label,
+  value,
+  onChange,
+  prefix,
+  editing,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  prefix?: boolean;
+  editing?: boolean;
+}) {
   return (
-    <div className="flex justify-between text-sm">
-      <span className="text-gray-600">{label}</span>
-      <span className="font-medium text-gray-900">{value}</span>
+    <div className="flex items-center justify-between">
+      <label className="text-gray-600">{label}</label>
+      {editing ? (
+        <div className="relative">
+          {prefix && (
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              v
+            </span>
+          )}
+          <input
+            value={value}
+            inputMode="decimal"
+            onChange={e => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
+            className={cn(
+              "w-28 text-right pr-2.5 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+              prefix ? "pl-6" : "pl-2.5"
+            )}
+          />
+        </div>
+      ) : (
+        <span className="font-medium text-gray-900">
+          {prefix ? "v" : ""}
+          {value}
+        </span>
+      )}
     </div>
   );
 }
@@ -2129,14 +2203,12 @@ function SupportView() {
 
 /* ---------- Customer update alert block (lives in Customer app version card) ---------- */
 
-function CustomerUpdateAlert() {
-  const CURRENT = "2.0.0";
-  const LATEST  = "2.1.4";
+function CustomerUpdateAlert({ ready }: { ready: boolean }) {
   const [sent, setSent]       = useState(false);
   const [sending, setSending] = useState(false);
 
   const alertCustomers = () => {
-    if (sending || sent) return;
+    if (sending || sent || !ready) return;
     setSending(true);
     setTimeout(() => {
       setSending(false);
@@ -2156,7 +2228,7 @@ function CustomerUpdateAlert() {
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-medium text-gray-900">Alert sent to customers</div>
             <div className="text-[11px] text-gray-600 mt-0.5">
-              A push notification was queued for users running v{CURRENT} and older.
+              A push notification was queued for customers to update their app.
             </div>
           </div>
         </div>
@@ -2175,15 +2247,19 @@ function CustomerUpdateAlert() {
             Please alert customer to update the mobile app
           </div>
           <div className="text-[11px] text-gray-600 mt-0.5 leading-snug">
-            v{CURRENT} → <span className="font-medium">v{LATEST}</span> · Bug fixes and performance improvements
+            {ready
+              ? "Please update your mobile app to have the best experience"
+              : "Save the version changes to enable alerting."}
           </div>
         </div>
         <button
           onClick={alertCustomers}
-          disabled={sending}
+          disabled={sending || !ready}
           className={cn(
             "flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-md font-medium whitespace-nowrap",
-            sending
+            !ready
+              ? "bg-amber-200/50 text-amber-800/50 cursor-not-allowed"
+              : sending
               ? "bg-amber-200 text-amber-800 cursor-wait"
               : "bg-amber-600 text-white hover:bg-amber-700"
           )}
