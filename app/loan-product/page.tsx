@@ -647,12 +647,10 @@ function CreateProductModal({
 
   const [name, setName] = useState("");
   const [descItems, setDescItems] = useState<string[]>([]);
-  const [descInput, setDescInput] = useState("");
+  const [docItems, setDocItems] = useState<DocItem[]>([]);
   const [media, setMedia] = useState("");
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const mediaRef = useRef<HTMLInputElement>(null);
-  const [descDrag, setDescDrag] = useState<number | null>(null);
-  const [descOver, setDescOver] = useState<number | null>(null);
   const [min, setMin] = useState("");
   const [max, setMax] = useState("");
   const [rateMin, setRateMin] = useState("");
@@ -714,7 +712,17 @@ function CreateProductModal({
               .filter(Boolean)
           : []
       );
-      setDescInput("");
+      setDocItems(
+        editing.requiredDocuments?.length
+          ? editing.requiredDocuments.map(d => ({ name: d.name, note: d.note, icon: d.icon }))
+          : editing.requiredDocs
+          ? editing.requiredDocs
+              .split(/\r?\n/)
+              .map(s => s.replace(/^[•\-]\s*/, "").trim())
+              .filter(Boolean)
+              .map(name => ({ name }))
+          : []
+      );
       setMedia(editing.media ?? "");
       setMediaType(editing.mediaType ?? "image");
       setMin(String(editing.min));
@@ -753,7 +761,7 @@ function CreateProductModal({
       setCountryInput("");
       setName("");
       setDescItems([]);
-      setDescInput("");
+      setDocItems(DEFAULT_REQUIRED_DOCS.map(d => ({ ...d })));
       setMedia("");
       setMediaType("image");
       setMin("");
@@ -867,9 +875,14 @@ function CreateProductModal({
       description: descItems.map(s => `• ${s}`).join("\n"),
       // Compose the 4 structured eligibility rows back to the existing field.
       eligibility: composeEligibility(),
-      // Benefits field is no longer in the form — preserve existing value when
-      // editing, default to empty when creating.
-      requiredDocs: editing?.requiredDocs ?? "",
+      requiredDocs: docItems.map(d => d.name).join("\n"),
+      requiredDocuments: docItems.length
+        ? docItems.map(d => ({
+            name: d.name,
+            note: d.note?.trim() || undefined,
+            icon: d.icon || undefined,
+          }))
+        : undefined,
       processingFee: editing?.processingFee ?? 0,
       latePenalty: editing?.latePenalty ?? 0,
       // Early payoff is no longer offered — preserve existing value or default true.
@@ -944,26 +957,6 @@ function CreateProductModal({
 
   const removeCountry = (name: string) =>
     setCountries(prev => prev.filter(c => c !== name));
-
-  const addDescItem = () => {
-    const v = descInput.trim();
-    if (!v) return;
-    setDescItems(prev => [...prev, v]);
-    setDescInput("");
-  };
-
-  const removeDescItem = (i: number) =>
-    setDescItems(prev => prev.filter((_, idx) => idx !== i));
-
-  const moveDescItem = (from: number, to: number) => {
-    if (from === to) return;
-    setDescItems(prev => {
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  };
 
   const onMediaPick = () => mediaRef.current?.click();
   const onMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1160,87 +1153,13 @@ function CreateProductModal({
             )}
             <Field
               label="Description *"
-              hint={`${descItems.length} point${descItems.length === 1 ? "" : "s"}. Type a point and press Enter to add.`}
+              hint={`${descItems.length} point${descItems.length === 1 ? "" : "s"}. Type a point and press Enter to add. Drag to reorder.`}
             >
-              <div className="flex items-center gap-2">
-                <input
-                  value={descInput}
-                  onChange={e => setDescInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addDescItem();
-                    }
-                  }}
-                  placeholder="e.g. Rate from 9% APR"
-                  className="form-input flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={addDescItem}
-                  disabled={!descInput.trim()}
-                  className={cn(
-                    "px-3 py-2 text-sm font-medium rounded-md border",
-                    descInput.trim()
-                      ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
-                      : "border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed"
-                  )}
-                >
-                  Add
-                </button>
-              </div>
-              {descItems.length > 0 && (
-                <ul className="mt-2 space-y-1.5">
-                  {descItems.map((item, i) => (
-                    <li
-                      key={i}
-                      draggable
-                      onDragStart={e => {
-                        setDescDrag(i);
-                        e.dataTransfer.effectAllowed = "move";
-                        e.dataTransfer.setData("text/plain", String(i));
-                      }}
-                      onDragOver={e => {
-                        if (descDrag === null || descDrag === i) return;
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                        if (descOver !== i) setDescOver(i);
-                      }}
-                      onDragLeave={() => {
-                        if (descOver === i) setDescOver(null);
-                      }}
-                      onDrop={e => {
-                        e.preventDefault();
-                        if (descDrag !== null && descDrag !== i) moveDescItem(descDrag, i);
-                        setDescDrag(null);
-                        setDescOver(null);
-                      }}
-                      onDragEnd={() => {
-                        setDescDrag(null);
-                        setDescOver(null);
-                      }}
-                      className={cn(
-                        "flex items-center justify-between gap-2 rounded-md border bg-gray-50/60 px-2.5 py-2 transition",
-                        descOver === i ? "border-brand-300 ring-1 ring-brand-500/20" : "border-gray-200",
-                        descDrag === i && "opacity-50"
-                      )}
-                    >
-                      <span className="flex items-center gap-2 min-w-0">
-                        <GripVertical className="w-4 h-4 text-gray-300 cursor-grab flex-shrink-0" />
-                        <span className="text-sm text-gray-700">{item}</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeDescItem(i)}
-                        className="text-gray-400 hover:text-red-600 flex-shrink-0"
-                        aria-label="Remove point"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <SortableListInput
+                items={descItems}
+                onChange={setDescItems}
+                placeholder="e.g. Rate from 9% APR"
+              />
             </Field>
 
           </Section>
@@ -1467,6 +1386,15 @@ function CreateProductModal({
             </ToggleRow>
             </div>
           </Section>
+
+          {/* Required documents */}
+          <Section
+            icon={Files}
+            title="Required documents"
+            hint={`${docItems.length} document${docItems.length === 1 ? "" : "s"}. Type to add, click the icon to upload, drag to reorder.`}
+          >
+            <DocumentListInput items={docItems} onChange={setDocItems} />
+          </Section>
         </div>
 
         <div className="px-6 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
@@ -1613,6 +1541,288 @@ function Field({
       <div className="mt-1">{children}</div>
       {hint && <div className="text-[11px] text-gray-400 mt-1">{hint}</div>}
     </div>
+  );
+}
+
+/** Add-a-line list with removable, drag-to-reorder items. Used for Description
+ *  points and Required documents. */
+function SortableListInput({
+  items,
+  onChange,
+  placeholder,
+}: {
+  items: string[];
+  onChange: (items: string[]) => void;
+  placeholder: string;
+}) {
+  const [input, setInput] = useState("");
+  const [drag, setDrag] = useState<number | null>(null);
+  const [over, setOver] = useState<number | null>(null);
+
+  const add = () => {
+    const v = input.trim();
+    if (!v) return;
+    onChange([...items, v]);
+    setInput("");
+  };
+  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
+  const move = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...items];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m);
+    onChange(next);
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder={placeholder}
+          className="form-input flex-1"
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!input.trim()}
+          className={cn(
+            "px-3 py-2 text-sm font-medium rounded-md border",
+            input.trim()
+              ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
+              : "border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed"
+          )}
+        >
+          Add
+        </button>
+      </div>
+      {items.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {items.map((item, i) => (
+            <li
+              key={i}
+              draggable
+              onDragStart={e => {
+                setDrag(i);
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(i));
+              }}
+              onDragOver={e => {
+                if (drag === null || drag === i) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                if (over !== i) setOver(i);
+              }}
+              onDragLeave={() => {
+                if (over === i) setOver(null);
+              }}
+              onDrop={e => {
+                e.preventDefault();
+                if (drag !== null && drag !== i) move(drag, i);
+                setDrag(null);
+                setOver(null);
+              }}
+              onDragEnd={() => {
+                setDrag(null);
+                setOver(null);
+              }}
+              className={cn(
+                "flex items-center justify-between gap-2 rounded-md border bg-gray-50/60 px-2.5 py-2 transition",
+                over === i ? "border-brand-300 ring-1 ring-brand-500/20" : "border-gray-200",
+                drag === i && "opacity-50"
+              )}
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <GripVertical className="w-4 h-4 text-gray-300 cursor-grab flex-shrink-0" />
+                <span className="text-sm text-gray-700">{item}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                className="text-gray-400 hover:text-red-600 flex-shrink-0"
+                aria-label="Remove"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+type DocItem = { name: string; note?: string; icon?: string };
+
+/** Default required documents pre-filled when creating a new product. */
+const DEFAULT_REQUIRED_DOCS: DocItem[] = [
+  { name: "Business Documents",   note: "Required when applicable" },
+  { name: "Financial information", note: "Required when applicable" },
+  { name: "Collateral documents", note: "Required when applicable" },
+  { name: "Owner identification", note: "Required when applicable" },
+];
+
+/** Required-documents list: add a name, upload an icon per row, remove, drag-reorder. */
+function DocumentListInput({
+  items,
+  onChange,
+}: {
+  items: DocItem[];
+  onChange: (items: DocItem[]) => void;
+}) {
+  const [input, setInput] = useState("");
+  const [drag, setDrag] = useState<number | null>(null);
+  const [over, setOver] = useState<number | null>(null);
+
+  const add = () => {
+    const v = input.trim();
+    if (!v) return;
+    onChange([...items, { name: v, note: "Required when applicable" }]);
+    setInput("");
+  };
+  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
+  const setIcon = (i: number, icon: string) =>
+    onChange(items.map((it, idx) => (idx === i ? { ...it, icon } : it)));
+  const setNote = (i: number, note: string) =>
+    onChange(items.map((it, idx) => (idx === i ? { ...it, note } : it)));
+  const move = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...items];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m);
+    onChange(next);
+  };
+  const onPickIcon = (i: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = () => setIcon(i, String(reader.result || ""));
+      reader.readAsDataURL(file);
+    }
+    e.target.value = ""; // allow re-picking the same file
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder="e.g. Business Documents"
+          className="form-input flex-1"
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!input.trim()}
+          className={cn(
+            "px-3 py-2 text-sm font-medium rounded-md border",
+            input.trim()
+              ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
+              : "border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed"
+          )}
+        >
+          Add
+        </button>
+      </div>
+      {items.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {items.map((item, i) => (
+            <li
+              key={i}
+              draggable
+              onDragStart={e => {
+                setDrag(i);
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(i));
+              }}
+              onDragOver={e => {
+                if (drag === null || drag === i) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                if (over !== i) setOver(i);
+              }}
+              onDragLeave={() => {
+                if (over === i) setOver(null);
+              }}
+              onDrop={e => {
+                e.preventDefault();
+                if (drag !== null && drag !== i) move(drag, i);
+                setDrag(null);
+                setOver(null);
+              }}
+              onDragEnd={() => {
+                setDrag(null);
+                setOver(null);
+              }}
+              className={cn(
+                "flex items-center justify-between gap-2 rounded-md border bg-gray-50/60 px-2.5 py-2 transition",
+                over === i ? "border-brand-300 ring-1 ring-brand-500/20" : "border-gray-200",
+                drag === i && "opacity-50"
+              )}
+            >
+              <span className="flex items-center gap-2 min-w-0 flex-1">
+                <GripVertical className="w-4 h-4 text-gray-300 cursor-grab flex-shrink-0" />
+                {/* Click to upload an icon from the local device */}
+                <label
+                  title="Upload icon"
+                  className={cn(
+                    "h-8 rounded-md border border-gray-200 bg-white flex items-center cursor-pointer overflow-hidden hover:border-brand-300 flex-shrink-0 self-start",
+                    item.icon ? "w-8 justify-center" : "gap-1.5 px-2"
+                  )}
+                >
+                  {item.icon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.icon} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      <span className="text-[11px] text-gray-500 whitespace-nowrap">Upload icon</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => onPickIcon(i, e)}
+                  />
+                </label>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm text-gray-700 truncate">{item.name}</span>
+                  <input
+                    value={item.note ?? ""}
+                    onChange={e => setNote(i, e.target.value)}
+                    placeholder="Required when applicable"
+                    className="mt-0.5 w-full text-xs text-gray-500 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 placeholder:text-gray-400"
+                  />
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                className="text-gray-400 hover:text-red-600 flex-shrink-0 self-start"
+                aria-label="Remove"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 
@@ -1891,20 +2101,41 @@ function DetailProductModal({
           )}
 
           {/* Required documents */}
-          {product.requiredDocs && (
+          {(product.requiredDocuments?.length || product.requiredDocs) && (
             <div>
               <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
                 <Files className="w-3 h-3" />
                 Required documents
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {linesOf(product.requiredDocs).map((line, i) => (
+                {(product.requiredDocuments?.length
+                  ? product.requiredDocuments
+                  : linesOf(product.requiredDocs).map(name => ({
+                      name,
+                      note: undefined as string | undefined,
+                      icon: undefined as string | undefined,
+                    }))
+                ).map((doc, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-700"
+                    className="flex items-center gap-2.5 px-3 py-2 border border-gray-200 rounded-md"
                   >
-                    <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                    <span className="truncate">{line}</span>
+                    {doc.icon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={doc.icon}
+                        alt=""
+                        className="w-6 h-6 rounded object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-sm text-gray-800 truncate">{doc.name}</div>
+                      {doc.note && (
+                        <div className="text-xs text-gray-500 truncate">{doc.note}</div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

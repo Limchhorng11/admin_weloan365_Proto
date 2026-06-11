@@ -367,6 +367,10 @@ export type LoanProduct = {
   /** Optional product media — an uploaded image or video (data URL in the prototype). */
   media?: string;
   mediaType?: "image" | "video";
+  /** Structured required documents with an optional caption + uploaded icon
+   *  (data URL). `requiredDocs` above is kept as the newline-joined names for
+   *  backward compatibility. */
+  requiredDocuments?: { name: string; note?: string; icon?: string }[];
 };
 
 export const PRODUCTS: LoanProduct[] = [
