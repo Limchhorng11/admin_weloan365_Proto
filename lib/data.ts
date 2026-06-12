@@ -926,7 +926,42 @@ export const PERMISSIONS: Permission[] = [
   { key: "user.create",   label: "Create user",                category: "Setting", sensitive: true },
   { key: "user.edit",     label: "Edit user",                  category: "Setting" },
   { key: "role.edit",     label: "Manage roles & permissions", category: "Setting", sensitive: true },
+  { key: "role.delete",   label: "Delete role",                category: "Setting", sensitive: true },
 ];
+
+/**
+ * Permission prerequisites — an action can't be granted without the "view" it
+ * depends on (you can't reply to a consultation you can't see, approve a loan
+ * you can't open, or manage users you can't list). The role editor uses this to
+ * auto-enable prerequisites when an action is checked and to cascade removals
+ * when a view is unchecked. Chains are allowed (payment.record → payment.view →
+ * loan.view). */
+export const PERMISSION_REQUIRES: Record<string, string> = {
+  "report.export": "report.view",
+  "customer.pin_reset": "customer.view",
+  "consultation.assign": "consultation.view",
+  "consultation.reply": "consultation.view",
+  "consultation.close": "consultation.view",
+  "feedback.reply": "feedback.view",
+  "loan.review": "loan.view",
+  "loan.approve": "loan.view",
+  "loan.reject": "loan.view",
+  "loan.reassign": "loan.view",
+  "loan.restructure": "loan.view",
+  "payment.view": "loan.view",
+  "payment.record": "payment.view",
+  "product.create": "product.view",
+  "product.edit": "product.view",
+  "product.reorder": "product.view",
+  "product.activate": "product.view",
+  "post.manage": "post.view",
+  "promotion.manage": "promotion.view",
+  "setting.edit": "setting.view",
+  "user.create": "user.view",
+  "user.edit": "user.view",
+  "role.edit": "user.view",
+  "role.delete": "user.view",
+};
 
 export type Role = {
   key: string;

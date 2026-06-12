@@ -2,21 +2,20 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
-  KeyRound,
-  Mail,
   Phone,
   Building2,
   MapPin,
   Calendar,
   Lock,
-  X,
 } from "lucide-react";
 import { CUSTOMERS, APPLICATIONS, CONSULTATIONS, FEEDBACK } from "@/lib/data";
 import { StatusBadge } from "@/components/status-badge";
+import { ChangePinModal } from "@/components/change-pin-modal";
 import { useRole } from "@/lib/role-context";
+import { useFeedbackResponses } from "@/lib/feedback-store";
 
 export default function CustomerDetailPage({
   params,
@@ -28,6 +27,19 @@ export default function CustomerDetailPage({
 
   const { role, can } = useRole();
   const [pinOpen, setPinOpen] = useState(false);
+
+  // Feedback replies — read from the shared store so the customer detail page
+  // and the Consult & Feedback inbox stay in sync. Replying happens on the inbox.
+  const responses = useFeedbackResponses();
+
+  // Open the Change PIN modal automatically when navigated here from the
+  // customer list's "Change pin" action (…?action=change-pin).
+  useEffect(() => {
+    const action = new URLSearchParams(window.location.search).get("action");
+    if (action === "change-pin" && can("customer.pin_reset")) {
+      setPinOpen(true);
+    }
+  }, [can]);
 
   // Block the entire page if the role can't even view customers.
   if (!can("customer.view")) {
@@ -75,22 +87,13 @@ export default function CustomerDetailPage({
           </div>
           <div className="flex items-center gap-2">
             <StatusBadge status={kycStatus} />
-            {can("customer.pin_reset") && (
-              <button
-                onClick={() => setPinOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700"
-              >
-                <KeyRound className="w-4 h-4 text-gray-500" />
-                Change pin
-              </button>
-            )}
           </div>
         </div>
       </div>
 
       {/* Profile information */}
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 bg-white rounded-xl border border-gray-200 shadow-card p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-card p-6">
           <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
             Personal information
           </div>
@@ -103,15 +106,6 @@ export default function CustomerDetailPage({
                 <span className="inline-flex items-center gap-1.5">
                   <Phone className="w-3.5 h-3.5 text-gray-400" />
                   {c.phone}
-                </span>
-              }
-            />
-            <Row
-              label="Email"
-              value={
-                <span className="inline-flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-gray-400" />
-                  {c.email}
                 </span>
               }
             />
@@ -191,18 +185,37 @@ export default function CustomerDetailPage({
             {custFeedback.length === 0 ? (
               <div className="text-xs text-gray-400">No feedback yet.</div>
             ) : (
-              <ul className="space-y-3 max-h-64 overflow-y-auto scrollbar-thin pr-1">
+              <ul className="space-y-2.5 max-h-72 overflow-y-auto scrollbar-thin pr-1">
                 {custFeedback.map(fb => (
-                  <li key={fb.id}>
-                    <div className="flex items-center justify-between gap-2">
-                      <StatusBadge status={fb.response ? "Replied" : "No reply"} />
-                      <span className="text-[11px] text-gray-400">{fb.date}</span>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">{fb.text}</div>
-                    {fb.response && (
-                      <div className="text-[11px] text-gray-500 mt-1 pl-2 border-l-2 border-gray-200">
-                        <span className="font-medium text-gray-600">Reply:</span> {fb.response}
+                  <li
+                    key={fb.id}
+                    className="rounded-lg border border-gray-100 bg-gray-50/50 px-3 py-2.5"
+                  >
+                    {/* Date */}
+                    <div className="text-[11px] text-gray-400">{fb.date}</div>
+
+                    {/* Comment */}
+                    <div className="text-sm text-gray-800 mt-1">{fb.text}</div>
+
+                    {/* Reply (from shared store), or an awaiting-reply status */}
+                    {responses[fb.id] ? (
+                      <div className="mt-2 rounded-md bg-white border border-gray-100 px-2.5 py-2">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-0.5">
+                          Officer reply
+                        </div>
+                        <div className="text-xs text-gray-600 leading-relaxed">
+                          {responses[fb.id].message}
+                        </div>
                       </div>
+                    ) : (
+                      <Link
+                        href={`/customer/consultations?feedback=${fb.id}`}
+                        className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-700 hover:text-amber-800 hover:underline"
+                        title="Reply to this feedback in the inbox"
+                      >
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        Awaiting reply
+                      </Link>
                     )}
                   </li>
                 ))}
@@ -269,124 +282,6 @@ export default function CustomerDetailPage({
       {pinOpen && (
         <ChangePinModal customerName={c.name} onClose={() => setPinOpen(false)} />
       )}
-    </div>
-  );
-}
-
-function ChangePinModal({
-  customerName,
-  onClose,
-}: {
-  customerName: string;
-  onClose: () => void;
-}) {
-  const [pin, setPin] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
-
-  // PIN is exactly 4 digits — strip anything else and cap at 4.
-  const onlyDigits = (v: string) => v.replace(/\D/g, "").slice(0, 4);
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pin.length !== 4) return setError("PIN must be exactly 4 digits.");
-    if (pin !== confirm) return setError("PINs do not match.");
-    setError(null);
-    setDone(true);
-  };
-
-  const inputCls =
-    "mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-center text-lg tracking-[0.6em] focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500";
-
-  return (
-    <div
-      className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-xl w-full max-w-sm shadow-2xl overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="h-14 px-5 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold text-gray-900">Change PIN</div>
-            <div className="text-[11px] text-gray-500">{customerName} · 4-digit PIN</div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {done ? (
-          <div className="p-6 text-center">
-            <div className="text-sm font-medium text-gray-900">PIN updated</div>
-            <div className="text-xs text-gray-500 mt-1">
-              {customerName}&apos;s 4-digit PIN has been changed.
-            </div>
-            <button
-              onClick={onClose}
-              className="mt-4 px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
-            >
-              Done
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={submit} className="p-5 space-y-4">
-            <div>
-              <label className="text-xs font-medium text-gray-600">New PIN</label>
-              <input
-                autoFocus
-                type="password"
-                inputMode="numeric"
-                value={pin}
-                onChange={e => setPin(onlyDigits(e.target.value))}
-                placeholder="••••"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600">Confirm PIN</label>
-              <input
-                type="password"
-                inputMode="numeric"
-                value={confirm}
-                onChange={e => setConfirm(onlyDigits(e.target.value))}
-                placeholder="••••"
-                className={inputCls}
-              />
-            </div>
-            <div className="text-[11px] text-gray-400">PIN must be exactly 4 digits.</div>
-
-            {error && (
-              <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-3 py-2">
-                {error}
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={pin.length !== 4 || confirm.length !== 4}
-                className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Save PIN
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
     </div>
   );
 }

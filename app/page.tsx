@@ -142,7 +142,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick links to key flows */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Link
           href="/customer/applications"
           className="bg-white rounded-xl border border-gray-200 p-5 hover:border-brand-300 hover:shadow-card transition"

@@ -95,7 +95,7 @@ export default function ApplicationsPage() {
       />
 
       {/* 4-block overview */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <OverviewTile
           icon={Loader2}
           iconClass="text-amber-600 bg-amber-50"

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { ChangePinModal } from "@/components/change-pin-modal";
 import { CUSTOMERS, BRANCHES } from "@/lib/data";
 import {
   ChevronLeft,
@@ -13,6 +14,7 @@ import {
   SlidersHorizontal,
   ChevronDown,
   Check,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +41,10 @@ export default function CustomersPage() {
   const [filterBranch, setFilterBranch] = useState<string>("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+
+  // Customer whose PIN is being changed — drives the in-place modal so the
+  // "Change pin" action no longer needs to navigate to the detail page.
+  const [pinCustomer, setPinCustomer] = useState<string | null>(null);
 
   // Close filter dropdown on outside click / Escape.
   useEffect(() => {
@@ -299,7 +305,7 @@ export default function CustomersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
-                {["ID", "Name", "Phone", "KYC", "Loans", "Branch", "Device"].map(h => (
+                {["ID", "Name", "Phone", "Status", "Loans", "Branch", "Device"].map(h => (
                   <th key={h} className="text-left px-6 py-3 text-[12px] font-medium text-gray-500">
                     <span className="inline-flex items-center gap-1">
                       {h}
@@ -308,7 +314,7 @@ export default function CustomersPage() {
                   </th>
                 ))}
                 <th className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap">
-                  Security
+                  Action
                 </th>
                 <th className="px-6 py-3" />
               </tr>
@@ -353,13 +359,7 @@ export default function CustomersPage() {
                           outstanding loan). All other PII columns are dashed. */}
                       <td className="px-6 py-3.5 text-gray-600">{c.phone}</td>
                       <td className="px-6 py-3.5">
-                        {suspended ? (
-                          <span className="text-gray-300">—</span>
-                        ) : (
-                          <StatusBadge
-                            status={c.kyc === "verified" ? "Verified" : c.kyc === "pending" ? "Pending" : "Rejected"}
-                          />
-                        )}
+                        <StatusBadge status={suspended ? "Inactive" : "Active"} />
                       </td>
                       <td className="px-6 py-3.5 text-gray-700">{c.loans}</td>
                       <td className="px-6 py-3.5 text-gray-600">
@@ -391,9 +391,15 @@ export default function CustomersPage() {
                       </td>
                       <td className="px-6 py-3.5">
                         {suspended ? (
-                          <StatusBadge status="Inactive" />
+                          <span className="text-gray-300">—</span>
                         ) : (
-                          <StatusBadge status="Change pin" />
+                          <button
+                            onClick={() => setPinCustomer(c.name)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50"
+                          >
+                            <KeyRound className="w-3.5 h-3.5 text-gray-500" />
+                            Change pin
+                          </button>
                         )}
                       </td>
                       <td className="px-6 py-3.5 text-right">
@@ -467,6 +473,13 @@ export default function CustomersPage() {
           </div>
         </div>
       </div>
+
+      {pinCustomer && (
+        <ChangePinModal
+          customerName={pinCustomer}
+          onClose={() => setPinCustomer(null)}
+        />
+      )}
     </div>
   );
 }

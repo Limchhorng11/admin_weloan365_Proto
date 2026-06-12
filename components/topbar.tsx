@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   ShieldCheck,
+  Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/lib/role-context";
@@ -30,7 +31,7 @@ const TITLES: { match: string; title: string }[] = [
   { match: "/chat",                   title: "Chat" },
 ];
 
-export function Topbar() {
+export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const pathname = usePathname();
   const active = TITLES.find(t => pathname === t.match || pathname.startsWith(t.match + "/"));
   const title = active?.title ?? "Dashboard";
@@ -64,9 +65,18 @@ export function Topbar() {
   return (
     <header
       ref={headerRef}
-      className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 lg:px-8 sticky top-0 z-20"
+      className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-20"
     >
-      <h1 className="text-sm font-medium text-gray-700">{title}</h1>
+      <div className="flex items-center gap-2 min-w-0">
+        <button
+          onClick={onMenuClick}
+          className="p-2 -ml-2 rounded-md hover:bg-gray-100 text-gray-600 lg:hidden"
+          aria-label="Open menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <h1 className="text-sm font-medium text-gray-700 truncate">{title}</h1>
+      </div>
 
       <div className="flex items-center gap-1">
         {/* Notifications */}
@@ -172,7 +182,7 @@ function NotificationsMenu() {
   const unread = NOTIFS.filter(n => !n.read).length;
 
   return (
-    <Dropdown className="w-[360px]">
+    <Dropdown className="w-[360px] max-w-[calc(100vw-2rem)]">
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="font-semibold text-sm text-gray-900">Notifications</div>

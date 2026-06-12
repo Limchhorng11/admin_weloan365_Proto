@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -14,6 +15,12 @@ function isPublic(pathname: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  // Mobile nav drawer state — lifted here so the Topbar hamburger and the
+  // Sidebar drawer share it. Always closed on desktop (drawer is CSS-hidden).
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Close the drawer whenever the route changes.
+  useEffect(() => setNavOpen(false), [pathname]);
 
   if (isPublic(pathname)) {
     return <>{children}</>;
@@ -22,10 +29,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <RoleProvider>
       <div className="flex min-h-screen">
-        <Sidebar />
+        <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
         <div className="flex-1 flex flex-col min-w-0">
-          <Topbar />
-          <main className="flex-1 p-6 lg:p-8 overflow-y-auto">{children}</main>
+          <Topbar onMenuClick={() => setNavOpen(true)} />
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{children}</main>
         </div>
       </div>
     </RoleProvider>

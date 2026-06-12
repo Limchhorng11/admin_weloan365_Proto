@@ -63,7 +63,13 @@ const NAV: { section: string; items: NavItem[] }[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  open = false,
+  onClose,
+}: {
+  open?: boolean;
+  onClose?: () => void;
+}) {
   const pathname = usePathname();
   const { can } = useRole();
 
@@ -146,6 +152,7 @@ export function Sidebar() {
                 <Link
                   key={child.href}
                   href={child.href}
+                  onClick={onClose}
                   className={cn(
                     "flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px]",
                     isActive(child.href, child.matchHrefs)
@@ -168,6 +175,7 @@ export function Sidebar() {
       <Link
         key={item.href}
         href={item.href!}
+        onClick={onClose}
         className={cn(
           "flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px]",
           active ? "bg-brand-50 text-brand-700 font-medium" : "text-gray-700 hover:bg-gray-100"
@@ -183,15 +191,37 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 h-screen sticky top-0">
+      {/* Mobile backdrop — only visible while the drawer is open on small screens. */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={onClose}
+          aria-hidden
+        />
+      )}
+
+      <aside
+        className={cn(
+          "w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 h-screen z-50",
+          // Mobile: off-canvas drawer that slides in from the left.
+          "fixed inset-y-0 left-0 transition-transform duration-200",
+          open ? "translate-x-0" : "-translate-x-full",
+          // Desktop: static sticky column, always visible.
+          "lg:sticky lg:top-0 lg:translate-x-0 lg:z-auto"
+        )}
+      >
         <div className="h-16 px-5 border-b border-gray-200 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" onClick={onClose} className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-sm">
               W
             </div>
             <span className="font-semibold text-gray-900 text-[15px]">WeLoan365</span>
           </Link>
-          <button className="p-1.5 rounded-md hover:bg-gray-100" title="Collapse">
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-gray-100"
+            title="Close menu"
+          >
             <PanelLeft className="w-4 h-4 text-gray-500" />
           </button>
         </div>

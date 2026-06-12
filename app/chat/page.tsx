@@ -1,14 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Phone, Info, Paperclip, Send } from "lucide-react";
+import { Phone, Info, Paperclip, Send, ArrowLeft } from "lucide-react";
 import { CHATS } from "@/lib/data";
 
 export default function ChatPage() {
   const [active, setActive] = useState(CHATS[0]);
+  // On mobile the two panes can't sit side by side, so we show one at a time:
+  // the conversation list, or the open thread. Desktop shows both.
+  const [mobileThread, setMobileThread] = useState(false);
   return (
     <div className="bg-white rounded-xl border border-gray-200 flex h-[calc(100vh-8rem)] overflow-hidden shadow-card">
-      <aside className="w-80 border-r border-gray-200 flex flex-col">
+      <aside
+        className={`w-full lg:w-80 border-r border-gray-200 flex-col ${
+          mobileThread ? "hidden lg:flex" : "flex"
+        }`}
+      >
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
           <div className="font-semibold text-gray-900">Chats</div>
           <span className="text-xs text-gray-500">
@@ -23,7 +30,10 @@ export default function ChatPage() {
           {CHATS.map(c => (
             <button
               key={c.id}
-              onClick={() => setActive(c)}
+              onClick={() => {
+                setActive(c);
+                setMobileThread(true);
+              }}
               className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${
                 active.id === c.id ? "bg-brand-50" : ""
               }`}
@@ -45,11 +55,22 @@ export default function ChatPage() {
         </div>
       </aside>
 
-      <section className="flex-1 flex flex-col">
+      <section
+        className={`flex-1 flex-col ${mobileThread ? "flex" : "hidden lg:flex"}`}
+      >
         <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <div className="font-semibold text-gray-900">{active.customer}</div>
-            <div className="text-xs text-gray-500">Online • {active.id}</div>
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={() => setMobileThread(false)}
+              className="p-1.5 -ml-1.5 rounded-md hover:bg-gray-100 text-gray-600 lg:hidden"
+              aria-label="Back to conversations"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div className="min-w-0">
+              <div className="font-semibold text-gray-900 truncate">{active.customer}</div>
+              <div className="text-xs text-gray-500">Online • {active.id}</div>
+            </div>
           </div>
           <div className="flex gap-1">
             <button className="p-2 rounded-md hover:bg-gray-100 text-gray-600">

@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Users,
   Building2,
-  CircleDollarSign,
   Lock,
   Check,
   Minus,
@@ -30,6 +29,7 @@ import {
   USERS,
   ROLES,
   PERMISSIONS,
+  PERMISSION_REQUIRES,
   type Role,
   type Permission,
   type PermissionCategory,
@@ -129,11 +129,6 @@ function Card({ children, className }: { children: React.ReactNode; className?: 
   );
 }
 
-function fmt$(n: number | null | undefined) {
-  if (n === null || n === undefined) return "Unlimited";
-  if (n === 0) return "—";
-  return "$" + n.toLocaleString();
-}
 
 /* ---------- USERS ---------- */
 
@@ -602,6 +597,7 @@ function slugify(s: string) {
 function RolesTab() {
   const { can } = useRole();
   const canManage = can("role.edit");
+  const canDelete = can("role.delete");
   const initialRoles: ManagedRole[] = ROLES.filter(r => r.isSystem).map(r => ({ ...r, stage: "general" }));
   const [roles, setRoles] = useState<ManagedRole[]>(initialRoles);
   const [selected, setSelected] = useState<ManagedRole | null>(initialRoles[0] ?? null);
@@ -648,9 +644,9 @@ function RolesTab() {
             Click a role to expand and see its permissions.
           </div>
         </div>
-        {canManage && (
+        {(canManage || canDelete) && (
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {customCount > 0 && (
+            {canDelete && customCount > 0 && (
               <button
                 onClick={() => setConfirmReset(true)}
                 className="text-xs text-gray-600 hover:text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md font-medium"
@@ -660,13 +656,15 @@ function RolesTab() {
                 Reset
               </button>
             )}
-            <button
-              onClick={() => setCreating(true)}
-              className="text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Create role
-            </button>
+            {canManage && (
+              <button
+                onClick={() => setCreating(true)}
+                className="text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Create role
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -684,7 +682,7 @@ function RolesTab() {
               role={r}
               expanded={selected?.key === r.key}
               onToggle={() => setSelected(selected?.key === r.key ? null : r)}
-              canManage={canManage}
+              canDelete={canDelete}
               onDelete={() => setConfirmDelete(r)}
               totalPerms={totalPerms}
               granted={grantedCount(r)}
@@ -728,7 +726,7 @@ function RoleCard({
   role,
   expanded,
   onToggle,
-  canManage,
+  canDelete,
   onDelete,
   totalPerms,
   granted,
@@ -736,7 +734,7 @@ function RoleCard({
   role: ManagedRole;
   expanded: boolean;
   onToggle: () => void;
-  canManage: boolean;
+  canDelete: boolean;
   onDelete: () => void;
   totalPerms: number;
   granted: number;
@@ -778,10 +776,6 @@ function RoleCard({
           <div className="text-xs text-gray-500 mt-1 line-clamp-1">{role.description}</div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[11px] text-gray-600">
             <span className="inline-flex items-center gap-1">
-              <CircleDollarSign className="w-3 h-3 text-gray-400" />
-              {fmt$(role.approvalLimit)}
-            </span>
-            <span className="inline-flex items-center gap-1">
               <Users className="w-3 h-3 text-gray-400" />
               {role.userCount} {role.userCount === 1 ? "user" : "users"}
             </span>
@@ -795,7 +789,7 @@ function RoleCard({
           className="flex items-center gap-0.5 flex-shrink-0"
           onClick={e => e.stopPropagation()}
         >
-          {canManage && !role.isSystem && (
+          {canDelete && !role.isSystem && (
             <button
               onClick={onDelete}
               className="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50"
@@ -825,9 +819,6 @@ function RoleCard({
           <div className="flex items-center justify-between mb-3">
             <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
               Permissions
-            </div>
-            <div className="text-[11px] text-gray-500">
-              {granted} of {totalPerms} granted
             </div>
           </div>
           <PermissionList role={role} />
@@ -880,6 +871,10 @@ function CreateRoleModal({
   const [error, setError] = useState<string | null>(null);
 
   const grouped = useMemo(() => groupBy(PERMISSIONS, p => p.category), []);
+  const sensitiveCount = useMemo(
+    () => PERMISSIONS.filter(p => p.sensitive && perms.has(p.key)).length,
+    [perms]
+  );
 
   const applyTemplate = (t: RoleTemplate) => {
     setName(t.name);
@@ -896,11 +891,41 @@ function CreateRoleModal({
     setError(null);
   };
 
+  // Add a permission together with its prerequisite chain (e.g. enabling
+  // "Reply to customer" also enables "View consultation requests").
+  const addWithPrereqs = (set: Set<string>, key: string) => {
+    set.add(key);
+    let dep: string | undefined = PERMISSION_REQUIRES[key];
+    while (dep) {
+      set.add(dep);
+      dep = PERMISSION_REQUIRES[dep];
+    }
+  };
+
+  // Drop any permission whose prerequisite is no longer present — cascades when
+  // a "view" is unchecked (loops until stable to handle dependency chains).
+  const pruneOrphans = (set: Set<string>) => {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const [k, req] of Object.entries(PERMISSION_REQUIRES)) {
+        if (set.has(k) && !set.has(req)) {
+          set.delete(k);
+          changed = true;
+        }
+      }
+    }
+  };
+
   const togglePerm = (key: string) => {
     setPerms(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(key)) {
+        next.delete(key);
+        pruneOrphans(next);
+      } else {
+        addWithPrereqs(next, key);
+      }
       return next;
     });
   };
@@ -909,10 +934,12 @@ function CreateRoleModal({
     const allGranted = list.every(p => perms.has(p.key));
     setPerms(prev => {
       const next = new Set(prev);
-      list.forEach(p => {
-        if (allGranted) next.delete(p.key);
-        else next.add(p.key);
-      });
+      if (allGranted) {
+        list.forEach(p => next.delete(p.key));
+        pruneOrphans(next);
+      } else {
+        list.forEach(p => addWithPrereqs(next, p.key));
+      }
       return next;
     });
   };
@@ -928,6 +955,7 @@ function CreateRoleModal({
       while (existingKeys.includes(`${key}-${n}`)) n += 1;
       key = `${key}-${n}`;
     }
+    if (perms.size === 0) return setError("Select at least one permission for this role");
     const limit = unlimited ? null : Math.max(0, parseInt(approvalLimitStr || "0", 10));
     const role: ManagedRole = {
       key,
@@ -1013,8 +1041,18 @@ function CreateRoleModal({
           {/* Permissions */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-gray-600">Permissions</label>
-              <div className="text-[11px] text-gray-500">{perms.size} selected</div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-gray-600">Permissions</label>
+                <span className="text-[10px] text-gray-400">
+                  Actions auto-include the “View” they depend on
+                </span>
+              </div>
+              <div className="text-[11px] text-gray-500">
+                {perms.size} selected
+                {sensitiveCount > 0 && (
+                  <span className="text-amber-700"> · {sensitiveCount} sensitive</span>
+                )}
+              </div>
             </div>
             <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
               {(Object.entries(grouped) as [PermissionCategory, Permission[]][]).map(([cat, list]) => {
@@ -1204,7 +1242,6 @@ function PermissionList({ role }: { role: Role }) {
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] font-mono text-gray-400">{p.key}</span>
                 </div>
               );
             })}

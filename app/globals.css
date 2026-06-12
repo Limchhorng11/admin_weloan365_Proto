@@ -27,3 +27,19 @@
     background: #cbd5e1;
   }
 }
+
+/* Looping background pulse used to flag a row deep-linked from elsewhere
+   (e.g. clicking "Awaiting reply" on the customer detail page). */
+@keyframes row-highlight {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: #fef3c7; /* amber-100 */
+  }
+}
+
+.animate-row-highlight {
+  animation: row-highlight 1.1s ease-in-out 4;
+}
