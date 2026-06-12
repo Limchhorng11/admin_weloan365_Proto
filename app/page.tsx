@@ -42,7 +42,7 @@ export default function DashboardPage() {
         </div>
 
         {/* KPI cards */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <KpiCard
             icon={CircleDollarSign}
             label="Total Volume"
@@ -76,21 +76,21 @@ export default function DashboardPage() {
 
       {/* Applications table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-gray-200">
           <h2 className="text-[17px] font-semibold text-gray-900">Loan Applications</h2>
           <div className="flex items-center gap-2">
-            <div className="relative">
+            <div className="relative w-full sm:w-56">
               <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
               <input
                 placeholder="Search..."
-                className="pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 w-56"
+                className="w-full pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[600px] text-sm">
             <thead>
               <tr className="border-b border-gray-200">
                 {["Name", "Branch", "Loan range", "Sent", "Status"].map(h => (

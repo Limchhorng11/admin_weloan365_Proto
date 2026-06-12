@@ -188,7 +188,7 @@ export default function ConsultationsPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         {/* Filter chips */}
-        <div className="flex items-center gap-1.5 px-6 py-4 border-b border-gray-200">
+        <div className="flex flex-wrap items-center gap-1.5 px-6 py-4 border-b border-gray-200">
           <FilterChip
             label="All"
             count={counts.all}
@@ -213,7 +213,7 @@ export default function ConsultationsPage() {
 
         {/* Unified table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-200">
                 {["Type", "Customer", "Subject", "Preview", "Date", "Status", "Action"].map(h => (

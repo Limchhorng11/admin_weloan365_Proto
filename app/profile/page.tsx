@@ -40,7 +40,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Account */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
           <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">

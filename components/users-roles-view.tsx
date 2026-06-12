@@ -175,7 +175,7 @@ function UsersTab() {
 
   return (
     <Card className="!p-0">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-3 border-b border-gray-200">
         <div>
           <div className="font-medium text-gray-900">Staff users</div>
           <div className="text-[11px] text-gray-500">
@@ -204,7 +204,7 @@ function UsersTab() {
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-gray-50">
             <tr>
               {["User", "Role", "Branch", "Status", ""].map((h, i) => (
@@ -372,7 +372,7 @@ function UserModal({
         </div>
 
         <form onSubmit={submit} className="p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600">Full name *</label>
               <input
@@ -1015,7 +1015,7 @@ function CreateRoleModal({
           </div>
 
           {/* Basics */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600">Role name *</label>
               <input
@@ -1074,7 +1074,7 @@ function CreateRoleModal({
                       )}
                       {cat}
                     </button>
-                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
                       {list.map(p => {
                         const granted = perms.has(p.key);
                         return (

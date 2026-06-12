@@ -127,17 +127,17 @@ export default function CustomersPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         {/* Toolbar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div />
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-gray-200">
+          <div className="hidden sm:block" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             {/* Search */}
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search phone number"
-                className="pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 w-56"
+                className="pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 w-full sm:w-56"
               />
             </div>
 
@@ -178,7 +178,7 @@ export default function CustomersPage() {
               {filterOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-30 overflow-hidden"
+                  className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-lg z-30 overflow-hidden"
                 >
                   <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
@@ -302,7 +302,7 @@ export default function CustomersPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-200">
                 {["ID", "Name", "Phone", "Status", "Loans", "Branch", "Device"].map(h => (

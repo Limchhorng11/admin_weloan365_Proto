@@ -136,7 +136,7 @@ export default function ApplicationDetailPage({
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         {/* Header */}
-        <div className="flex items-start justify-between px-6 py-5 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 px-6 py-5 border-b border-gray-200">
           <div>
             <div className="text-xs font-mono text-gray-500">{a.id}</div>
             <div className="text-xl font-semibold text-gray-900">{a.name}</div>
@@ -144,7 +144,7 @@ export default function ApplicationDetailPage({
               {a.product} • ${a.amount.toLocaleString()} • {a.term}m
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={a.status} />
 
             {mayRequestInfo && (
@@ -455,7 +455,7 @@ function LoanStatusTab({ a }: { a: Application }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mt-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
         <Box label="Requested amount" value={`$${a.amount.toLocaleString()}`} />
         <Box label="Monthly payment" value={`$${monthly.toLocaleString()}`} />
         <Box label="Total repayable" value={`$${total.toLocaleString()}`} />
@@ -568,7 +568,7 @@ function KycTab({ a }: { a: Application }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
         <div>
           <SectionLabel>Personal information (KYC)</SectionLabel>
           <dl className="divide-y divide-gray-100">
@@ -622,7 +622,7 @@ function KycTab({ a }: { a: Application }) {
 
       <div className="mt-8">
         <SectionLabel>Uploaded documents</SectionLabel>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {docs.map(d => (
             <div key={d.name} className="border border-gray-200 rounded-lg p-3 flex items-center gap-3">
               <div
@@ -668,7 +668,7 @@ function GuarantorTab({ a }: { a: Application }) {
   const initials = guarantor.name.split(" ").map(s => s[0]).join("");
 
   return (
-    <div className="grid grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
       {/* Left: Guarantor personal info */}
       <div>
         <SectionLabel>Guarantor — personal info</SectionLabel>
@@ -757,14 +757,14 @@ function RepaymentTab({ a }: { a: Application }) {
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <Box label="Paid to date" value={`$${Math.round(paid).toLocaleString()}`} tone="green" />
         <Box label="Outstanding" value={`$${Math.round(outstanding).toLocaleString()}`} />
         <Box label="Next due" value="May 1" tone="amber" />
       </div>
 
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="border border-gray-200 rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-gray-50">
             <tr>
               {["#", "Due date", "Principal", "Interest", "Total", "Status"].map((h, i) => (
@@ -828,7 +828,7 @@ function RemindersTab({ a }: { a: Application }) {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium">
             Scheduled notifications
@@ -964,7 +964,7 @@ function PostReminderModal({
         </div>
 
         {/* Body — form + preview */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin p-6 grid grid-cols-2 gap-6">
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
           {/* Form */}
           <div className="space-y-4">
             {error && (
@@ -1124,7 +1124,7 @@ function ReportsTab() {
   return (
     <>
       <SectionLabel>Application analytics</SectionLabel>
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Box label="Time to approval"    value="2.3 days" />
         <Box label="Risk rating"         value="Medium-Low" />
         <Box label="Default probability" value="4.2%" tone="green" />
@@ -1146,7 +1146,7 @@ function OfficerTab({ a }: { a: Application }) {
     officerName === "Unassigned" ? "?" : officerName.split(" ").map(s => s[0]).join("");
 
   return (
-    <div className="grid grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
       <div>
         <SectionLabel>Person in charge</SectionLabel>
         <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
@@ -1307,7 +1307,7 @@ function RestructureTab({ a }: { a: Application }) {
         </div>
 
         {/* Reason + requested change */}
-        <div className="p-4 grid grid-cols-2 gap-4">
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 mb-1.5">
               Reason from customer
@@ -1327,7 +1327,7 @@ function RestructureTab({ a }: { a: Application }) {
         </div>
 
         {/* Contact actions */}
-        <div className="px-4 pb-4 grid grid-cols-2 gap-2">
+        <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <Link
             href="/chat"
             className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-200 rounded-md hover:bg-gray-50 text-sm text-gray-700 font-medium"
@@ -1345,7 +1345,7 @@ function RestructureTab({ a }: { a: Application }) {
         </div>
 
         {/* Decision footer */}
-        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-end gap-2">
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50/60 flex flex-wrap items-center justify-end gap-2">
           <button
             disabled={decision !== "pending"}
             onClick={() => setDecision("declined")}
@@ -1705,7 +1705,7 @@ function RejectReasonModal({
             <label className="text-xs font-medium text-gray-700">
               Reason for rejection *
             </label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
               {REJECT_REASONS.map(r => {
                 const active = reasonId === r.id;
                 return (

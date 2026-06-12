@@ -239,7 +239,8 @@ export default function CustomerDetailPage({
             No applications yet.
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-200">
                 {["Product", "Amount", "Term", "Rate", "Status"].map(h => (
@@ -275,6 +276,7 @@ export default function CustomerDetailPage({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
       )}

@@ -128,7 +128,7 @@ export default function ApplicationsPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         {/* Toolbar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-base font-semibold text-gray-900">All applications</h2>
             <div className="text-xs text-gray-500 mt-0.5">
@@ -138,13 +138,13 @@ export default function ApplicationsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search..."
-                className="pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 w-56"
+                className="pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 w-full sm:w-56"
               />
             </div>
 
@@ -184,13 +184,13 @@ export default function ApplicationsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="border-b border-gray-200">
                   {["ID", "Customer", "Product", "Branch", "Loan range", "Applied", "Status", "Remark"].map(h => (
                     <th
                       key={h}
-                      className="text-left px-6 py-3 text-[12px] font-medium text-gray-500"
+                      className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap"
                     >
                       <span className="inline-flex items-center gap-1">
                         {h}

@@ -162,7 +162,7 @@ export default function ProductsPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         {/* Toolbar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-base font-semibold text-gray-900">All products</h2>
             <div className="text-xs text-gray-500 mt-0.5">
@@ -171,14 +171,14 @@ export default function ProductsPage() {
                 : `${filtered.length} of ${products.length} products`}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-auto">
               <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search products..."
-                className="pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 w-56"
+                className="pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 w-full sm:w-56"
               />
             </div>
 
@@ -249,14 +249,15 @@ export default function ProductsPage() {
             )}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="w-16 px-3 py-3 text-left text-[12px] font-medium text-gray-500">
                   #
                 </th>
                 {["Name", "Amount range", "Rate", "Term", "Active loans", "Status"].map(h => (
-                  <th key={h} className="text-left px-6 py-3 text-[12px] font-medium text-gray-500">
+                  <th key={h} className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -428,6 +429,7 @@ export default function ProductsPage() {
               })()}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -1397,7 +1399,7 @@ function CreateProductModal({
           </Section>
         </div>
 
-        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           {/* Status — Active/Inactive toggle. Drives the primary save button's
               saved status. "Save as draft" bypasses this and forces draft. */}
           <div className="flex items-center gap-2">
@@ -1429,7 +1431,7 @@ function CreateProductModal({
               {activeNow ? "Active" : "Inactive"}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={onClose}
               className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
@@ -2037,7 +2039,7 @@ function DetailProductModal({
           </div>
 
           {/* Stats grid */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Stat
               icon={CircleDollarSign}
               label="Amount range"
@@ -2107,7 +2109,7 @@ function DetailProductModal({
                 <Files className="w-3 h-3" />
                 Required documents
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {(product.requiredDocuments?.length
                   ? product.requiredDocuments
                   : linesOf(product.requiredDocs).map(name => ({
@@ -2144,7 +2146,7 @@ function DetailProductModal({
         </div>
 
         {/* Footer actions */}
-        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <button
             onClick={onClose}
             className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
@@ -2152,7 +2154,7 @@ function DetailProductModal({
             Close
           </button>
           {canEdit && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => onEdit(product)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"

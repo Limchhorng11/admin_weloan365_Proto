@@ -128,11 +128,11 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl w-full max-w-6xl h-[85vh] max-h-[800px] flex overflow-hidden shadow-2xl"
+        className="bg-white rounded-xl w-full max-w-6xl h-[85vh] max-h-[800px] flex flex-col sm:flex-row overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Left nav */}
-        <aside className="w-60 bg-gray-50 border-r border-gray-200 flex flex-col flex-shrink-0">
+        <aside className="w-full sm:w-60 bg-gray-50 border-b sm:border-b-0 sm:border-r border-gray-200 flex flex-col flex-shrink-0 max-h-[40%] sm:max-h-none">
           <div className="px-5 py-4">
             <div className="text-[13px] font-medium text-gray-500">Settings</div>
           </div>
@@ -973,7 +973,7 @@ function CompanyView() {
       <Card className="space-y-4">
         <div className="font-medium text-gray-900">Company information</div>
         <Field label="Company name" defaultValue="KoSign Microfinance Plc." />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Founded" defaultValue="2018" />
           <Field label="License №" defaultValue="NBC-MFI-00123" />
         </div>
@@ -1132,7 +1132,7 @@ function BranchListPanel({
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-gray-50">
             <tr>
               {["Branch", "Address", "Phone"].map(h => (
@@ -1208,9 +1208,9 @@ function BranchMapPanel({
   const selected = list.find(b => b.id === selectedId) ?? null;
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       {/* Map */}
-      <div className="col-span-2">
+      <div className="lg:col-span-2">
         <Card className="!p-0 overflow-hidden">
           <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
             <div className="text-xs font-medium text-gray-700 inline-flex items-center gap-1.5">
@@ -1654,7 +1654,7 @@ function ReferralView() {
       </div>
 
       {/* KPI strip */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatTile label="Active codes" value="14" delta="+2" />
         <StatTile label="Customers referred" value="287" delta="+24" />
         <StatTile label="Applications" value="173" delta="+18" />
@@ -1666,12 +1666,12 @@ function ReferralView() {
           <div className="font-medium text-gray-900">Credit Officer codes</div>
           <div className="text-xs text-gray-500 mt-0.5">One unique 5-digit code per officer.</div>
         </div>
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="border border-gray-200 rounded-lg overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm min-w-[560px]">
             <thead className="bg-gray-50">
               <tr>
                 {["Code", "Officer", "Branch", "Apps", "Disbursed"].map(h => (
-                  <th key={h} className="text-left px-4 py-2 text-[12px] font-medium text-gray-500">
+                  <th key={h} className="text-left px-4 py-2 text-[12px] font-medium text-gray-500 whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -2026,8 +2026,8 @@ function PolicyEditor({
       {/* Meta */}
       <Card>
         <div className="font-medium text-gray-900 mb-3">Document settings</div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="sm:col-span-2">
             <label className="text-xs font-medium text-gray-600">Title</label>
             <input
               value={title}
@@ -2310,18 +2310,19 @@ function BirthdayView() {
         <P>Automated happy-birthday messages sent to customers on their birthday.</P>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="col-span-2 !p-0">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2 !p-0">
           <div className="px-5 py-3 border-b border-gray-200">
             <div className="font-medium text-gray-900 text-sm">Upcoming — next 7 day</div>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 {["Customer", "Birthday", "Turning", "Status"].map(h => (
                   <th
                     key={h}
-                    className="text-left px-4 py-2 text-[12px] font-medium text-gray-500"
+                    className="text-left px-4 py-2 text-[12px] font-medium text-gray-500 whitespace-nowrap"
                   >
                     {h}
                   </th>
@@ -2341,6 +2342,7 @@ function BirthdayView() {
               ))}
             </tbody>
           </table>
+          </div>
         </Card>
 
         <Card>
@@ -2462,7 +2464,7 @@ function BirthdayEditTemplateModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto scrollbar-thin p-5 grid grid-cols-2 gap-5">
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div className="space-y-4">
             <div>
               <label className="text-xs font-medium text-gray-700">Title</label>

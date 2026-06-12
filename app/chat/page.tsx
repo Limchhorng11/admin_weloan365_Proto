@@ -56,7 +56,7 @@ export default function ChatPage() {
       </aside>
 
       <section
-        className={`flex-1 flex-col ${mobileThread ? "flex" : "hidden lg:flex"}`}
+        className={`flex-1 min-w-0 flex-col ${mobileThread ? "flex" : "hidden lg:flex"}`}
       >
         <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
@@ -84,17 +84,17 @@ export default function ChatPage() {
         <div className="flex-1 p-5 overflow-y-auto scrollbar-thin bg-gray-50 space-y-3">
           <div className="text-center text-xs text-gray-400">Today</div>
           <div className="flex">
-            <div className="max-w-sm px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm">
+            <div className="max-w-[80%] px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm">
               Hi, I applied for a personal loan yesterday.
             </div>
           </div>
           <div className="flex justify-end">
-            <div className="max-w-sm px-3 py-2 bg-brand-600 text-white rounded-lg text-sm">
+            <div className="max-w-[80%] px-3 py-2 bg-brand-600 text-white rounded-lg text-sm">
               Hello {active.customer.split(" ")[0]}, thanks for reaching out. Your application is under review.
             </div>
           </div>
           <div className="flex">
-            <div className="max-w-sm px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm">
+            <div className="max-w-[80%] px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm">
               {active.last}
             </div>
           </div>
@@ -105,7 +105,7 @@ export default function ChatPage() {
           </button>
           <input
             placeholder="Type a message..."
-            className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            className="flex-1 min-w-0 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           />
           <button className="flex items-center gap-1.5 px-3 py-2 bg-brand-600 text-white rounded-md text-sm hover:bg-brand-700 font-medium">
             <Send className="w-4 h-4" />

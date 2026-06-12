@@ -99,7 +99,7 @@ export function RestructureRequestModal({
             <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 mb-2">
               Contact customer directly
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Link
                 href="/chat"
                 className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-200 rounded-md hover:bg-gray-50 text-sm text-gray-700 font-medium"
@@ -118,14 +118,14 @@ export function RestructureRequestModal({
           </div>
         </div>
 
-        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <button
             onClick={onClose}
             className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
           >
             Close
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50">
               <XCircle className="w-4 h-4" />
               Decline request
