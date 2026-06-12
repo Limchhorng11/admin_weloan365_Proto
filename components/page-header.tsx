@@ -12,8 +12,8 @@ export function PageHeader({
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{title}</h1>
-        {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-gray-900">{title}</h1>
+        {subtitle && <p className="text-[13px] sm:text-sm text-gray-500 mt-1">{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>

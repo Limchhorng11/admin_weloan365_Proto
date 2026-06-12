@@ -19,8 +19,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 max-w-[1400px]">
       {/* Greeting */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-[26px] font-semibold tracking-tight text-gray-900">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-gray-900">
           Welcome back, Laybun!
         </h1>
         <DateRangeMenu />
@@ -77,7 +77,7 @@ export default function DashboardPage() {
       {/* Applications table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-gray-200">
-          <h2 className="text-[17px] font-semibold text-gray-900">Loan Applications</h2>
+          <h2 className="text-base font-semibold text-gray-900">Loan Applications</h2>
           <div className="flex items-center gap-2">
             <div className="relative w-full sm:w-56">
               <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />

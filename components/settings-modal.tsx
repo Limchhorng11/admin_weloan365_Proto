@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   X,
+  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -81,6 +82,11 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [cursor, setCursor] = useState(0);
   const section = history[cursor];
 
+  // Mobile master-detail: below sm we show EITHER the section list or the
+  // selected section's content (with a back button) — never both at once.
+  // Desktop keeps the side-by-side split regardless of this flag.
+  const [mobileDetail, setMobileDetail] = useState(false);
+
   // If the role changes and the active section is no longer allowed, jump to first allowed.
   useEffect(() => {
     if (!visibleSections.some(s => s.key === section)) {
@@ -107,7 +113,13 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     }
   }, [open]);
 
+  // Reset to the section list each time the modal opens (mobile).
+  useEffect(() => {
+    if (open) setMobileDetail(false);
+  }, [open]);
+
   const selectSection = (key: SectionKey) => {
+    setMobileDetail(true); // open the detail pane on mobile
     if (key === section) return;
     const next = [...history.slice(0, cursor + 1), key];
     setHistory(next);
@@ -132,7 +144,12 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         onClick={e => e.stopPropagation()}
       >
         {/* Left nav */}
-        <aside className="w-full sm:w-60 bg-gray-50 border-b sm:border-b-0 sm:border-r border-gray-200 flex flex-col flex-shrink-0 max-h-[40%] sm:max-h-none">
+        <aside
+          className={cn(
+            "w-full sm:w-60 bg-gray-50 sm:border-r border-gray-200 flex-col flex-shrink-0",
+            mobileDetail ? "hidden sm:flex" : "flex"
+          )}
+        >
           <div className="px-5 py-4">
             <div className="text-[13px] font-medium text-gray-500">Settings</div>
           </div>
@@ -168,13 +185,25 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         </aside>
 
         {/* Right content */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white">
+        <div
+          className={cn(
+            "flex-1 flex-col min-w-0 bg-white",
+            mobileDetail ? "flex" : "hidden sm:flex"
+          )}
+        >
           <div className="h-14 px-5 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-1">
               <button
+                onClick={() => setMobileDetail(false)}
+                className="p-1.5 -ml-1.5 mr-0.5 rounded-md hover:bg-gray-100 text-gray-500 sm:hidden"
+                aria-label="Back to settings menu"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <button
                 onClick={() => canBack && setCursor(c => c - 1)}
                 disabled={!canBack}
-                className="p-1.5 rounded-md hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent text-gray-500"
+                className="hidden sm:inline-flex p-1.5 rounded-md hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent text-gray-500"
                 aria-label="Back"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -182,7 +211,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               <button
                 onClick={() => canFwd && setCursor(c => c + 1)}
                 disabled={!canFwd}
-                className="p-1.5 rounded-md hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent text-gray-500"
+                className="hidden sm:inline-flex p-1.5 rounded-md hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent text-gray-500"
                 aria-label="Forward"
               >
                 <ChevronRight className="w-4 h-4" />
