@@ -442,13 +442,7 @@ function LoanStatusTab({ a }: { a: Application }) {
         ref={scrollRef}
         className="overflow-x-auto scrollbar-thin scroll-smooth pb-1"
       >
-        <div
-          className="grid gap-3"
-          style={{
-            gridAutoFlow: "column",
-            gridAutoColumns: "calc((100% - 24px) / 3)",
-          }}
-        >
+        <div className="grid grid-flow-col gap-3 [grid-auto-columns:88%] sm:[grid-auto-columns:calc((100%_-_24px)/3)]">
           {stages.map((s, i) => (
             <StageCard key={s.key} stage={s} index={i + 1} />
           ))}
