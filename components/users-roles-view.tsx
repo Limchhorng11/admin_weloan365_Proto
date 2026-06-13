@@ -389,7 +389,7 @@ function UserModal({
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="name@kosign.com.kh"
+                placeholder="name@nonghyup.com.kh"
                 className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>

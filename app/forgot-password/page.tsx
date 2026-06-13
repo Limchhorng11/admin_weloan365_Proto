@@ -8,7 +8,6 @@ import {
   Lock,
   Eye,
   EyeOff,
-  ShieldCheck,
   Loader2,
   ArrowRight,
   ArrowLeft,
@@ -16,6 +15,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "@/components/brand-logo";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -132,53 +132,12 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-white">
-      {/* Brand panel */}
-      <div className="hidden lg:flex relative overflow-hidden bg-gradient-to-br from-brand-900 via-brand-700 to-brand-600 text-white flex-col p-10">
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-white/5 blur-3xl" />
-        <div className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-white/5 blur-3xl" />
-
-        <Link href="/login" className="relative z-10 flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center font-bold">
-            W
-          </div>
-          <span className="font-semibold">WeLoan365</span>
+    <div className="min-h-screen flex items-center justify-center bg-white p-6">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <Link href="/login" className="inline-block mb-8">
+          <BrandLogo size={36} />
         </Link>
-
-        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-md">
-          <div className="inline-flex items-center gap-1.5 text-xs font-medium bg-white/10 backdrop-blur-sm border border-white/10 rounded-full px-2.5 py-1 w-fit">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Account recovery
-          </div>
-          <h2 className="mt-6 text-4xl font-semibold tracking-tight leading-tight">
-            Reset your<br />admin password.
-          </h2>
-          <p className="mt-4 text-white/70 text-[15px] leading-relaxed">
-            We&apos;ll verify it&apos;s you with a one-time code or an email link, then you can set a new password.
-          </p>
-
-          <div className="mt-10 space-y-3 text-sm text-white/80">
-            <BulletItem text="Codes expire 10 minutes after they're sent" />
-            <BulletItem text="Sessions stay signed in on other devices unless you sign them out" />
-            <BulletItem text="2FA stays enabled after the reset" />
-          </div>
-        </div>
-
-        <div className="relative z-10 text-xs text-white/50">
-          © 2026 KoSign Microfinance Plc. All rights reserved.
-        </div>
-      </div>
-
-      {/* Form panel */}
-      <div className="flex items-center justify-center p-6 lg:p-10">
-        <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <Link href="/login" className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold">
-              W
-            </div>
-            <span className="font-semibold text-gray-900">WeLoan365</span>
-          </Link>
 
           {/* Stepper */}
           <Stepper currentStep={step} />
@@ -240,7 +199,6 @@ export default function ForgotPasswordPage() {
               Back to sign in
             </Link>
           </div>
-        </div>
       </div>
     </div>
   );
@@ -282,7 +240,7 @@ function StepIdentify({
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="you@kosign.com.kh"
+              placeholder="you@nonghyup.com.kh"
               autoComplete="email"
               required
               className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
@@ -630,15 +588,6 @@ function ErrorBox({ message }: { message: string }) {
   return (
     <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-3 py-2">
       {message}
-    </div>
-  );
-}
-
-function BulletItem({ text }: { text: string }) {
-  return (
-    <div className="flex items-start gap-2">
-      <CheckCircle2 className="w-4 h-4 text-white/80 flex-shrink-0 mt-0.5" />
-      <span>{text}</span>
     </div>
   );
 }

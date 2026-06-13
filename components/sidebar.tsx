@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "./brand-logo";
 import { LATEST_VERSION } from "./app-version";
 import { SettingsModal } from "./settings-modal";
 import { useRole } from "@/lib/role-context";
@@ -211,11 +212,8 @@ export function Sidebar({
         )}
       >
         <div className="h-16 px-5 border-b border-gray-200 flex items-center justify-between">
-          <Link href="/" onClick={onClose} className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-sm">
-              W
-            </div>
-            <span className="font-semibold text-gray-900 text-[15px]">WeLoan365</span>
+          <Link href="/" onClick={onClose}>
+            <BrandLogo size={32} />
           </Link>
           <button
             onClick={onClose}

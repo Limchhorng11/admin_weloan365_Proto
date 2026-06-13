@@ -130,6 +130,8 @@ export type Customer = {
   occupation: string;
   monthlyIncome: number;
   bankAccount: string;
+  /** Marital status captured on the customer's loan-application form. */
+  maritalStatus: string;
   /** Full mobile-app profile, grouped by type (address + employment). */
   profile: CustomerProfile;
   /** Devices the customer has signed in from. The first entry is the primary
@@ -149,7 +151,7 @@ export type Customer = {
 export const CUSTOMERS: Customer[] = [
   {
     id: "C-0421", name: "Sokha Chan",   phone: "+855 12 345 678", email: "sokha@mail.com",  kyc: "verified", loans: 2, joined: "2023-06-11", branch: "Phnom Penh — Central",
-    nationalId: "200112 ••• 4521", dob: "1993-08-12", address: "#123, St. 271, Sangkat BKK1, Phnom Penh", occupation: "Retail supervisor", monthlyIncome: 850, bankAccount: "ABA •••• 1284",
+    nationalId: "200112 ••• 4521", dob: "1993-08-12", address: "#123, St. 271, Sangkat BKK1, Phnom Penh", occupation: "Retail supervisor", monthlyIncome: 850, bankAccount: "ABA •••• 1284", maritalStatus: "Married",
     profile: {
       address: { cityProvince: "Phnom Penh", district: "Khan Chamkarmon", commune: "Sangkat BKK 1", village: "Phum 1", houseStreet: "No. 123 · St. 271" },
       employment: { type: "Employed", companyName: "Lucky Supermarket", businessType: "Retail Trade", businessNature: "Supermarket", incomeSource: "Salary", incomeRange: "$500 – $1,000 / month" },
@@ -161,7 +163,7 @@ export const CUSTOMERS: Customer[] = [
   },
   {
     id: "C-0422", name: "Dara Meas",    phone: "+855 17 998 221", email: "dara@mail.com",   kyc: "verified", loans: 1, joined: "2024-01-03", branch: "Siem Reap",
-    nationalId: "200456 ••• 7782", dob: "1990-03-25", address: "#45, Wat Bo Road, Siem Reap", occupation: "Shop owner", monthlyIncome: 1200, bankAccount: "ACLEDA •••• 9921",
+    nationalId: "200456 ••• 7782", dob: "1990-03-25", address: "#45, Wat Bo Road, Siem Reap", occupation: "Shop owner", monthlyIncome: 1200, bankAccount: "ACLEDA •••• 9921", maritalStatus: "Married",
     profile: {
       address: { cityProvince: "Siem Reap", district: "Krong Siem Reap", commune: "Sangkat Sala Kamreuk", village: "Phum Wat Bo", houseStreet: "No. 45 · Wat Bo Road" },
       employment: { type: "Self-employed", companyName: "Dara Grocery", businessType: "Retail Trade", businessNature: "Grocery & General Goods", incomeSource: "Business Revenue", incomeRange: "$1,000 – $1,500 / month" },
@@ -172,7 +174,7 @@ export const CUSTOMERS: Customer[] = [
   },
   {
     id: "C-0423", name: "Vichet Lim",   phone: "+855 10 556 777", email: "vichet@mail.com", kyc: "verified", loans: 1, joined: "2025-02-28", branch: "Phnom Penh — Toul Kork",
-    nationalId: "199823 ••• 1190", dob: "1995-11-02", address: "#56, St. 289, Toul Kork, Phnom Penh", occupation: "Delivery driver", monthlyIncome: 700, bankAccount: "Wing •••• 3345",
+    nationalId: "199823 ••• 1190", dob: "1995-11-02", address: "#56, St. 289, Toul Kork, Phnom Penh", occupation: "Delivery driver", monthlyIncome: 700, bankAccount: "Wing •••• 3345", maritalStatus: "Single",
     profile: {
       address: { cityProvince: "Phnom Penh", district: "Khan Toul Kork", commune: "Sangkat Boeung Kak 1", village: "Phum 5", houseStreet: "No. 56 · St. 289" },
       employment: { type: "Employed", companyName: "Nham24", businessType: "Logistics & Delivery", businessNature: "Food Delivery", incomeSource: "Salary", incomeRange: "$500 – $1,000 / month" },
@@ -186,7 +188,7 @@ export const CUSTOMERS: Customer[] = [
   // and admin actions like Reset PIN are disabled.
   {
     id: "C-0428", name: "Chenda Oum",   phone: "+855 86 772 554", email: "chenda@mail.com", kyc: "rejected", loans: 0, joined: "2026-04-17", branch: "Phnom Penh — Central",
-    nationalId: "200298 ••• 6620", dob: "1998-05-19", address: "#9, St. 105, Phnom Penh", occupation: "Student", monthlyIncome: 0, bankAccount: "—",
+    nationalId: "200298 ••• 6620", dob: "1998-05-19", address: "#9, St. 105, Phnom Penh", occupation: "Student", monthlyIncome: 0, bankAccount: "—", maritalStatus: "Single",
     profile: {
       address: { cityProvince: "Phnom Penh", district: "Khan Daun Penh", commune: "Sangkat Wat Phnom", village: "Phum 2", houseStreet: "No. 9 · St. 105" },
       employment: { type: "Student", companyName: "—", businessType: "—", businessNature: "—", incomeSource: "Family Support", incomeRange: "Under $500 / month" },
@@ -199,7 +201,7 @@ export const CUSTOMERS: Customer[] = [
   },
   {
     id: "C-0424", name: "Pisey Ros",    phone: "+855 96 221 004", email: "pisey@mail.com",  kyc: "verified", loans: 1, joined: "2025-09-14", branch: "Battambang",
-    nationalId: "199567 ••• 4410", dob: "1992-07-30", address: "#78, St. 3, Svay Por, Battambang", occupation: "Teacher", monthlyIncome: 950, bankAccount: "ABA •••• 5567",
+    nationalId: "199567 ••• 4410", dob: "1992-07-30", address: "#78, St. 3, Svay Por, Battambang", occupation: "Teacher", monthlyIncome: 950, bankAccount: "ABA •••• 5567", maritalStatus: "Married",
     profile: {
       address: { cityProvince: "Battambang", district: "Krong Battambang", commune: "Sangkat Svay Por", village: "Phum 3", houseStreet: "No. 78 · St. 3" },
       employment: { type: "Employed", companyName: "Battambang High School", businessType: "Education", businessNature: "Public School", incomeSource: "Salary", incomeRange: "$500 – $1,000 / month" },
@@ -210,7 +212,7 @@ export const CUSTOMERS: Customer[] = [
   },
   {
     id: "C-0425", name: "Narith Kim",   phone: "+855 88 330 112", email: "narith@mail.com", kyc: "pending",  loans: 1, joined: "2024-11-05", branch: "Phnom Penh — Central",
-    nationalId: "200034 ••• 8810", dob: "1994-01-15", address: "#212, St. 271, Phnom Penh", occupation: "Factory worker", monthlyIncome: 600, bankAccount: "ACLEDA •••• 2210",
+    nationalId: "200034 ••• 8810", dob: "1994-01-15", address: "#212, St. 271, Phnom Penh", occupation: "Factory worker", monthlyIncome: 600, bankAccount: "ACLEDA •••• 2210", maritalStatus: "Single",
     profile: {
       address: { cityProvince: "Phnom Penh", district: "Khan Chamkarmon", commune: "Sangkat Tonle Bassac", village: "Phum 4", houseStreet: "No. 212 · St. 271" },
       employment: { type: "Employed", companyName: "Grand Twins Garment", businessType: "Manufacturing", businessNature: "Garment Factory", incomeSource: "Salary", incomeRange: "$500 – $1,000 / month" },
@@ -221,7 +223,7 @@ export const CUSTOMERS: Customer[] = [
   },
   {
     id: "C-0426", name: "Bopha Sok",    phone: "+855 77 441 993", email: "bopha@mail.com",  kyc: "verified", loans: 1, joined: "2025-07-22", branch: "Kampong Cham",
-    nationalId: "199789 ••• 3301", dob: "1991-09-08", address: "#10, Preah Monivong Blvd, Kampong Cham", occupation: "Market vendor", monthlyIncome: 800, bankAccount: "Wing •••• 7788",
+    nationalId: "199789 ••• 3301", dob: "1991-09-08", address: "#10, Preah Monivong Blvd, Kampong Cham", occupation: "Market vendor", monthlyIncome: 800, bankAccount: "Wing •••• 7788", maritalStatus: "Married",
     profile: {
       address: { cityProvince: "Kampong Cham", district: "Krong Kampong Cham", commune: "Sangkat Kampong Cham", village: "Phum 1", houseStreet: "No. 10 · Preah Monivong Blvd" },
       employment: { type: "Self-employed", companyName: "Bopha Stall", businessType: "Retail Trade", businessNature: "Fresh Market Vendor", incomeSource: "Business Revenue", incomeRange: "$500 – $1,000 / month" },
@@ -232,7 +234,7 @@ export const CUSTOMERS: Customer[] = [
   },
   {
     id: "C-0427", name: "Rithy Pen",    phone: "+855 92 118 006", email: "rithy@mail.com",  kyc: "verified", loans: 1, joined: "2024-04-17", branch: "Siem Reap",
-    nationalId: "199345 ••• 5567", dob: "1989-12-21", address: "#33, Wat Bo Road, Siem Reap", occupation: "Tour guide", monthlyIncome: 1100, bankAccount: "ABA •••• 4456",
+    nationalId: "199345 ••• 5567", dob: "1989-12-21", address: "#33, Wat Bo Road, Siem Reap", occupation: "Tour guide", monthlyIncome: 1100, bankAccount: "ABA •••• 4456", maritalStatus: "Married",
     profile: {
       address: { cityProvince: "Siem Reap", district: "Krong Siem Reap", commune: "Sangkat Svay Dangkum", village: "Phum Wat Bo", houseStreet: "No. 33 · Wat Bo Road" },
       employment: { type: "Self-employed", companyName: "Angkor Smile Tours", businessType: "Tourism", businessNature: "Tour Services", incomeSource: "Business Revenue", incomeRange: "$1,000 – $1,500 / month" },
@@ -833,13 +835,13 @@ export type StaffUser = {
 };
 
 export const USERS: StaffUser[] = [
-  { id: "U-01", name: "Laybun N.",    email: "laybunnavitou@kosign.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago",  code: "10247", referralStats: { referrals: 28, applications: 19, disbursed: 11 } },
-  { id: "U-02", name: "Sophea K.",    email: "sophea.k@kosign.com.kh",      role: "Senior Officer",        branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago",   code: "10248", referralStats: { referrals: 41, applications: 32, disbursed: 21 } },
-  { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@kosign.com.kh",     role: "Senior Officer",        branch: "Battambang",  status: "Active",   lastActive: "Today",      code: "10312", referralStats: { referrals: 14, applications:  9, disbursed:  5 } },
-  { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@kosign.com.kh",   role: "Customer Service",      branch: "HQ",          status: "Active",   lastActive: "Today",      code: "10402", referralStats: { referrals:  9, applications:  4, disbursed:  2 } },
-  { id: "U-05", name: "Kosal M.",     email: "kosal.m@kosign.com.kh",       role: "Admin",                 branch: "HQ",          status: "Inactive", lastActive: "30 d ago",   code: "10502", referralStats: { referrals:  0, applications:  0, disbursed:  0 } },
-  { id: "U-06", name: "Pisey C.",     email: "pisey.c@kosign.com.kh",       role: "Customer Service",      branch: "Phnom Penh",  status: "Active",   lastActive: "10 min ago", code: "10401", referralStats: { referrals:  6, applications:  3, disbursed:  1 } },
-  { id: "U-07", name: "Mengsrun H.",  email: "mengsrun.h@kosign.com.kh",    role: "Senior Officer",        branch: "HQ",          status: "Active",   lastActive: "Yesterday" },
+  { id: "U-01", name: "Laybun N.",    email: "laybunnavitou@nonghyup.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago",  code: "10247", referralStats: { referrals: 28, applications: 19, disbursed: 11 } },
+  { id: "U-02", name: "Sophea K.",    email: "sophea.k@nonghyup.com.kh",      role: "Senior Officer",        branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago",   code: "10248", referralStats: { referrals: 41, applications: 32, disbursed: 21 } },
+  { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@nonghyup.com.kh",     role: "Senior Officer",        branch: "Battambang",  status: "Active",   lastActive: "Today",      code: "10312", referralStats: { referrals: 14, applications:  9, disbursed:  5 } },
+  { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@nonghyup.com.kh",   role: "Customer Service",      branch: "HQ",          status: "Active",   lastActive: "Today",      code: "10402", referralStats: { referrals:  9, applications:  4, disbursed:  2 } },
+  { id: "U-05", name: "Kosal M.",     email: "kosal.m@nonghyup.com.kh",       role: "Admin",                 branch: "HQ",          status: "Inactive", lastActive: "30 d ago",   code: "10502", referralStats: { referrals:  0, applications:  0, disbursed:  0 } },
+  { id: "U-06", name: "Pisey C.",     email: "pisey.c@nonghyup.com.kh",       role: "Customer Service",      branch: "Phnom Penh",  status: "Active",   lastActive: "10 min ago", code: "10401", referralStats: { referrals:  6, applications:  3, disbursed:  1 } },
+  { id: "U-07", name: "Mengsrun H.",  email: "mengsrun.h@nonghyup.com.kh",    role: "Senior Officer",        branch: "HQ",          status: "Active",   lastActive: "Yesterday" },
 ];
 
 /* ====================================================================

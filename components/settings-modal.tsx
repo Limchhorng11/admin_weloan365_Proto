@@ -1001,7 +1001,7 @@ function CompanyView() {
       </div>
       <Card className="space-y-4">
         <div className="font-medium text-gray-900">Company information</div>
-        <Field label="Company name" defaultValue="KoSign Microfinance Plc." />
+        <Field label="Company name" defaultValue="NongHyup Finance (Cambodia) Plc." />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Founded" defaultValue="2018" />
           <Field label="License №" defaultValue="NBC-MFI-00123" />

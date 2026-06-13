@@ -10,6 +10,8 @@ import {
   X,
   MessageCircle,
   FileCheck2,
+  Eye,
+  Info,
   Plus,
   Download,
   Banknote,
@@ -24,7 +26,7 @@ import {
   Search,
   Phone,
 } from "lucide-react";
-import { APPLICATIONS, CUSTOMERS, USERS, type Application, type ApplicationStatus } from "@/lib/data";
+import { APPLICATIONS, CUSTOMERS, USERS, PRODUCTS, type Application, type ApplicationStatus } from "@/lib/data";
 import { StatusBadge } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/lib/role-context";
@@ -33,7 +35,7 @@ type TabDef = { key: TabKey; label: string; permission?: string };
 
 const TABS: TabDef[] = [
   { key: "status",      label: "Loan Status" },
-  { key: "kyc",         label: "KYC / Docs / CBC",          permission: "customer.view" },
+  { key: "kyc",         label: "KYC / Documents",           permission: "customer.view" },
   { key: "guarantor",   label: "Guarantor info",            permission: "customer.view" },
   { key: "repayment",   label: "Repayment & Collection",    permission: "payment.view" },
   { key: "reminders",   label: "Reminders / Notifications" },
@@ -69,9 +71,9 @@ export default function ApplicationDetailPage({
       TABS.filter(t => {
         // Re-structure is only meaningful once the loan has been approved.
         if (t.key === "restructure" && a.status !== "Approved") return false;
-        // Repayment is only meaningful once a loan exists — hide while in Progress
-        // (and also on rejected loans, see below).
-        if (t.key === "repayment" && a.status === "Progress") return false;
+        // Repayment and its reminders are only meaningful once a loan exists —
+        // hide while in Progress (and also on rejected loans, see below).
+        if ((t.key === "repayment" || t.key === "reminders") && a.status === "Progress") return false;
         // For rejected loans, only surface the tabs relevant to the rejection record.
         if (a.status === "Rejected") {
           const REJECTED_TABS: TabKey[] = ["status", "kyc", "audit", "officer"];
@@ -237,7 +239,7 @@ export default function ApplicationDetailPage({
           {tab === "repayment" && <RepaymentTab a={a} />}
           {tab === "reminders" && <RemindersTab a={a} />}
           {tab === "audit"     && <AuditTab a={a} />}
-          {tab === "reports"     && <ReportsTab />}
+          {tab === "reports"     && <ReportsTab a={a} />}
           {tab === "officer"     && <OfficerTab a={a} />}
           {tab === "restructure" && <RestructureTab a={a} />}
         </div>
@@ -542,23 +544,40 @@ function Box({ label, value, tone }: { label: string; value: string; tone?: "gre
   );
 }
 
-/* ---------- tab: KYC / Docs / CBC ---------- */
+/* ---------- tab: KYC / Documents ---------- */
+
+type KycDoc = { name: string; status: "verified" | "pending"; image: string };
+
+/** Inline SVG placeholder standing in for a scanned/photographed upload, so the
+ *  preview + download flow works without real image assets in the prototype. */
+function docPlaceholder(label: string): string {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='520' viewBox='0 0 800 520'>
+    <rect width='800' height='520' fill='#f1f5f9'/>
+    <rect x='40' y='40' width='720' height='440' rx='16' fill='#ffffff' stroke='#cbd5e1' stroke-width='2'/>
+    <rect x='80' y='90' width='180' height='180' rx='12' fill='#e2e8f0'/>
+    <rect x='300' y='100' width='380' height='28' rx='6' fill='#e2e8f0'/>
+    <rect x='300' y='154' width='300' height='20' rx='6' fill='#eef2f7'/>
+    <rect x='300' y='196' width='340' height='20' rx='6' fill='#eef2f7'/>
+    <rect x='80' y='320' width='600' height='20' rx='6' fill='#eef2f7'/>
+    <rect x='80' y='360' width='520' height='20' rx='6' fill='#eef2f7'/>
+    <text x='400' y='452' font-family='sans-serif' font-size='28' fill='#94a3b8' text-anchor='middle'>${label}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
 
 function KycTab({ a }: { a: Application }) {
   // Pull personal information from the linked customer record so the customer
   // detail page and this loan application detail always show the same data.
   const customer = CUSTOMERS.find(c => c.id === a.cid);
-  const docs = [
-    { name: "National ID",      status: "verified" as const },
-    { name: "Payslip",          status: "verified" as const },
-    { name: "Bank Statement",   status: "verified" as const },
-    { name: "Collateral Deed",  status: "verified" as const },
-    { name: "Business License", status: "pending"  as const },
-    { name: "Utility Bill",     status: "verified" as const },
+  // The loan product the customer applied for (for its name + allowed range).
+  const product = PRODUCTS.find(p => p.name === a.product);
+  // Documents the customer uploads through the mobile KYC form.
+  const docs: KycDoc[] = [
+    { name: "National ID",            status: "verified", image: docPlaceholder("National ID") },
+    { name: "Selfie with National ID", status: "verified", image: docPlaceholder("Selfie with National ID") },
+    { name: "Family book",            status: "verified", image: docPlaceholder("Family Book") },
   ];
-
-  // Mock referral code — 5 digits as per Credit Officer code convention.
-  const referralCode = "10247";
+  const [preview, setPreview] = useState<KycDoc | null>(null);
 
   return (
     <>
@@ -566,82 +585,121 @@ function KycTab({ a }: { a: Application }) {
         <div>
           <SectionLabel>Personal information (KYC)</SectionLabel>
           <dl className="divide-y divide-gray-100">
+            {/* Exactly the fields submitted on the customer's loan-application form */}
             <Row label="Full name" value={customer?.name ?? a.name} />
-            <Row label="Customer ID" value={<span className="font-mono text-xs">{a.cid}</span>} />
-            <Row label="National ID" value={customer?.nationalId ?? "—"} />
-            <Row label="Date of birth" value={customer?.dob ?? "—"} />
-            <Row label="Address" value={customer?.address ?? "—"} />
-            <Row label="Occupation" value={customer?.occupation ?? "—"} />
-            <Row
-              label="Monthly income"
-              value={customer ? `$${customer.monthlyIncome.toLocaleString()}` : "—"}
-            />
-            <Row
-              label="Bank account"
-              value={<span className="font-mono text-xs">{customer?.bankAccount ?? "—"}</span>}
-            />
-            <Row
-              label="Referral"
-              value={
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="font-mono text-xs tracking-wider">{referralCode}</span>
-                  <span className="text-[10px] text-gray-400">CO code</span>
-                </span>
-              }
-            />
-            <Row label="KYC status" value={<StatusBadge status="Verified" />} />
+            <Row label="Phone" value={<span className="font-mono text-xs">{customer?.phone ?? "—"}</span>} />
+            <Row label="City" value={customer?.profile.address.cityProvince ?? "—"} />
+            <Row label="Current occupation" value={customer?.occupation ?? "—"} />
+            <Row label="Marital status" value={customer?.maritalStatus ?? "—"} />
+            <Row label="Select branch" value={a.branch} />
           </dl>
         </div>
         <div>
-          <SectionLabel>Credit Bureau (CBC) report</SectionLabel>
-          <div className="space-y-4 text-sm">
-            <div>
-              <div className="flex justify-between mb-1.5">
-                <span className="text-gray-500">Credit score</span>
-                <span className="font-medium text-gray-900">{a.score} / 850</span>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={cn(
-                    "h-full",
-                    a.score >= 720 ? "bg-emerald-500" : a.score >= 680 ? "bg-amber-500" : "bg-red-500"
-                  )}
-                  style={{ width: `${(a.score / 850) * 100}%` }}
+          {/* Loan request — what the customer applied for */}
+          <SectionLabel>Loan request</SectionLabel>
+          <dl className="divide-y divide-gray-100">
+              <Row label="Loan product" value={a.product} />
+              <Row
+                label="Request amount"
+                value={
+                  <span className="inline-flex items-baseline gap-1.5">
+                    <span className="font-semibold text-gray-900">
+                      ${a.amount.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-gray-400">USD</span>
+                  </span>
+                }
+              />
+              {product && (
+                <Row
+                  label="Allowed range"
+                  value={`$${product.min.toLocaleString()} – $${product.max.toLocaleString()}`}
                 />
-              </div>
-            </div>
-          </div>
+              )}
+          </dl>
         </div>
       </div>
 
       <div className="mt-8">
         <SectionLabel>Uploaded documents</SectionLabel>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {docs.map(d => (
-            <div key={d.name} className="border border-gray-200 rounded-lg p-3 flex items-center gap-3">
-              <div
-                className={cn(
-                  "w-9 h-9 rounded-md flex items-center justify-center",
-                  d.status === "verified" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                )}
-              >
-                <FileCheck2 className="w-4 h-4" />
+            <button
+              key={d.name}
+              onClick={() => setPreview(d)}
+              className="group text-left border border-gray-200 rounded-lg p-3 flex items-center gap-3 hover:border-brand-300 hover:bg-gray-50 transition"
+            >
+              <div className="w-11 h-11 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
+                <img src={d.image} alt={d.name} className="w-full h-full object-cover" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-gray-900 truncate">{d.name}</div>
                 <div
                   className={cn(
-                    "text-[11px]",
+                    "text-[11px] inline-flex items-center gap-1",
                     d.status === "verified" ? "text-emerald-600" : "text-amber-600"
                   )}
                 >
+                  <FileCheck2 className="w-3 h-3" />
                   {d.status === "verified" ? "Verified" : "Pending"}
                 </div>
               </div>
-            </div>
+              <Eye className="w-4 h-4 text-gray-300 group-hover:text-brand-600 flex-shrink-0" />
+            </button>
           ))}
         </div>
       </div>
+
+      {/* Full-image preview + download */}
+      {preview && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setPreview(null)}
+        >
+          <div
+            className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900 truncate">{preview.name}</div>
+                <div
+                  className={cn(
+                    "text-[11px]",
+                    preview.status === "verified" ? "text-emerald-600" : "text-amber-600"
+                  )}
+                >
+                  {preview.status === "verified" ? "Verified" : "Pending"}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <a
+                  href={preview.image}
+                  download={`${preview.name}.svg`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700"
+                >
+                  <Download className="w-4 h-4 text-gray-500" />
+                  Download
+                </a>
+                <button
+                  onClick={() => setPreview(null)}
+                  className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-gray-50 p-4 flex items-center justify-center">
+              <img
+                src={preview.image}
+                alt={preview.name}
+                className="max-w-full max-h-[70vh] rounded-md shadow-sm bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1114,17 +1172,279 @@ function AuditTab({ a }: { a: Application }) {
 
 /* ---------- tab: Reports & Analytics ---------- */
 
-function ReportsTab() {
+// Shared "good / caution / bad" styling so every result reads the same way.
+type Tone = "good" | "warn" | "bad";
+const RISK_SCALE = ["Low", "Medium-Low", "Medium-High", "High"];
+const TONE_CARD: Record<Tone, string> = {
+  good: "bg-emerald-50 border-emerald-100",
+  warn: "bg-amber-50 border-amber-100",
+  bad: "bg-red-50 border-red-100",
+};
+const TONE_PILL: Record<Tone, string> = {
+  good: "bg-emerald-100 text-emerald-700",
+  warn: "bg-amber-100 text-amber-700",
+  bad: "bg-red-100 text-red-700",
+};
+const TONE_BAR: Record<Tone, string> = {
+  good: "bg-emerald-500",
+  warn: "bg-amber-500",
+  bad: "bg-red-500",
+};
+
+function ResultCard({
+  label,
+  value,
+  tone,
+  hint,
+  children,
+}: {
+  label: string;
+  value: string;
+  tone: Tone;
+  hint?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className={cn("rounded-lg border p-4", TONE_CARD[tone])}>
+      <div className="text-xs text-gray-500">{label}</div>
+      <div className="text-xl font-semibold text-gray-900 mt-1">{value}</div>
+      {children}
+      {hint && <div className="text-[11px] text-gray-500 mt-1.5 leading-snug">{hint}</div>}
+    </div>
+  );
+}
+
+function GuideRow({
+  title,
+  bands,
+}: {
+  title: string;
+  bands: { label: string; range: string; tone: Tone; active: boolean }[];
+}) {
+  return (
+    <div>
+      <div className="text-xs font-medium text-gray-700 mb-1.5">{title}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {bands.map(b => (
+          <span
+            key={b.label}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]",
+              b.active
+                ? cn(TONE_PILL[b.tone], "border-transparent font-semibold")
+                : "border-gray-200 bg-white text-gray-500"
+            )}
+          >
+            <span className={cn("w-1.5 h-1.5 rounded-full", TONE_BAR[b.tone])} />
+            <span>{b.label}</span>
+            <span className={b.active ? "opacity-70" : "text-gray-400"}>· {b.range}</span>
+            {b.active && <span className="ml-0.5 text-[9px] uppercase tracking-wider">• now</span>}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReportsTab({ a }: { a: Application }) {
+  // ---- Inputs actually used by the calculations below ----
+  const customer = CUSTOMERS.find(c => c.id === a.cid);
+  const income = customer?.monthlyIncome ?? 0;                       // monthly income
+  const monthly = (a.amount * (1 + a.rate / 100)) / a.term;          // monthly repayment
+  const dti = income > 0 ? monthly / income : 1;                     // debt-to-income ratio
+  const cbcPct = a.score / 850;                                      // credit-score share
+
+  // Risk score 0–100 — 55% credit score, 45% repayment capacity (1 − DTI).
+  const riskScore = Math.round(100 * (0.55 * cbcPct + 0.45 * (1 - Math.min(dti, 1))));
+  const riskBand =
+    riskScore >= 75 ? "Low" :
+    riskScore >= 60 ? "Medium-Low" :
+    riskScore >= 45 ? "Medium-High" : "High";
+  const riskTone: Tone = riskScore >= 60 ? "good" : riskScore >= 45 ? "warn" : "bad";
+  const riskIdx = RISK_SCALE.indexOf(riskBand);
+
+  // Default probability — inverse of the risk score. Lower is better.
+  const pd = Math.max(0.3, Math.round((1 - riskScore / 100) * 19 * 10) / 10);
+  const pdTone: Tone = pd <= 5 ? "good" : pd <= 10 ? "warn" : "bad";
+
+  // Recommendation from policy thresholds.
+  const action =
+    pd <= 5 && riskScore >= 60 ? "Approve" : pd <= 10 ? "Review" : "Reject";
+  const actionTone: Tone = action === "Approve" ? "good" : action === "Review" ? "warn" : "bad";
+
+  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+
+  const formulas: { metric: string; formula: string; worked: string }[] = [
+    {
+      metric: "Time to approval",
+      formula: "date(final approval) − date(submission)",
+      worked: "Operational SLA — benchmarked against the branch median for this product (not derived from the applicant's financials).",
+    },
+    {
+      metric: "Risk rating",
+      formula: "100 × (0.55 × CBC ÷ 850  +  0.45 × (1 − DTI))",
+      worked: `= 100 × (0.55 × ${a.score} ÷ 850 + 0.45 × (1 − ${pct(Math.min(dti, 1))})) = ${riskScore} / 100 → ${riskBand}`,
+    },
+    {
+      metric: "Default probability",
+      formula: "(1 − RiskScore ÷ 100) × 19",
+      worked: `= (1 − ${riskScore} ÷ 100) × 19 = ${pd}%`,
+    },
+    {
+      metric: "Recommended action",
+      formula: "Approve if PD ≤ 5% and Risk ≥ 65  ·  Review if PD ≤ 10%  ·  else Reject",
+      worked: `PD ${pd}% · Risk ${riskScore} → ${action}`,
+    },
+  ];
+
   return (
     <>
       <SectionLabel>Application analytics</SectionLabel>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Box label="Time to approval"    value="2.3 days" />
-        <Box label="Risk rating"         value="Medium-Low" />
-        <Box label="Default probability" value="4.2%" tone="green" />
-        <Box label="Recommended action"  value="Approve" tone="green" />
+
+      {/* How this works — only the inputs these figures actually use. */}
+      <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
+        <Info className="w-4 h-4 text-brand-600 mt-0.5 flex-shrink-0" />
+        <div className="text-xs text-gray-600 leading-relaxed">
+          <span className="font-medium text-gray-900">How this works. </span>
+          These figures are <span className="font-medium">decision support, not a final decision</span>.
+          They are calculated from the applicant&apos;s{" "}
+          <span className="font-medium">credit-bureau (CBC) score</span>,{" "}
+          <span className="font-medium">monthly income</span>, and the{" "}
+          <span className="font-medium">requested amount &amp; term</span> (which set the monthly
+          repayment and the debt-to-income ratio). They refresh whenever these inputs change.
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Operational — neutral, not a risk verdict */}
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="text-xs text-gray-500">Time to approval</div>
+          <div className="text-xl font-semibold text-gray-900 mt-1">2.3 days</div>
+          <div className="text-[11px] text-gray-500 mt-1.5">Branch SLA benchmark for this product.</div>
+        </div>
+
+        {/* Risk rating — with a Low → High scale */}
+        <ResultCard label="Risk rating" value={riskBand} tone={riskTone}>
+          <div className="mt-2">
+            <div className="flex gap-0.5">
+              {RISK_SCALE.map((b, i) => (
+                <div
+                  key={b}
+                  className={cn(
+                    "h-1.5 flex-1 rounded-full",
+                    i === riskIdx ? TONE_BAR[riskTone] : "bg-gray-200"
+                  )}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+              <span>Low risk</span>
+              <span>High risk</span>
+            </div>
+          </div>
+        </ResultCard>
+
+        {/* Default probability — lower is better */}
+        <ResultCard
+          label="Default probability"
+          value={`${pd}%`}
+          tone={pdTone}
+          hint="Lower is better — ≤5% within policy, over 10% is high."
+        />
+
+        {/* Recommended action */}
+        <ResultCard
+          label="Recommended action"
+          value={action}
+          tone={actionTone}
+          hint={
+            action === "Approve"
+              ? "Meets policy — safe to proceed."
+              : action === "Review"
+              ? "Borderline — manual review advised."
+              : "Outside policy — decline or escalate."
+          }
+        />
+      </div>
+
+      {/* Inputs used for this application */}
+      <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+        <InputStat label="CBC credit score" value={`${a.score} / 850`} />
+        <InputStat label="Monthly income" value={`$${income.toLocaleString()}`} />
+        <InputStat label="Monthly repayment" value={`$${Math.round(monthly).toLocaleString()}`} />
+        <InputStat label="Debt-to-income (DTI)" value={pct(Math.min(dti, 1))} />
+      </div>
+
+      {/* Status guide — what verdict each value gets, current band highlighted */}
+      <div className="mt-6">
+        <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-1">
+          Status guide
+        </div>
+        <div className="text-xs text-gray-500 mb-3">
+          How the status changes with the value — the current band is highlighted.
+        </div>
+        <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+          <div className="px-3.5 py-3">
+            <GuideRow
+              title="Risk rating (0–100 score)"
+              bands={[
+                { label: "Low", range: "75–100", tone: "good", active: riskBand === "Low" },
+                { label: "Medium-Low", range: "60–74", tone: "good", active: riskBand === "Medium-Low" },
+                { label: "Medium-High", range: "45–59", tone: "warn", active: riskBand === "Medium-High" },
+                { label: "High", range: "0–44", tone: "bad", active: riskBand === "High" },
+              ]}
+            />
+          </div>
+          <div className="px-3.5 py-3">
+            <GuideRow
+              title="Default probability"
+              bands={[
+                { label: "Low", range: "≤ 5%", tone: "good", active: pd <= 5 },
+                { label: "Moderate", range: "5–10%", tone: "warn", active: pd > 5 && pd <= 10 },
+                { label: "High", range: "> 10%", tone: "bad", active: pd > 10 },
+              ]}
+            />
+          </div>
+          <div className="px-3.5 py-3">
+            <GuideRow
+              title="Recommended action"
+              bands={[
+                { label: "Approve", range: "PD ≤ 5% & Risk ≥ 60", tone: "good", active: action === "Approve" },
+                { label: "Review", range: "PD ≤ 10%", tone: "warn", active: action === "Review" },
+                { label: "Reject", range: "otherwise", tone: "bad", active: action === "Reject" },
+              ]}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Formulas — how each of the four results is calculated */}
+      <div className="mt-6">
+        <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-2">
+          How each result is calculated
+        </div>
+        <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+          {formulas.map(f => (
+            <div key={f.metric} className="px-3.5 py-3">
+              <div className="text-sm font-medium text-gray-900">{f.metric}</div>
+              <div className="mt-1 font-mono text-[11px] text-brand-700 bg-brand-50/60 border border-brand-100 rounded px-2 py-1 inline-block">
+                {f.formula}
+              </div>
+              <div className="text-xs text-gray-500 mt-1.5 leading-relaxed">{f.worked}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </>
+  );
+}
+
+function InputStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-gray-200 px-3 py-2">
+      <div className="text-[11px] text-gray-500">{label}</div>
+      <div className="text-sm font-semibold text-gray-900 mt-0.5">{value}</div>
+    </div>
   );
 }
 
