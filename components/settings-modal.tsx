@@ -494,54 +494,42 @@ const req = (name: string): FlowField => ({ name, show: true, required: true });
 const opt = (name: string): FlowField => ({ name, show: true });
 
 const MWL_PAGES: FlowPage[] = [
-  { name: "Choose destination", show: true, fields: [
-    opt("Republic of Korea — EPS · up to $15,000 / 30 months"),
-    opt("Japan — SSW / Technical intern · up to $12,000 / 36 months"),
-    opt("Singapore — Work Permit / S Pass · up to $10,000 / 24 months"),
-  ] },
-  { name: "Borrower Quick Information Submission", show: true, fields: [], sections: [
-    { name: "Tell us about you", show: true, fields: [
-      req("Full name"), req("Mobile number"), req("Province / Capital"),
-      req("Current occupation"), req("Requested amount"), req("Loan purpose"),
+  { name: "Step 1 — Tell us about you", show: true, fields: [], sections: [
+    { name: "Where are you heading?", show: true, fields: [
+      opt("Korea — EPS · most active"),
+      opt("Japan — SSW / Technical intern"),
+      opt("Singapore — Work Permit / S Pass"),
     ] },
-    { name: "Choose your branch", show: true, fields: [
-      req("Select branch"), opt("Staff referral code"),
+    { name: "Your info", show: true, fields: [
+      req("First name"), req("Last name"), req("Mobile number"),
+      req("City"), req("Current occupation"), req("Marital status"),
+      req("Select branch"),
+    ] },
+    { name: "Upload your documents", show: true, fields: [
+      req("National ID Card"), req("Selfie with NID"), opt("Family Book"),
     ] },
   ] },
-  { name: "Borrower Employment Information", show: true, fields: [
-    req("Job position"), req("Employer / company name"), req("Destination country"),
-    req("Destination city"), req("Start date"), req("End date"),
-    req("Salary currency"), req("Monthly salary"),
+  { name: "Step 2 — Loan request", show: true, fields: [
+    req("Requested amount (within product range)"), req("Currency"),
+    req("Loan term"), opt("Monthly interest (auto)"),
+    req("Repayment method"), opt("Payment estimate / repayment table"),
   ] },
-  { name: "Input referral", show: true, fields: [ opt("Staff referral code") ] },
-  { name: "Borrower MWL Agency information", show: true, fields: [
-    req("Registered agency"), opt("Agency code"), opt("Licence"),
-    opt("Contact person"), opt("Phone"), opt("Address"),
+  { name: "Step 3 — Add your guarantor", show: true, fields: [
+    req("Full name"), req("Mobile number"), req("Relationship"),
   ] },
-  { name: "Borrower Loan Request Information", show: true, fields: [
-    req("Loan purpose"), req("Repayment method"), req("Amount"),
-    req("Loan term"), opt("Monthly interest"),
+  { name: "Review your application", show: true, fields: [], sections: [
+    { name: "Customer info", show: true, fields: [
+      opt("Full name"), opt("Phone"), opt("City"),
+      opt("Current occupation"), opt("Marital status"), opt("Select branch"),
+    ] },
+    { name: "Loan request", show: true, fields: [
+      opt("Amount"), opt("Loan term"), opt("Monthly interest"), opt("Repayment method"),
+    ] },
+    { name: "Guarantor", show: true, fields: [
+      opt("Full name"), opt("Mobile number"), opt("Relationship"),
+    ] },
   ] },
-  { name: "Borrower Bank Account", show: true, fields: [
-    req("Bank"), req("Account holder name"), req("Account number"),
-    req("Currency"), req("Branch name"),
-  ] },
-  { name: "Review & Confirm", show: true, fields: [] },
-  { name: "Add Guarantor", show: true, fields: [
-    req("Full name"), req("Mobile number"), req("NID number"),
-    req("Relationship"), req("Eligibility checklist"),
-  ] },
-  { name: "Guarantor System Send SMS/Link", show: true, system: true, fields: [],
-    messageLabel: "SMS / link message",
-    placeholders: ["{name}", "{product}", "{link}"],
-    description:
-      "Hi {name}, you have been added as a guarantor for a {product} application. " +
-      "Tap the secure link to confirm your details: {link}" },
-  { name: "Guarantor Receives SMS/Link", show: true, system: true, fields: [] },
-  { name: "Guarantor Confirm OTP", show: true, system: true, fields: [] },
-  { name: "Guarantor Verify Face With ID Card", show: true, system: true, fields: [] },
-  { name: "Borrower Confirm Review Guarantor", show: true, fields: [] },
-  { name: "Final Submission", show: true, system: true, fields: [] },
+  { name: "E-Signature", show: true, fields: [ req("Draw signature") ] },
   { name: "Application submitted", show: true, system: true, fields: [],
     messageLabel: "Confirmation message",
     description:
@@ -549,15 +537,35 @@ const MWL_PAGES: FlowPage[] = [
       "Our loan officer will contact you at {phone} within 1 business day." },
 ];
 
-/** Non-MWL (quick / domestic) flow — for an existing customer: request → documents → received. */
+/** Non-MWL (quick / domestic) flow — two steps for the customer:
+ *  Step 1 "Tell us about you" (personal info + document uploads) →
+ *  Step 2 "Loan request" (amount, term, repayment) → request received. */
 const NON_MWL_PAGES: FlowPage[] = [
-  { name: "Request Loan", show: true, fields: [
-    req("What's it for? (loan purpose)"), req("Amount"), req("Currency"),
-    opt("Payment table"),
+  { name: "Step 1 — Tell us about you", show: true, fields: [], sections: [
+    { name: "Your info", show: true, fields: [
+      req("First name"), req("Last name"), req("Mobile number"),
+      req("City"), req("Current occupation"), req("Marital status"),
+      req("Select branch"),
+    ] },
+    { name: "Upload your documents", show: true, fields: [
+      req("National ID Card"), req("Selfie with NID"), opt("Family book"),
+    ] },
   ] },
-  { name: "Documents (optional)", show: true, fields: [
-    opt("Supported document upload"), opt("Referral code"),
+  { name: "Step 2 — Loan request", show: true, fields: [
+    req("Requested amount (within product range)"), req("Currency"),
+    req("Loan term"), opt("Monthly interest (auto)"),
+    req("Repayment method"), opt("Payment estimate / repayment table"),
   ] },
+  { name: "Review your application", show: true, fields: [], sections: [
+    { name: "Customer info", show: true, fields: [
+      opt("Full name"), opt("Phone"), opt("City"),
+      opt("Current occupation"), opt("Marital status"), opt("Select branch"),
+    ] },
+    { name: "Loan request", show: true, fields: [
+      opt("Amount"), opt("Loan term"), opt("Monthly interest"), opt("Repayment method"),
+    ] },
+  ] },
+  { name: "E-Signature", show: true, fields: [ req("Draw signature") ] },
   { name: "Request received", show: true, system: true, fields: [],
     messageLabel: "Confirmation message",
     description:
