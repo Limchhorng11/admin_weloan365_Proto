@@ -65,7 +65,7 @@ const SECTIONS: Section[] = [
   { key: "app",      label: "App Setting",      icon: Smartphone,  group: "main", badge: "Admin", permission: "setting.edit" },
   { key: "users",    label: "User & Role",      icon: Users,       group: "main", permission: "user.view" },
   { key: "menu",     label: "Apply Loan Setting", icon: LayoutGrid,  group: "main", permission: "setting.edit" },
-  { key: "company",  label: "Company Profile",  icon: Building2,   group: "main", permission: "setting.edit" },
+  { key: "company",  label: "Company Profile",  icon: Building2,   group: "main", permission: "setting.view" },
   { key: "branches", label: "Branch Locator",   icon: MapPin,      group: "main", permission: "setting.view" },
   { key: "referral", label: "Referral Program", icon: Gift,        group: "main", badge: "New", permission: "setting.edit" },
   { key: "birthday", label: "Birthday Notification", icon: Cake,   group: "main", permission: "setting.edit" },
@@ -320,11 +320,17 @@ function Field({
   label,
   defaultValue,
   textarea,
+  disabled,
 }: {
   label: string;
   defaultValue: string;
   textarea?: boolean;
+  disabled?: boolean;
 }) {
+  const inputCls = cn(
+    "mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+    disabled && "bg-gray-50 text-gray-500 cursor-not-allowed"
+  );
   return (
     <div>
       <label className="text-xs font-medium text-gray-600">{label}</label>
@@ -332,13 +338,11 @@ function Field({
         <textarea
           rows={2}
           defaultValue={defaultValue}
-          className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          disabled={disabled}
+          className={inputCls}
         />
       ) : (
-        <input
-          defaultValue={defaultValue}
-          className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-        />
+        <input defaultValue={defaultValue} disabled={disabled} className={inputCls} />
       )}
     </div>
   );
@@ -1001,41 +1005,47 @@ function MenuView() {
 }
 
 function CompanyView() {
+  const { can } = useRole();
+  const canEdit = can("setting.edit");
   return (
     <div className="space-y-5">
       <div>
         <H2>Company Profile</H2>
-        <P>Update shared vision, goals and contact info.</P>
+        <P>{canEdit ? "Update shared vision, goals and contact info." : "Shared vision, goals and contact info."}</P>
       </div>
       <Card className="space-y-4">
         <div className="font-medium text-gray-900">Company information</div>
-        <Field label="Company name" defaultValue="NongHyup Finance (Cambodia) Plc." />
+        <Field label="Company name" defaultValue="NongHyup Finance (Cambodia) Plc." disabled={!canEdit} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Founded" defaultValue="2018" />
-          <Field label="License №" defaultValue="NBC-MFI-00123" />
+          <Field label="Founded" defaultValue="2018" disabled={!canEdit} />
+          <Field label="License №" defaultValue="NBC-MFI-00123" disabled={!canEdit} />
         </div>
         <Field
           label="Vision"
           textarea
           defaultValue="To be Cambodia's most trusted microfinance partner, expanding financial access to every household."
+          disabled={!canEdit}
         />
         <Field
           label="Mission"
           textarea
           defaultValue="Deliver responsible, transparent lending that helps customers grow."
+          disabled={!canEdit}
         />
       </Card>
       <Card className="space-y-3">
         <div className="font-medium text-gray-900">Contact & social</div>
-        <Field label="Support phone" defaultValue="+855 23 900 000" />
-        <Field label="Support email" defaultValue="support@loanops.kh" />
-        <Field label="Website" defaultValue="https://loanops.kh" />
+        <Field label="Support phone" defaultValue="+855 23 900 000" disabled={!canEdit} />
+        <Field label="Support email" defaultValue="support@loanops.kh" disabled={!canEdit} />
+        <Field label="Website" defaultValue="https://loanops.kh" disabled={!canEdit} />
       </Card>
-      <div className="flex justify-end">
-        <button className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
-          Save changes
-        </button>
-      </div>
+      {canEdit && (
+        <div className="flex justify-end">
+          <button className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
+            Save changes
+          </button>
+        </div>
+      )}
     </div>
   );
 }

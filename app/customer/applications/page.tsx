@@ -183,7 +183,8 @@ export default function ApplicationsPage() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="overflow-x-auto hidden md:block">
             <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="border-b border-gray-200">
@@ -266,6 +267,71 @@ export default function ApplicationsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Cards (mobile) */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {paginated.map(r => {
+              const decision = r.restructureRequest?.decision ?? "pending";
+              const hasRestructure = r.status === "Approved" && !!r.restructureRequest;
+              const rsTone =
+                decision === "approved"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                  : decision === "declined"
+                  ? "bg-red-50 border-red-200 text-red-700"
+                  : "bg-brand-50 border-brand-200 text-brand-700";
+              const rsLabel =
+                decision === "approved"
+                  ? "Re-structure accepted"
+                  : decision === "declined"
+                  ? "Re-structure failed"
+                  : "Re-structure request";
+              return (
+                <div key={r.id} className="px-4 py-3.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900">{r.name}</div>
+                      <div className="text-[11px] font-mono text-gray-400 mt-0.5">{r.id}</div>
+                    </div>
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                    <div className="col-span-2">
+                      <div className="text-gray-400">Product</div>
+                      <div className="text-gray-700">{r.product}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-400">Amount</div>
+                      <div className="text-gray-700">{r.range}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-400">Applied</div>
+                      <div className="text-gray-700">{r.sent}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <div className="text-gray-400">Branch</div>
+                      <div className="text-gray-700">{r.branch}</div>
+                    </div>
+                  </div>
+                  {hasRestructure && (
+                    <div className="mt-2">
+                      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border", rsTone)}>
+                        {rsLabel}
+                      </span>
+                    </div>
+                  )}
+                  <div className="mt-3 text-right">
+                    <Link
+                      href={`/customer/applications/${r.id}`}
+                      className="text-xs text-brand-600 hover:underline font-medium"
+                    >
+                      Detail
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         )}
 
         {filtered.length > 0 && (

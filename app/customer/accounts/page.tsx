@@ -300,8 +300,8 @@ export default function CustomersPage() {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
+        {/* Table (md and up) */}
+        <div className="overflow-x-auto hidden md:block">
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-200">
@@ -426,6 +426,65 @@ export default function CustomersPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Cards (mobile) */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {paginated.length === 0 ? (
+            <div className="px-4 py-16 text-center text-sm text-gray-500">
+              No customers match your filters.
+            </div>
+          ) : (
+            paginated.map(c => {
+              const suspended = c.accountStatus === "suspended";
+              return (
+                <div key={c.id} className={cn("px-4 py-3.5", suspended && "bg-gray-50/40 opacity-70")}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className={cn("text-sm font-medium", suspended ? "text-gray-500 line-through" : "text-gray-900")}>
+                        {c.name}
+                      </div>
+                      <div className="text-[11px] font-mono text-gray-400 mt-0.5">{c.id}</div>
+                    </div>
+                    <StatusBadge status={suspended ? "Inactive" : "Active"} />
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                    <div>
+                      <div className="text-gray-400">Phone</div>
+                      <div className="text-gray-700">{c.phone}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-400">Loans</div>
+                      <div className="text-gray-700">{c.loans}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <div className="text-gray-400">Branch</div>
+                      <div className="text-gray-700">{suspended ? "—" : c.branch}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    {suspended ? (
+                      <span className="text-xs text-gray-300">No actions</span>
+                    ) : (
+                      <button
+                        onClick={() => setPinCustomer(c.name)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50"
+                      >
+                        <KeyRound className="w-3.5 h-3.5 text-gray-500" />
+                        Change pin
+                      </button>
+                    )}
+                    <Link
+                      href={`/customer/accounts/${c.id}`}
+                      className="text-xs text-brand-600 hover:underline font-medium"
+                    >
+                      Detail
+                    </Link>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Pagination */}

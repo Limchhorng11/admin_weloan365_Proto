@@ -106,7 +106,7 @@ export default function ChatPage() {
             <div className="min-w-0">
               {activeCustomer ? (
                 <Link
-                  href={`/customer/accounts/${activeCustomer.id}`}
+                  href={`/customer/accounts/${activeCustomer.id}?from=chat`}
                   className="font-semibold text-gray-900 truncate block hover:text-brand-700 hover:underline"
                   title="View customer profile"
                 >
@@ -120,7 +120,7 @@ export default function ChatPage() {
           </div>
           {activeCustomer && (
             <Link
-              href={`/customer/accounts/${activeCustomer.id}`}
+              href={`/customer/accounts/${activeCustomer.id}?from=chat`}
               className="p-2 rounded-md hover:bg-gray-100 text-gray-600"
               title="View customer profile"
             >

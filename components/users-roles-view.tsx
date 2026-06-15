@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/lib/role-context";
@@ -602,6 +603,7 @@ function RolesTab() {
   const [roles, setRoles] = useState<ManagedRole[]>(initialRoles);
   const [selected, setSelected] = useState<ManagedRole | null>(initialRoles[0] ?? null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<ManagedRole | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ManagedRole | null>(null);
   const totalPerms = PERMISSIONS.length;
@@ -629,6 +631,12 @@ function RolesTab() {
     setRoles(prev => [...prev, r]);
     setSelected(r);
     setCreating(false);
+  };
+
+  const updateRole = (r: ManagedRole) => {
+    setRoles(prev => prev.map(x => (x.key === r.key ? r : x)));
+    setSelected(r);
+    setEditing(null);
   };
 
   return (
@@ -682,6 +690,8 @@ function RolesTab() {
               role={r}
               expanded={selected?.key === r.key}
               onToggle={() => setSelected(selected?.key === r.key ? null : r)}
+              canEdit={canManage}
+              onEdit={() => setEditing(r)}
               canDelete={canDelete}
               onDelete={() => setConfirmDelete(r)}
               totalPerms={totalPerms}
@@ -691,11 +701,15 @@ function RolesTab() {
         </div>
       )}
 
-      {creating && (
+      {(creating || editing) && (
         <CreateRoleModal
           existingKeys={roles.map(r => r.key)}
-          onCancel={() => setCreating(false)}
-          onSave={addRole}
+          editRole={editing ?? undefined}
+          onCancel={() => {
+            setCreating(false);
+            setEditing(null);
+          }}
+          onSave={editing ? updateRole : addRole}
         />
       )}
 
@@ -726,6 +740,8 @@ function RoleCard({
   role,
   expanded,
   onToggle,
+  canEdit,
+  onEdit,
   canDelete,
   onDelete,
   totalPerms,
@@ -734,6 +750,8 @@ function RoleCard({
   role: ManagedRole;
   expanded: boolean;
   onToggle: () => void;
+  canEdit: boolean;
+  onEdit: () => void;
   canDelete: boolean;
   onDelete: () => void;
   totalPerms: number;
@@ -789,6 +807,16 @@ function RoleCard({
           className="flex items-center gap-0.5 flex-shrink-0"
           onClick={e => e.stopPropagation()}
         >
+          {canEdit && (
+            <button
+              onClick={onEdit}
+              className="p-1.5 rounded-md text-gray-400 hover:text-brand-600 hover:bg-brand-50"
+              aria-label={`Edit ${role.name}`}
+              title="Edit role"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
           {canDelete && !role.isSystem && (
             <button
               onClick={onDelete}
@@ -855,19 +883,35 @@ function EmptyRoles({ canCreate, onCreate }: { canCreate: boolean; onCreate: () 
 
 function CreateRoleModal({
   existingKeys,
+  editRole,
   onCancel,
   onSave,
 }: {
   existingKeys: string[];
+  /** When provided, the modal edits this role instead of creating a new one. */
+  editRole?: ManagedRole;
   onCancel: () => void;
   onSave: (role: ManagedRole) => void;
 }) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [stage, setStage] = useState<StageKey>("intake");
-  const [approvalLimitStr, setApprovalLimitStr] = useState("0");
-  const [unlimited, setUnlimited] = useState(false);
-  const [perms, setPerms] = useState<Set<string>>(new Set());
+  const isEdit = !!editRole;
+  const [name, setName] = useState(editRole?.name ?? "");
+  const [description, setDescription] = useState(
+    editRole && editRole.description !== "—" ? editRole.description : ""
+  );
+  const [stage, setStage] = useState<StageKey>(editRole?.stage ?? "intake");
+  const [approvalLimitStr, setApprovalLimitStr] = useState(
+    editRole && editRole.approvalLimit != null ? String(editRole.approvalLimit) : "0"
+  );
+  const [unlimited, setUnlimited] = useState(editRole?.approvalLimit === null);
+  const [perms, setPerms] = useState<Set<string>>(
+    new Set(
+      editRole
+        ? editRole.permissions === "*"
+          ? ALL_PERMISSION_KEYS
+          : editRole.permissions
+        : []
+    )
+  );
   const [error, setError] = useState<string | null>(null);
 
   const grouped = useMemo(() => groupBy(PERMISSIONS, p => p.category), []);
@@ -948,6 +992,24 @@ function CreateRoleModal({
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return setError("Role name is required");
+    if (perms.size === 0) return setError("Select at least one permission for this role");
+    const limit = unlimited ? null : Math.max(0, parseInt(approvalLimitStr || "0", 10));
+    // Keep "*" semantics when every permission is granted (e.g. Admin).
+    const permissions =
+      perms.size === ALL_PERMISSION_KEYS.length ? "*" : Array.from(perms);
+
+    if (isEdit && editRole) {
+      onSave({
+        ...editRole,
+        name: trimmed,
+        description: description.trim() || "—",
+        stage,
+        approvalLimit: limit,
+        permissions,
+      });
+      return;
+    }
+
     let key = slugify(trimmed);
     if (!key) return setError("Role name must contain letters or numbers");
     if (existingKeys.includes(key)) {
@@ -955,19 +1017,16 @@ function CreateRoleModal({
       while (existingKeys.includes(`${key}-${n}`)) n += 1;
       key = `${key}-${n}`;
     }
-    if (perms.size === 0) return setError("Select at least one permission for this role");
-    const limit = unlimited ? null : Math.max(0, parseInt(approvalLimitStr || "0", 10));
-    const role: ManagedRole = {
+    onSave({
       key,
       name: trimmed,
       description: description.trim() || "—",
       stage,
       approvalLimit: limit,
-      permissions: Array.from(perms),
+      permissions,
       userCount: 0,
       isSystem: false,
-    };
-    onSave(role);
+    });
   };
 
   return (
@@ -981,8 +1040,14 @@ function CreateRoleModal({
       >
         <div className="h-14 px-5 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
           <div>
-            <div className="text-sm font-semibold text-gray-900">Create new role</div>
-            <div className="text-[11px] text-gray-500">Define a sub-user level with the permissions you want to grant.</div>
+            <div className="text-sm font-semibold text-gray-900">
+              {isEdit ? `Edit role — ${editRole?.name}` : "Create new role"}
+            </div>
+            <div className="text-[11px] text-gray-500">
+              {isEdit
+                ? "Update this role's details and permissions."
+                : "Define a sub-user level with the permissions you want to grant."}
+            </div>
           </div>
           <button
             onClick={onCancel}
@@ -994,7 +1059,8 @@ function CreateRoleModal({
         </div>
 
         <form onSubmit={submit} className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-5">
-          {/* Templates */}
+          {/* Templates (creating only) */}
+          {!isEdit && (
           <div>
             <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-2">
               <Sparkles className="w-3.5 h-3.5 text-brand-600" />
@@ -1013,6 +1079,7 @@ function CreateRoleModal({
               ))}
             </div>
           </div>
+          )}
 
           {/* Basics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1126,7 +1193,7 @@ function CreateRoleModal({
             onClick={submit}
             className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
           >
-            Create role
+            {isEdit ? "Save changes" : "Create role"}
           </button>
         </div>
       </div>

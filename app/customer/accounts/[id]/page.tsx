@@ -27,18 +27,22 @@ export default function CustomerDetailPage({
 
   const { role, can } = useRole();
   const [pinOpen, setPinOpen] = useState(false);
+  // When opened from the chat customer-info link (…?from=chat), this is a
+  // support context — hide the loan applications section.
+  const [fromChat, setFromChat] = useState(false);
 
   // Feedback replies — read from the shared store so the customer detail page
   // and the Consult & Feedback inbox stay in sync. Replying happens on the inbox.
   const responses = useFeedbackResponses();
 
-  // Open the Change PIN modal automatically when navigated here from the
-  // customer list's "Change pin" action (…?action=change-pin).
+  // Read URL params on mount: auto-open Change PIN (…?action=change-pin) and
+  // detect the chat support context (…?from=chat).
   useEffect(() => {
-    const action = new URLSearchParams(window.location.search).get("action");
-    if (action === "change-pin" && can("customer.pin_reset")) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("action") === "change-pin" && can("customer.pin_reset")) {
       setPinOpen(true);
     }
+    setFromChat(params.get("from") === "chat");
   }, [can]);
 
   // Block the entire page if the role can't even view customers.
@@ -226,7 +230,7 @@ export default function CustomerDetailPage({
       </div>
 
       {/* Customer's applications — gated by loan.view */}
-      {can("loan.view") && (
+      {can("loan.view") && !fromChat && (
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Loan applications</h2>

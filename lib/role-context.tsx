@@ -1,7 +1,18 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ROLES, USERS, type Role } from "./data";
+
+const ROLE_STORAGE_KEY = "weloan_role";
+
+/** Persist the role chosen on the sign-in screen (prototype auth). */
+export function setActiveRole(key: string) {
+  try {
+    localStorage.setItem(ROLE_STORAGE_KEY, key);
+  } catch {
+    /* ignore (SSR / storage disabled) */
+  }
+}
 
 type RoleContextValue = {
   role: Role;
@@ -15,7 +26,7 @@ type RoleContextValue = {
 const RoleContext = createContext<RoleContextValue | null>(null);
 
 /** Pick a representative staff member to show as the "logged-in user" for each role. */
-const ROLE_TO_USER: Record<string, string> = {
+export const ROLE_TO_USER: Record<string, string> = {
   admin:            "Kosal M.",
   senior_officer:   "Sophea K.",
   credit_officer:   "Laybun N.",
@@ -23,8 +34,19 @@ const ROLE_TO_USER: Record<string, string> = {
 };
 
 export function RoleProvider({ children }: { children: ReactNode }) {
+  // The active role is chosen on the sign-in screen and stored locally.
+  const [roleKey, setRoleKey] = useState<string>("admin");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(ROLE_STORAGE_KEY);
+      if (saved && ROLES.some(r => r.key === saved)) setRoleKey(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const value = useMemo<RoleContextValue>(() => {
-    const role = ROLES.find(r => r.key === "admin") ?? ROLES[0];
+    const role = ROLES.find(r => r.key === roleKey) ?? ROLES[0];
     const userName = ROLE_TO_USER[role.key];
     const user = USERS.find(u => u.name === userName) ?? USERS[0];
 
@@ -39,7 +61,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     };
 
     return { role, user, can, canApprove };
-  }, []);
+  }, [roleKey]);
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 }

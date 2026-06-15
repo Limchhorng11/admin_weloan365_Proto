@@ -211,8 +211,8 @@ export default function ConsultationsPage() {
           />
         </div>
 
-        {/* Unified table */}
-        <div className="overflow-x-auto">
+        {/* Unified table (md and up) */}
+        <div className="overflow-x-auto hidden md:block">
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-200">
@@ -255,6 +255,66 @@ export default function ConsultationsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Cards (mobile) */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {paginated.length === 0 ? (
+            <div className="px-4 py-16 text-center text-sm text-gray-500">
+              No messages in this view.
+            </div>
+          ) : (
+            paginated.map(item => {
+              const isConsult = item.kind === "consultation";
+              const status = isConsult
+                ? item.data.status === "open"
+                  ? "Open"
+                  : item.data.status === "closed"
+                  ? "Closed"
+                  : "Pending"
+                : responses[item.id]
+                ? "Replied"
+                : "No reply";
+              const subject = isConsult ? item.data.topic : "Feedback";
+              const preview = isConsult ? clip(item.data.note ?? "", 90) : clip(item.data.text, 90);
+              const date = isConsult ? item.data.requested : item.data.date;
+              const highlighted = !isConsult && item.id === highlightId;
+              return (
+                <div
+                  key={`${item.kind}-${item.id}`}
+                  className={cn("px-4 py-3.5", highlighted && "animate-row-highlight")}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <TypeChip kind={item.kind} />
+                    <span className="text-[11px] text-gray-400 whitespace-nowrap">{date}</span>
+                  </div>
+                  <div className="mt-1.5 text-sm font-medium text-gray-900">{item.data.customer}</div>
+                  <div className="text-xs text-gray-500">{subject}</div>
+                  {preview && (
+                    <div className="text-xs text-gray-600 mt-1 line-clamp-2">{preview}</div>
+                  )}
+                  <div className="mt-2.5 flex items-center justify-between">
+                    <StatusBadge status={status} />
+                    <button
+                      onClick={() =>
+                        isConsult ? setOpenId(item.id) : setOpenFeedbackId(item.id)
+                      }
+                      className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline font-medium"
+                    >
+                      {isConsult ? (
+                        "Open"
+                      ) : (
+                        <>
+                          <Pencil className="w-3 h-3" />
+                          {responses[item.id] ? "Edit reply" : "Reply"}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Pagination */}
