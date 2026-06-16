@@ -3,7 +3,14 @@
 import { useSyncExternalStore } from "react";
 import { FEEDBACK } from "./data";
 
-export type FeedbackResponse = { message: string; sentAt: string };
+export type FeedbackResponse = {
+  message: string;
+  sentAt: string;
+  /** Officer who made the most recent reply/edit. */
+  by?: string;
+  /** Once an officer edits a reply, it's finalised and can only be reviewed. */
+  locked?: boolean;
+};
 
 /**
  * Shared, in-memory store for officer replies to customer feedback.
@@ -17,14 +24,23 @@ export type FeedbackResponse = { message: string; sentAt: string };
  * but resets on a full page reload.
  */
 let store: Record<string, FeedbackResponse> = Object.fromEntries(
-  FEEDBACK.filter(f => f.response).map(f => [f.id, { message: f.response!, sentAt: f.date }])
+  FEEDBACK.filter(f => f.response).map(f => [
+    f.id,
+    { message: f.response!, sentAt: f.date, by: "Support team" },
+  ])
 );
 
 const listeners = new Set<() => void>();
 
-export function setFeedbackResponse(id: string, message: string, sentAt: string) {
+export function setFeedbackResponse(
+  id: string,
+  message: string,
+  sentAt: string,
+  locked = false,
+  by?: string
+) {
   // Replace the object reference so useSyncExternalStore detects the change.
-  store = { ...store, [id]: { message, sentAt } };
+  store = { ...store, [id]: { message, sentAt, locked, by } };
   listeners.forEach(l => l());
 }
 

@@ -31,7 +31,7 @@ export type Application = {
 };
 
 export const APPLICATIONS: Application[] = [
-  { id: "APP-10293", cid: "C-0421", name: "Sokha Chan",  product: "Micro Loan (ML)",  amount: 2500,  term: 12, rate: 14.5, score: 712, branch: "Phnom Penh — Central",  range: "$2,500",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
+  { id: "APP-10293", cid: "C-0421", name: "Sokha Chan",  product: "Micro Loan (ML)",  amount: 2500,  term: 12, rate: 14.5, score: 712, branch: "Phnom Penh — Central",  range: "$2,500",  sent: "Apr 21, 2026", officer: "Visal P.",  status: "Progress" },
   {
     id: "APP-10231", cid: "C-0421", name: "Sokha Chan",  product: "Micro Loan (ML)",  amount: 1500,  term: 6,  rate: 13.5, score: 712, branch: "Phnom Penh — Central",  range: "$1,500",  sent: "Nov 4, 2025",  officer: "Sophea K.",  status: "Approved",
     restructureRequest: {
@@ -41,7 +41,7 @@ export const APPLICATIONS: Application[] = [
       phone: "+855 12 345 678",
     },
   },
-  { id: "APP-10294", cid: "C-0422", name: "Dara Meas",   product: "Small Business Loan (SBL)", amount: 8000,  term: 18, rate: 16.0, score: 684, branch: "Siem Reap",             range: "$8,000",  sent: "Apr 21, 2026", officer: "Laybun N.",  status: "Progress" },
+  { id: "APP-10294", cid: "C-0422", name: "Dara Meas",   product: "Small Business Loan (SBL)", amount: 8000,  term: 18, rate: 16.0, score: 684, branch: "Siem Reap",             range: "$8,000",  sent: "Apr 21, 2026", officer: "Visal P.",  status: "Progress" },
   {
     id: "APP-10295", cid: "C-0424", name: "Pisey Ros",   product: "Small & Medium Enterprise (SME)", amount: 15000, term: 36, rate: 11.5, score: 758, branch: "Battambang",            range: "$15,000", sent: "Apr 20, 2026", officer: "Sophea K.",  status: "Approved",
     restructureRequest: {
@@ -63,7 +63,7 @@ export const APPLICATIONS: Application[] = [
       decision: "declined",
     },
   },
-  { id: "APP-10299", cid: "C-0425", name: "Narith Kim",  product: "Micro Loan (ML)",  amount: 4000,  term: 12, rate: 15.0, score: 640, branch: "Phnom Penh — Central",  range: "$4,000",  sent: "Apr 16, 2026", officer: "Laybun N.",  status: "Rejected" },
+  { id: "APP-10299", cid: "C-0425", name: "Narith Kim",  product: "Micro Loan (ML)",  amount: 4000,  term: 12, rate: 15.0, score: 640, branch: "Phnom Penh — Central",  range: "$4,000",  sent: "Apr 16, 2026", officer: "Visal P.",  status: "Rejected" },
 ];
 
 export const CHART_DATA: { label: string; value: number; highlight?: boolean }[] = [
@@ -583,8 +583,8 @@ export const CONSULTATIONS = [
     customer: "Dara Meas",
     topic: "SME expansion financing",
     requested: "2026-04-20 14:03",
-    status: "open",
-    officer: "Laybun N.",
+    status: "waiting",
+    officer: "Visal P.",
     preferredBranch: "Siem Reap",
     preferredDate: "May 27, 2026",
     preferredTime: "10:30",
@@ -607,8 +607,8 @@ export const CONSULTATIONS = [
     customer: "Chenda Oum",
     topic: "First-time borrower",
     requested: "2026-04-18 16:20",
-    status: "pending",
-    officer: "Laybun N.",
+    status: "closed",
+    officer: "Visal P.",
     preferredBranch: "Phnom Penh — Central",
     preferredDate: "Apr 28, 2026",
     preferredTime: "14:30",
@@ -729,7 +729,7 @@ export const POSTS: Post[] = [
     body:
       "APR (Annual Percentage Rate) is the **true cost** of a loan, expressed as a yearly rate.\n\nFlat rate looks simpler but can be deceiving — the actual cost is usually higher than the headline number.\n\n## Quick comparison\n- *Flat 10% × 1 year* ≈ APR of ~18%\n- Always compare loans using APR\n\nAsk your loan officer to walk through both numbers before you sign.",
     thumbnail: "",
-    author: "Laybun N.",
+    author: "Visal P.",
     status: "Published",
     date: "2026-04-08",
     views: 890,
@@ -835,7 +835,7 @@ export type StaffUser = {
 };
 
 export const USERS: StaffUser[] = [
-  { id: "U-01", name: "Laybun N.",    email: "laybunnavitou@nonghyup.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago",  code: "10247", referralStats: { referrals: 28, applications: 19, disbursed: 11 } },
+  { id: "U-01", name: "Visal P.",    email: "visal.p@nonghyup.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago",  code: "10247", referralStats: { referrals: 28, applications: 19, disbursed: 11 } },
   { id: "U-02", name: "Sophea K.",    email: "sophea.k@nonghyup.com.kh",      role: "Senior Officer",        branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago",   code: "10248", referralStats: { referrals: 41, applications: 32, disbursed: 21 } },
   { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@nonghyup.com.kh",     role: "Senior Officer",        branch: "Battambang",  status: "Active",   lastActive: "Today",      code: "10312", referralStats: { referrals: 14, applications:  9, disbursed:  5 } },
   { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@nonghyup.com.kh",   role: "Customer Service",      branch: "HQ",          status: "Active",   lastActive: "Today",      code: "10402", referralStats: { referrals:  9, applications:  4, disbursed:  2 } },
@@ -997,7 +997,7 @@ export const ROLES: Role[] = [
       "report.view", "report.export",
       "customer.view",
       "consultation.view", "consultation.assign", "consultation.reply", "consultation.close",
-      "feedback.view", "feedback.reply",
+      "feedback.view",
       "loan.view", "loan.review", "loan.approve", "loan.reject",
       "loan.reassign", "loan.restructure",
       "payment.view", "payment.record",
@@ -1123,7 +1123,7 @@ export const PROMOTIONS: Promotion[] = [
     image: "",
     status: "Active",
     date: "2026-03-22",
-    author: "Laybun N.",
+    author: "Visal P.",
   },
   {
     id: "PM-003",

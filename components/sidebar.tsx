@@ -14,6 +14,7 @@ import {
   PanelLeft,
   ChevronDown,
   MessageSquareText,
+  Star,
   UserCircle2,
   type LucideIcon,
 } from "lucide-react";
@@ -50,10 +51,9 @@ const NAV: { section: string; items: NavItem[] }[] = [
         permission: "customer.view",
         children: [
           { label: "All Accounts", href: "/customer/accounts", icon: UserCircle2, permission: "customer.view" },
-          // Consultations + Feedback & Rate are merged behind a single
-          // "Messages" entry. Inside the page, in-page tabs switch between
-          // the two views; the sidebar shows just one item.
-          { label: "Consult & Feedback", href: "/customer/consultations", icon: MessageSquareText, permission: "consultation.view" },
+          // Consultations and Feedback are separate sections, each with its own table.
+          { label: "Consultation", href: "/customer/consultations", icon: MessageSquareText, permission: "consultation.view" },
+          { label: "Feedback", href: "/customer/feedback", icon: Star, permission: "feedback.view" },
         ],
       },
       { label: "Loan Application", href: "/customer/applications", icon: FileText, permission: "loan.view" },

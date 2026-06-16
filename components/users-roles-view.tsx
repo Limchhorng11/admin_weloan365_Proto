@@ -349,6 +349,12 @@ function UserModal({
 
   const branches = Array.from(new Set(["Phnom Penh", "Siem Reap", "Battambang", "HQ", "Kampong Cham", ...USERS.map(u => u.branch)]));
 
+  // When editing an existing user, only Role, Branch and Status are editable.
+  // Identity fields (name, email, password, code) are shown read-only.
+  const lockedInput = editMode
+    ? "bg-gray-50 text-gray-500 cursor-not-allowed"
+    : "bg-white";
+
   return (
     <div
       className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
@@ -377,11 +383,15 @@ function UserModal({
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600">Full name *</label>
               <input
-                autoFocus
+                autoFocus={!editMode}
                 value={name}
                 onChange={e => setName(e.target.value)}
+                disabled={editMode}
                 placeholder="e.g. Sokha Chan"
-                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                className={cn(
+                  "mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+                  lockedInput
+                )}
               />
             </div>
             <div className="col-span-2">
@@ -390,36 +400,43 @@ function UserModal({
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
+                disabled={editMode}
                 placeholder="name@nonghyup.com.kh"
-                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                className={cn(
+                  "mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+                  lockedInput
+                )}
               />
             </div>
 
-            {/* Password — required on create, optional on edit (means "set new"). */}
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600">
-                Password {editMode ? "" : "*"}
-              </label>
-              <div className="mt-1 relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder={editMode ? "Leave blank to keep current password" : "At least 6 characters"}
-                  autoComplete="new-password"
-                  className="w-full pl-3 pr-9 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            {/* Password — only set on create. On edit, the password is managed
+                separately and is not editable from this form. */}
+            {!editMode && (
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-600">
+                  Password *
+                </label>
+                <div className="mt-1 relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="At least 6 characters"
+                    autoComplete="new-password"
+                    className="w-full pl-3 pr-9 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* User code — exactly 5 characters, width is sized to fit just 5. */}
             <div className="col-span-2">
@@ -435,12 +452,16 @@ function UserModal({
                         .slice(0, 5)
                     )
                   }
+                  disabled={editMode}
                   placeholder="ABC12"
                   inputMode="text"
                   maxLength={5}
                   // Width sized to fit exactly 5 mono characters + padding.
                   // text-center to keep partial codes visually centered in the slot.
-                  className="w-[7.5rem] px-3 py-2 border border-gray-200 rounded-md text-sm font-mono tracking-[0.4em] text-center uppercase focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  className={cn(
+                    "w-[7.5rem] px-3 py-2 border border-gray-200 rounded-md text-sm font-mono tracking-[0.4em] text-center uppercase focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+                    lockedInput
+                  )}
                 />
                 <span className="text-[11px] text-gray-400">
                   {code.length} / 5 · letters & digits

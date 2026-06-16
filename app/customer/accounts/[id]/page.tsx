@@ -3,14 +3,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  Phone,
-  Building2,
-  MapPin,
-  Calendar,
-  Lock,
-} from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { CUSTOMERS, APPLICATIONS, CONSULTATIONS, FEEDBACK } from "@/lib/data";
 import { StatusBadge } from "@/components/status-badge";
 import { ChangePinModal } from "@/components/change-pin-modal";
@@ -102,45 +95,13 @@ export default function CustomerDetailPage({
             Personal information
           </div>
           <dl className="divide-y divide-gray-100">
-            <Row label="Customer ID" value={<span className="font-mono text-xs">{c.id}</span>} />
+            {/* Exactly the fields submitted on the customer's loan-application form */}
             <Row label="Full name" value={c.name} />
-            <Row
-              label="Phone"
-              value={
-                <span className="inline-flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-gray-400" />
-                  {c.phone}
-                </span>
-              }
-            />
-            <Row
-              label="Branch"
-              value={
-                <span className="inline-flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-gray-400" />
-                  {c.branch}
-                </span>
-              }
-            />
-            <Row
-              label="Address"
-              value={
-                <span className="inline-flex items-start gap-1.5 text-right">
-                  <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
-                  {c.address}
-                </span>
-              }
-            />
-            <Row
-              label="Joined"
-              value={
-                <span className="inline-flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                  {c.joined}
-                </span>
-              }
-            />
-            <Row label="KYC status" value={<StatusBadge status={kycStatus} />} />
+            <Row label="Phone" value={<span className="font-mono text-xs">{c.phone}</span>} />
+            <Row label="City" value={c.profile.address.cityProvince} />
+            <Row label="Current occupation" value={c.occupation} />
+            <Row label="Marital status" value={c.maritalStatus} />
+            <Row label="Select branch" value={c.branch} />
           </dl>
         </div>
 
@@ -213,7 +174,7 @@ export default function CustomerDetailPage({
                       </div>
                     ) : (
                       <Link
-                        href={`/customer/consultations?feedback=${fb.id}`}
+                        href={`/customer/feedback?feedback=${fb.id}`}
                         className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-700 hover:text-amber-800 hover:underline"
                         title="Reply to this feedback in the inbox"
                       >

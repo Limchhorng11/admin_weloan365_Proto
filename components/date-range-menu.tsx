@@ -4,11 +4,35 @@ import { useEffect, useRef, useState } from "react";
 import { Calendar, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const RANGES = ["This Week", "This Month", "This Quarter", "This Year", "All time"];
+export const DATE_RANGES = [
+  "This Week",
+  "This Month",
+  "This Quarter",
+  "This Year",
+  "All time",
+] as const;
 
-export function DateRangeMenu() {
+export type DateRange = (typeof DATE_RANGES)[number];
+
+/**
+ * Date-range selector. Can be used uncontrolled (manages its own value) or
+ * controlled by passing `value` + `onChange` so a parent (e.g. the dashboard)
+ * can react to the selection.
+ */
+export function DateRangeMenu({
+  value: valueProp,
+  onChange,
+}: {
+  value?: DateRange;
+  onChange?: (value: DateRange) => void;
+} = {}) {
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("This Month");
+  const [internal, setInternal] = useState<DateRange>("This Month");
+  const value = valueProp ?? internal;
+  const setValue = (v: DateRange) => {
+    if (onChange) onChange(v);
+    else setInternal(v);
+  };
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,7 +71,7 @@ export function DateRangeMenu() {
           role="menu"
           className="absolute right-0 top-full mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-30 overflow-hidden py-1"
         >
-          {RANGES.map(r => {
+          {DATE_RANGES.map(r => {
             const on = r === value;
             return (
               <button

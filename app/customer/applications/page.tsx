@@ -11,6 +11,7 @@ import {
   type ApplicationStatus,
 } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { useRole } from "@/lib/role-context";
 import {
   ChevronLeft,
   ChevronRight,
@@ -24,6 +25,7 @@ import {
   CheckCircle2,
   XCircle,
   RotateCcw,
+  Lock,
 } from "lucide-react";
 
 type StatusFacet = "all" | ApplicationStatus;
@@ -41,6 +43,7 @@ const EMPTY_FILTERS: Filters = {
 const PAGE_SIZE = 8;
 
 export default function ApplicationsPage() {
+  const { role, can } = useRole();
 
   const [list]                = useState<Application[]>(APPLICATIONS);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
@@ -86,6 +89,18 @@ export default function ApplicationsPage() {
     (filters.status !== "all" ? 1 : 0) +
     (filters.branches.length  ? 1 : 0);
 
+  // Roles without loan.view (e.g. Customer Service) cannot access this section.
+  if (!can("loan.view")) {
+    return (
+      <div className="max-w-2xl mx-auto mt-12 bg-white rounded-xl border border-gray-200 p-10 text-center shadow-card">
+        <Lock className="w-8 h-8 text-gray-400 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-gray-900">No access</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          The <span className="font-medium">{role.name}</span> role cannot view loan applications.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-[1400px]">

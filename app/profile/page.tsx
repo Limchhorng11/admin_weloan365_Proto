@@ -1,17 +1,58 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { useRole } from "@/lib/role-context";
 import { PERMISSIONS } from "@/lib/data";
-import { Mail, Building2, ShieldCheck, CircleDollarSign, Crown } from "lucide-react";
+import { Mail, Building2, ShieldCheck, Crown, Camera, X } from "lucide-react";
+
+const AVATAR_STORAGE_KEY = "admin-profile-avatar";
 
 export default function ProfilePage() {
   const { user, role } = useRole();
   const initials = user.name.split(" ").map(s => s[0]).join("");
 
-  const fmtLimit = (n: number | null) =>
-    n === null ? "Unlimited" : n === 0 ? "Cannot approve" : "$" + n.toLocaleString();
+  // Profile photo — uploaded by the user and persisted locally (prototype:
+  // no backend, so we keep the data URL in localStorage).
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(AVATAR_STORAGE_KEY);
+      if (saved) setAvatar(saved);
+    } catch {
+      /* ignore unavailable storage */
+    }
+  }, []);
+
+  const onPickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = reader.result as string;
+      setAvatar(url);
+      try {
+        localStorage.setItem(AVATAR_STORAGE_KEY, url);
+      } catch {
+        /* ignore */
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = ""; // allow re-selecting the same file
+  };
+
+  const onRemovePhoto = () => {
+    setAvatar(null);
+    try {
+      localStorage.removeItem(AVATAR_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const grantedCount =
     role.permissions === "*" ? PERMISSIONS.length : role.permissions.length;
 
@@ -22,12 +63,65 @@ export default function ProfilePage() {
       {/* Header card */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-brand-600 text-white flex items-center justify-center text-base font-semibold">
-            {initials}
+          <div className="relative flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              title={avatar ? "Change profile photo" : "Upload a profile photo"}
+              aria-label={avatar ? "Change profile photo" : "Upload a profile photo"}
+              className="group relative block w-16 h-16 rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+            >
+              {avatar ? (
+                <img src={avatar} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full bg-brand-600 text-white flex items-center justify-center text-lg font-semibold">
+                  {initials}
+                </span>
+              )}
+              {/* Hover hint over the whole avatar */}
+              <span className="absolute inset-0 hidden group-hover:flex flex-col items-center justify-center bg-black/50 text-white">
+                <Camera className="w-4 h-4" />
+              </span>
+            </button>
+            {/* Persistent camera badge so it's always clear the photo is editable */}
+            <span
+              className="pointer-events-none absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-brand-600 text-white border-2 border-white flex items-center justify-center shadow-sm"
+              aria-hidden="true"
+            >
+              <Camera className="w-3 h-3" />
+            </span>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onPickPhoto}
+            />
           </div>
           <div className="min-w-0">
             <div className="text-xl font-semibold text-gray-900">{user.name}</div>
             <div className="text-sm text-gray-500">{user.email}</div>
+            {/* Explicit, labelled action so the upload affordance is obvious */}
+            <div className="mt-1.5 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                {avatar ? "Change photo" : "Upload a profile picture"}
+              </button>
+              {avatar && (
+                <button
+                  type="button"
+                  onClick={onRemovePhoto}
+                  className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-red-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Remove
+                </button>
+              )}
+            </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-xs font-medium">
@@ -79,15 +173,6 @@ export default function ProfilePage() {
           <dl className="divide-y divide-gray-100">
             <Row label="Role" value={role.name} />
             <Row label="Description" value={<span className="text-right">{role.description}</span>} />
-            <Row
-              label="Approval limit"
-              value={
-                <span className="inline-flex items-center gap-1.5">
-                  <CircleDollarSign className="w-3.5 h-3.5 text-gray-400" />
-                  {fmtLimit(role.approvalLimit)}
-                </span>
-              }
-            />
             <Row label="Permissions" value={`${grantedCount} / ${PERMISSIONS.length} granted`} />
           </dl>
         </div>

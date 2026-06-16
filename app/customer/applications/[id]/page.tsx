@@ -310,7 +310,7 @@ function getStages(status: ApplicationStatus): StageInfo[] {
     description: "CO submits the application on behalf of the customer.",
     icon: ClipboardCheck,
     state: "done",
-    who: "Laybun N.",
+    who: "Visal P.",
     when: "Apr 20",
   };
   // Stage 2 — Document Review (KYC + uploaded docs)
@@ -343,12 +343,12 @@ function getStages(status: ApplicationStatus): StageInfo[] {
 
   if (status === "Progress") {
     REVIEW.state = "done";
-    REVIEW.who = "Laybun N.";
+    REVIEW.who = "Visal P.";
     REVIEW.when = "Apr 20";
     CREDIT_CHECK.state = "active";
   } else if (status === "Approved") {
     REVIEW.state = "done";
-    REVIEW.who = "Laybun N.";
+    REVIEW.who = "Visal P.";
     REVIEW.when = "Apr 20";
     CREDIT_CHECK.state = "done";
     CREDIT_CHECK.who = "System / Sophea K.";
@@ -360,7 +360,7 @@ function getStages(status: ApplicationStatus): StageInfo[] {
     // Rejected at Document Review — surface that stage in red and leave
     // the downstream stages as "pending" (they never happened).
     REVIEW.state = "failed";
-    REVIEW.who = "Laybun N.";
+    REVIEW.who = "Visal P.";
     REVIEW.when = "Apr 20";
     // CREDIT_CHECK and APPROVAL stay in their default "pending" state.
   }
@@ -709,19 +709,16 @@ function KycTab({ a }: { a: Application }) {
 function GuarantorTab({ a }: { a: Application }) {
   // Mock guarantor — would come from the application record in production.
   const guarantor = {
-    name: "Sophea Meas",
-    phone: "+855 12 998 221",
-    nationalId: "200405 ••• 6712",
-    dateOfBirth: "1990-02-14",
-    address: "Phnom Penh, Cambodia",
-    score: 736,
+    name: "Krong Kampuchea",
+    phone: "+855 012 482 991",
+    relationship: "Spouse",
   };
 
   const initials = guarantor.name.split(" ").map(s => s[0]).join("");
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-      {/* Left: Guarantor personal info */}
+    <div>
+      {/* Guarantor personal info */}
       <div>
         <SectionLabel>Guarantor — personal info</SectionLabel>
         <div className="border border-gray-200 rounded-lg p-4 mb-4 flex items-center gap-3">
@@ -737,44 +734,9 @@ function GuarantorTab({ a }: { a: Application }) {
           </div>
         </div>
         <dl className="divide-y divide-gray-100">
-          <Row label="National ID" value={<span className="font-mono text-xs">{guarantor.nationalId}</span>} />
-          <Row label="Date of birth" value={guarantor.dateOfBirth} />
-          <Row label="Address" value={guarantor.address} />
+          <Row label="Relationship" value={guarantor.relationship} />
           <Row label="Guarantee for" value={<span className="font-medium text-gray-700">{a.name}</span>} />
         </dl>
-      </div>
-
-      {/* Right: Guarantor CBC report */}
-      <div>
-        <SectionLabel>Guarantor — Credit Bureau (CBC) report</SectionLabel>
-        <div className="space-y-4 text-sm">
-          <div>
-            <div className="flex justify-between mb-1.5">
-              <span className="text-gray-500">Credit score</span>
-              <span className="font-medium text-gray-900">{guarantor.score} / 850</span>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className={cn(
-                  "h-full",
-                  guarantor.score >= 720
-                    ? "bg-emerald-500"
-                    : guarantor.score >= 680
-                    ? "bg-amber-500"
-                    : "bg-red-500"
-                )}
-                style={{ width: `${(guarantor.score / 850) * 100}%` }}
-              />
-            </div>
-            <div className="text-[11px] text-gray-500 mt-1.5">
-              {guarantor.score >= 720
-                ? "Excellent — strong support for the application."
-                : guarantor.score >= 680
-                ? "Fair — review CBC details before final decision."
-                : "Below threshold — guarantor may not strengthen the file."}
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -1145,7 +1107,7 @@ function PostReminderModal({
 
 function AuditTab({ a }: { a: Application }) {
   const log = [
-    { at: "2026-04-21 09:42", who: "Laybun N.", action: "Viewed application" },
+    { at: "2026-04-21 09:42", who: "Visal P.", action: "Viewed application" },
     { at: "2026-04-20 16:10", who: "System",    action: `CBC report retrieved (score ${a.score})` },
     { at: "2026-04-20 15:55", who: "Sophea K.", action: "Moved status: Submitted → Under Review" },
     { at: "2026-04-20 15:48", who: "System",    action: "KYC verified via national ID match" },
@@ -1494,7 +1456,7 @@ function OfficerTab({ a }: { a: Application }) {
         <SectionLabel>Approval chain</SectionLabel>
         <ul className="space-y-3">
           {[
-            ["Loan Officer",    "Laybun N.",  "approved", "Apr 20"],
+            ["Loan Officer",    "Visal P.",  "approved", "Apr 20"],
             ["Senior Officer",  "Sophea K.",  "pending",  "—"],
             ["Branch Manager",  "Ratanak L.", "—",        "—"],
           ].map(([r, n, s, d]) => (

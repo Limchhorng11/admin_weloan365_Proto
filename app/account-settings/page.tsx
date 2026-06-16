@@ -10,7 +10,6 @@ export default function AccountSettingsPage() {
   const { user } = useRole();
   const [name, setName] = useState(user.name);
   const [lang, setLang] = useState("English");
-  const [twoFA, setTwoFA] = useState(false);
   const [emailNotif, setEmailNotif] = useState(true);
   const [pushNotif, setPushNotif] = useState(true);
 
@@ -33,37 +32,34 @@ export default function AccountSettingsPage() {
         />
       </Card>
 
-      {/* Security */}
-      <Card title="Security">
-        <ToggleRow
-          label="Two-factor authentication"
-          desc="Require a one-time code when signing in."
-          checked={twoFA}
-          onChange={() => setTwoFA(v => !v)}
-        />
-        <div className="pt-3">
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700">
-            <KeyRound className="w-4 h-4 text-gray-500" />
-            Change password
-          </button>
-        </div>
-      </Card>
+      {/* Block 2 — Notifications + Security in one block */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6 space-y-6">
+        {/* Section 1 — Notifications */}
+        <Section title="Notifications">
+          <ToggleRow
+            label="Email notifications"
+            desc="Updates about applications and approvals."
+            checked={emailNotif}
+            onChange={() => setEmailNotif(v => !v)}
+          />
+          <ToggleRow
+            label="Push notifications"
+            desc="Real-time alerts inside the app."
+            checked={pushNotif}
+            onChange={() => setPushNotif(v => !v)}
+          />
+        </Section>
 
-      {/* Notifications */}
-      <Card title="Notifications">
-        <ToggleRow
-          label="Email notifications"
-          desc="Updates about applications and approvals."
-          checked={emailNotif}
-          onChange={() => setEmailNotif(v => !v)}
-        />
-        <ToggleRow
-          label="Push notifications"
-          desc="Real-time alerts inside the app."
-          checked={pushNotif}
-          onChange={() => setPushNotif(v => !v)}
-        />
-      </Card>
+        {/* Section 2 — Security */}
+        <Section title="Security" divider>
+          <div>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700">
+              <KeyRound className="w-4 h-4 text-gray-500" />
+              Change password
+            </button>
+          </div>
+        </Section>
+      </div>
 
       <div className="flex justify-end">
         <button className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium">
@@ -77,6 +73,27 @@ export default function AccountSettingsPage() {
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
+      <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
+        {title}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </div>
+  );
+}
+
+/** A labelled section inside a block. `divider` adds a top separator so two
+ *  sections can share one card. */
+function Section({
+  title,
+  children,
+  divider,
+}: {
+  title: string;
+  children: React.ReactNode;
+  divider?: boolean;
+}) {
+  return (
+    <div className={divider ? "pt-6 border-t border-gray-100" : undefined}>
       <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
         {title}
       </div>

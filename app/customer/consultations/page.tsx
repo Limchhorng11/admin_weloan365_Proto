@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
-import { FeedbackResponseModal } from "@/components/feedback-response-modal";
-import { CONSULTATIONS, CUSTOMERS, USERS, FEEDBACK } from "@/lib/data";
+import { CONSULTATIONS, CUSTOMERS, USERS } from "@/lib/data";
 import { useRole } from "@/lib/role-context";
-import { useFeedbackResponses, setFeedbackResponse, nowStamp } from "@/lib/feedback-store";
 import { cn } from "@/lib/utils";
 import {
   X,
@@ -18,13 +16,14 @@ import {
   CheckCircle2,
   Paperclip,
   MessageCircle,
-  MessageSquare,
   Search,
   Check,
   Crown,
   Building2,
   Briefcase,
   Pencil,
+  Bell,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -33,13 +32,6 @@ const PAGE_SIZE = 8;
 
 type Consult = (typeof CONSULTATIONS)[number];
 type Officer = (typeof USERS)[number];
-type Feedback = (typeof FEEDBACK)[number];
-
-type FilterKind = "all" | "consultations" | "feedback";
-
-type Item =
-  | { kind: "consultation"; id: string; ts: number; data: Consult }
-  | { kind: "feedback";     id: string; ts: number; data: Feedback };
 
 /* Parse "2026-04-21 09:12" or "2026-04-21" into a sortable timestamp. */
 function parseTs(s: string): number {
@@ -55,6 +47,62 @@ function clip(s: string, max = 80): string {
   return s.length > max ? `${s.slice(0, max).trimEnd()}…` : s;
 }
 
+/* ----- Consultation scheduling / status flow -----
+   Pending  → customer requested, no officer assigned yet
+   Waiting  → officer assigned + schedule confirmed; waiting for the date
+              (a reminder fires when the appointment is within 24h)
+   Closed   → the scheduled date has passed (auto), or closed manually
+
+   Demo anchor: the mock schedule dates are in 2026, so we treat this fixed
+   day as "today" to show every stage (past = closed, tomorrow = due-soon). */
+const TODAY = new Date(2026, 4, 26); // May 26, 2026
+
+const MONTHS: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+function parseDate(s: string): Date | null {
+  const m = s.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})$/);
+  if (!m) return null;
+  const mo = MONTHS[m[1]];
+  if (mo === undefined) return null;
+  return new Date(Number(m[3]), mo, Number(m[2]));
+}
+
+/** Whole days from TODAY to the date string (negative = in the past). */
+function daysUntil(s: string): number | null {
+  const d = parseDate(s);
+  if (!d) return null;
+  const a = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+  const b = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}
+
+type DisplayStatus = "Pending" | "Waiting" | "Closed";
+
+function displayStatus(c: Consult): DisplayStatus {
+  if (c.status === "closed") return "Closed";
+  if (c.status === "pending" || c.officer === "Unassigned") return "Pending";
+  const du = daysUntil(c.preferredDate);
+  if (du !== null && du < 0) return "Closed"; // auto-close once the date passes
+  return "Waiting";
+}
+
+/** A waiting consultation within 24h fires a reminder to officer + customer. */
+function isDueSoon(c: Consult): boolean {
+  if (displayStatus(c) !== "Waiting") return false;
+  const du = daysUntil(c.preferredDate);
+  return du !== null && du >= 0 && du <= 1;
+}
+
+function dueLabel(c: Consult): string {
+  const du = daysUntil(c.preferredDate);
+  if (du === 0) return "Today";
+  if (du === 1) return "Tomorrow";
+  return c.preferredDate;
+}
+
 export default function ConsultationsPage() {
   const { user } = useRole();
 
@@ -65,94 +113,45 @@ export default function ConsultationsPage() {
   const active = openId ? list.find(c => c.id === openId) ?? null : null;
   const pickerConsult = pickerFor ? list.find(c => c.id === pickerFor) ?? null : null;
 
-  /* ----- Feedback state (shared store — consistent with customer detail) ----- */
-  const responses = useFeedbackResponses();
-  const [openFeedbackId, setOpenFeedbackId] = useState<string | null>(null);
-  const activeFeedback = openFeedbackId ? FEEDBACK.find(f => f.id === openFeedbackId) ?? null : null;
-
-  const submitResponse = (id: string, message: string) => {
-    setFeedbackResponse(id, message, nowStamp());
-    setOpenFeedbackId(null);
-  };
-
-  /* ----- Unified items list (consultations + feedback, newest first) ----- */
-  const items = useMemo<Item[]>(() => {
-    const cs: Item[] = list.map(c => ({
-      kind: "consultation",
-      id: c.id,
-      ts: parseTs(c.requested),
-      data: c,
-    }));
-    const fs: Item[] = FEEDBACK.map(f => ({
-      kind: "feedback",
-      id: f.id,
-      ts: parseTs(f.date),
-      data: f,
-    }));
-    return [...cs, ...fs].sort((a, b) => b.ts - a.ts);
-  }, [list]);
-
-  const counts = useMemo(
-    () => ({
-      all: items.length,
-      consultations: items.filter(i => i.kind === "consultation").length,
-      feedback: items.filter(i => i.kind === "feedback").length,
-    }),
-    [items]
+  /* ----- Consultations, newest first ----- */
+  const sorted = useMemo(
+    () => [...list].sort((a, b) => parseTs(b.requested) - parseTs(a.requested)),
+    [list]
   );
 
-  const unassignedCount = list.filter(c => c.officer === "Unassigned").length;
-  const unrepliedCount = FEEDBACK.filter(f => !responses[f.id]).length;
-
-  /* ----- Filter ----- */
-  const [filter, setFilter] = useState<FilterKind>("all");
-  const filtered = useMemo(() => {
-    if (filter === "all") return items;
-    return items.filter(i =>
-      filter === "consultations" ? i.kind === "consultation" : i.kind === "feedback"
-    );
-  }, [items, filter]);
+  const pendingCount = list.filter(c => displayStatus(c) === "Pending").length;
+  const waitingCount = list.filter(c => displayStatus(c) === "Waiting").length;
+  const dueSoonCount = list.filter(isDueSoon).length;
 
   /* ----- Pagination ----- */
   const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  useEffect(() => setPage(1), [filter]);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
   const paginated = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, page]);
+    return sorted.slice(start, start + PAGE_SIZE);
+  }, [sorted, page]);
 
-  const firstIdx = filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const lastIdx = Math.min(page * PAGE_SIZE, filtered.length);
-
-  /* ----- Deep-link highlight (e.g. "Awaiting reply" on the detail page) ----- */
-  const [highlightId, setHighlightId] = useState<string | null>(null);
-
-  // Read the ?feedback=<id> param once on mount.
-  useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("feedback");
-    if (id) setHighlightId(id);
-  }, []);
-
-  // Jump to the page that contains the highlighted row.
-  useEffect(() => {
-    if (!highlightId) return;
-    const idx = filtered.findIndex(i => i.id === highlightId);
-    if (idx >= 0) setPage(Math.floor(idx / PAGE_SIZE) + 1);
-  }, [highlightId, filtered]);
-
-  // Clear the highlight after the animation has run so it doesn't replay.
-  useEffect(() => {
-    if (!highlightId) return;
-    const t = setTimeout(() => setHighlightId(null), 6000);
-    return () => clearTimeout(t);
-  }, [highlightId]);
+  const firstIdx = sorted.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastIdx = Math.min(page * PAGE_SIZE, sorted.length);
 
   /* ----- Consultation mutators ----- */
+  // Assigning a person also confirms the schedule from the customer's request:
+  // the consultation moves to "waiting" (or straight to "closed" if the
+  // requested date has already passed).
+  const assignOfficer = (id: string, officer: string) =>
+    setList(prev =>
+      prev.map(c => {
+        if (c.id !== id) return c;
+        if (c.status === "closed") return { ...c, officer };
+        const du = daysUntil(c.preferredDate);
+        return { ...c, officer, status: du !== null && du < 0 ? "closed" : "waiting" };
+      })
+    );
+
   const closeConsultation = (id: string) =>
     setList(prev => prev.map(c => (c.id === id ? { ...c, status: "closed" } : c)));
 
@@ -160,21 +159,7 @@ export default function ConsultationsPage() {
     setList(prev =>
       prev.map(c =>
         c.id === id
-          ? { ...c, status: c.officer === "Unassigned" ? "pending" : "open" }
-          : c
-      )
-    );
-
-  const reassign = (id: string, officer: string) =>
-    setList(prev =>
-      prev.map(c =>
-        c.id === id
-          ? {
-              ...c,
-              officer,
-              status:
-                officer !== "Unassigned" && c.status === "pending" ? "open" : c.status,
-            }
+          ? { ...c, status: c.officer === "Unassigned" ? "pending" : "waiting" }
           : c
       )
     );
@@ -182,41 +167,30 @@ export default function ConsultationsPage() {
   return (
     <div className="space-y-6 max-w-[1400px]">
       <PageHeader
-        title="Customer Messages"
-        subtitle={`${items.length} messages · ${unassignedCount} unassigned · ${unrepliedCount} unreplied`}
+        title="Consultations"
+        subtitle={`${waitingCount} waiting · ${pendingCount} need scheduling · ${dueSoonCount} due within 24h`}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-card">
-        {/* Filter chips */}
-        <div className="flex flex-wrap items-center gap-1.5 px-6 py-4 border-b border-gray-200">
-          <FilterChip
-            label="All"
-            count={counts.all}
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-          />
-          <FilterChip
-            label="Consultations"
-            count={counts.consultations}
-            badge={unassignedCount > 0 ? `${unassignedCount} unassigned` : undefined}
-            active={filter === "consultations"}
-            onClick={() => setFilter("consultations")}
-          />
-          <FilterChip
-            label="Feedback"
-            count={counts.feedback}
-            badge={unrepliedCount > 0 ? `${unrepliedCount} unreplied` : undefined}
-            active={filter === "feedback"}
-            onClick={() => setFilter("feedback")}
-          />
+      {/* Reminder banner — officer-in-charge + customer are alerted a day before */}
+      {dueSoonCount > 0 && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <Bell className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-amber-800">
+            <span className="font-medium">
+              {dueSoonCount} consultation{dueSoonCount > 1 ? "s" : ""} scheduled within 24 hours.
+            </span>{" "}
+            A reminder has been sent to the officer in charge and the customer.
+          </div>
         </div>
+      )}
 
-        {/* Unified table (md and up) */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-card">
+        {/* Table (md and up) */}
         <div className="overflow-x-auto hidden md:block">
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-200">
-                {["Type", "Customer", "Subject", "Preview", "Date", "Status", "Action"].map(h => (
+                {["Customer", "Subject", "Schedule", "Officer", "Status", "Action"].map(h => (
                   <th
                     key={h}
                     className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap"
@@ -229,29 +203,19 @@ export default function ConsultationsPage() {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-500">
-                    No messages in this view.
+                  <td colSpan={6} className="px-6 py-16 text-center text-sm text-gray-500">
+                    No consultations.
                   </td>
                 </tr>
               ) : (
-                paginated.map(item =>
-                  item.kind === "consultation" ? (
-                    <ConsultRow
-                      key={`c-${item.id}`}
-                      c={item.data}
-                      currentUserName={user.name}
-                      onOpen={() => setOpenId(item.id)}
-                    />
-                  ) : (
-                    <FeedbackRow
-                      key={`f-${item.id}`}
-                      f={item.data}
-                      responded={!!responses[item.id]}
-                      highlight={item.id === highlightId}
-                      onOpen={() => setOpenFeedbackId(item.id)}
-                    />
-                  )
-                )
+                paginated.map(c => (
+                  <ConsultRow
+                    key={c.id}
+                    c={c}
+                    currentUserName={user.name}
+                    onOpen={() => setOpenId(c.id)}
+                  />
+                ))
               )}
             </tbody>
           </table>
@@ -261,54 +225,37 @@ export default function ConsultationsPage() {
         <div className="md:hidden divide-y divide-gray-100">
           {paginated.length === 0 ? (
             <div className="px-4 py-16 text-center text-sm text-gray-500">
-              No messages in this view.
+              No consultations.
             </div>
           ) : (
-            paginated.map(item => {
-              const isConsult = item.kind === "consultation";
-              const status = isConsult
-                ? item.data.status === "open"
-                  ? "Open"
-                  : item.data.status === "closed"
-                  ? "Closed"
-                  : "Pending"
-                : responses[item.id]
-                ? "Replied"
-                : "No reply";
-              const subject = isConsult ? item.data.topic : "Feedback";
-              const preview = isConsult ? clip(item.data.note ?? "", 90) : clip(item.data.text, 90);
-              const date = isConsult ? item.data.requested : item.data.date;
-              const highlighted = !isConsult && item.id === highlightId;
+            paginated.map(c => {
+              const status = displayStatus(c);
+              const dueSoon = isDueSoon(c);
               return (
-                <div
-                  key={`${item.kind}-${item.id}`}
-                  className={cn("px-4 py-3.5", highlighted && "animate-row-highlight")}
-                >
+                <div key={c.id} className="px-4 py-3.5">
                   <div className="flex items-center justify-between gap-2">
-                    <TypeChip kind={item.kind} />
-                    <span className="text-[11px] text-gray-400 whitespace-nowrap">{date}</span>
-                  </div>
-                  <div className="mt-1.5 text-sm font-medium text-gray-900">{item.data.customer}</div>
-                  <div className="text-xs text-gray-500">{subject}</div>
-                  {preview && (
-                    <div className="text-xs text-gray-600 mt-1 line-clamp-2">{preview}</div>
-                  )}
-                  <div className="mt-2.5 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">{c.customer}</span>
                     <StatusBadge status={status} />
+                  </div>
+                  <div className="text-xs text-gray-500">{c.topic}</div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-gray-500">
+                    <CalendarClock className="w-3 h-3 text-gray-400" />
+                    {c.preferredDate} · {c.preferredTime}
+                    {dueSoon && (
+                      <span className="text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-1.5 py-0.5">
+                        {dueLabel(c)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2.5 flex items-center justify-between">
+                    <span className="text-[11px] text-gray-500">
+                      {c.officer === "Unassigned" ? "Unassigned" : c.officer}
+                    </span>
                     <button
-                      onClick={() =>
-                        isConsult ? setOpenId(item.id) : setOpenFeedbackId(item.id)
-                      }
+                      onClick={() => setOpenId(c.id)}
                       className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline font-medium"
                     >
-                      {isConsult ? (
-                        "Open"
-                      ) : (
-                        <>
-                          <Pencil className="w-3 h-3" />
-                          {responses[item.id] ? "Edit reply" : "Reply"}
-                        </>
-                      )}
+                      {status === "Pending" ? "Assign" : "View"}
                     </button>
                   </div>
                 </div>
@@ -324,7 +271,7 @@ export default function ConsultationsPage() {
             <span className="font-medium text-gray-700">
               {firstIdx}-{lastIdx}
             </span>{" "}
-            of <span className="font-medium text-gray-700">{filtered.length}</span>
+            of <span className="font-medium text-gray-700">{sorted.length}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500">
@@ -386,87 +333,15 @@ export default function ConsultationsPage() {
         currentUserName={user.name}
         onClose={() => setPickerFor(null)}
         onPick={officer => {
-          if (pickerFor) reassign(pickerFor, officer);
+          if (pickerFor) assignOfficer(pickerFor, officer);
           setPickerFor(null);
         }}
-      />
-
-      <FeedbackResponseModal
-        feedback={activeFeedback}
-        existing={activeFeedback ? responses[activeFeedback.id] : undefined}
-        onClose={() => setOpenFeedbackId(null)}
-        onSubmit={msg => activeFeedback && submitResponse(activeFeedback.id, msg)}
       />
     </div>
   );
 }
 
-/* ---------- filter chip ---------- */
-
-function FilterChip({
-  label,
-  count,
-  active,
-  badge,
-  onClick,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  badge?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition",
-        active
-          ? "border-brand-500 bg-brand-50 text-brand-700"
-          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-      )}
-    >
-      <span>{label}</span>
-      <span
-        className={cn(
-          "text-[11px] font-medium rounded-full px-1.5 py-0.5",
-          active ? "bg-brand-100 text-brand-700" : "bg-gray-100 text-gray-500"
-        )}
-      >
-        {count}
-      </span>
-      {badge && (
-        <span className="text-[10px] font-medium uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-1.5 py-0.5">
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
-
-/* ---------- unified table rows ---------- */
-
-function TypeChip({ kind }: { kind: "consultation" | "feedback" }) {
-  const isConsult = kind === "consultation";
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider",
-        isConsult
-          ? "bg-brand-50 text-brand-700 border border-brand-100"
-          : "bg-gray-100 text-gray-600 border border-gray-200"
-      )}
-    >
-      {isConsult ? (
-        <MessageCircle className="w-2.5 h-2.5" />
-      ) : (
-        <MessageSquare className="w-2.5 h-2.5" />
-      )}
-      {isConsult ? "Consult" : "Feedback"}
-    </span>
-  );
-}
+/* ---------- consultation table row ---------- */
 
 function ConsultRow({
   c,
@@ -478,14 +353,14 @@ function ConsultRow({
   onOpen: () => void;
 }) {
   const isMine = c.officer === currentUserName;
+  const status = displayStatus(c);
+  const dueSoon = isDueSoon(c);
+  const scheduled = status !== "Pending";
   return (
     <tr
       className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60 cursor-pointer"
       onClick={onOpen}
     >
-      <td className="px-6 py-3.5 align-middle">
-        <TypeChip kind="consultation" />
-      </td>
       <td className="px-6 py-3.5 font-medium text-gray-900">
         <div className="flex items-center gap-1.5">
           {c.customer}
@@ -497,77 +372,28 @@ function ConsultRow({
         </div>
       </td>
       <td className="px-6 py-3.5 text-gray-700">{c.topic}</td>
-      <td className="px-6 py-3.5 text-gray-600 max-w-[320px]">
-        <div className="truncate">{clip(c.note ?? "", 80)}</div>
+      <td className="px-6 py-3.5 text-gray-600 text-xs whitespace-nowrap">
+        <div className="flex items-center gap-1.5">
+          <CalendarClock className="w-3.5 h-3.5 text-gray-400" />
+          <span>
+            {c.preferredDate} · {c.preferredTime}
+          </span>
+          {dueSoon && (
+            <span className="text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-1.5 py-0.5">
+              {dueLabel(c)}
+            </span>
+          )}
+        </div>
       </td>
-      <td className="px-6 py-3.5 text-gray-600 text-xs whitespace-nowrap">{c.requested}</td>
+      <td className="px-6 py-3.5 text-gray-600 text-xs whitespace-nowrap">
+        {c.officer === "Unassigned" ? (
+          <span className="text-gray-400 italic">Unassigned</span>
+        ) : (
+          c.officer
+        )}
+      </td>
       <td className="px-6 py-3.5">
-        <StatusBadge
-          status={
-            c.status === "open"
-              ? "Open"
-              : c.status === "closed"
-              ? "Closed"
-              : "Pending"
-          }
-        />
-      </td>
-      <td className="px-6 py-3.5">
-        <button
-          onClick={e => {
-            e.stopPropagation();
-            onOpen();
-          }}
-          className="text-xs text-brand-600 hover:underline font-medium"
-        >
-          Open
-        </button>
-      </td>
-    </tr>
-  );
-}
-
-function FeedbackRow({
-  f,
-  responded,
-  highlight = false,
-  onOpen,
-}: {
-  f: Feedback;
-  responded: boolean;
-  highlight?: boolean;
-  onOpen: () => void;
-}) {
-  const rowRef = useRef<HTMLTableRowElement>(null);
-
-  // When deep-linked from elsewhere, scroll the row into view so the pulse
-  // animation is actually visible.
-  useEffect(() => {
-    if (highlight && rowRef.current) {
-      rowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [highlight]);
-
-  return (
-    <tr
-      ref={rowRef}
-      className={cn(
-        "border-b border-gray-100 last:border-0 hover:bg-gray-50/60 cursor-pointer",
-        highlight && "animate-row-highlight"
-      )}
-      onClick={onOpen}
-    >
-      <td className="px-6 py-3.5 align-middle">
-        <TypeChip kind="feedback" />
-      </td>
-      <td className="px-6 py-3.5 font-medium text-gray-900">{f.customer}</td>
-      <td className="px-6 py-3.5 text-gray-700">Feedback</td>
-      <td className="px-6 py-3.5 text-gray-600 max-w-[320px]">
-        <div className="truncate">{clip(f.text, 80)}</div>
-      </td>
-      <td className="px-6 py-3.5 text-gray-600 text-xs whitespace-nowrap">{f.date}</td>
-      <td className="px-6 py-3.5">
-        <StatusBadge status={responded ? "Replied" : "No reply"} />
+        <StatusBadge status={status} />
       </td>
       <td className="px-6 py-3.5">
         <button
@@ -575,10 +401,9 @@ function FeedbackRow({
             e.stopPropagation();
             onOpen();
           }}
-          className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline font-medium whitespace-nowrap"
+          className="text-xs text-brand-600 hover:underline font-medium whitespace-nowrap"
         >
-          <Pencil className="w-3 h-3" />
-          {responded ? "Edit reply" : "Reply"}
+          {status === "Pending" ? "Assign" : "View"}
         </button>
       </td>
     </tr>
@@ -607,17 +432,15 @@ function ConsultationDetailModal({
   if (!consultation) return null;
 
   const customer = CUSTOMERS.find(c => c.name === consultation.customer);
-  const unassigned = consultation.officer === "Unassigned";
+  const status = displayStatus(consultation);
+  const unassigned = status === "Pending";
   const isMine = consultation.officer === user.name;
-  const isClosed = consultation.status === "closed";
+  const isClosed = status === "Closed";
+  const isWaiting = status === "Waiting";
+  const dueSoon = isDueSoon(consultation);
 
   const initials = consultation.customer.split(" ").map(s => s[0]).join("");
-  const statusLabel =
-    consultation.status === "open"
-      ? "Open"
-      : consultation.status === "closed"
-      ? "Closed"
-      : "Pending";
+  const statusLabel = status;
 
   const send = () => {
     if (!reply.trim()) return;
@@ -721,11 +544,46 @@ function ConsultationDetailModal({
           </dl>
         </div>
 
+        {/* Confirmed schedule + reminder (waiting) */}
+        {isWaiting && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-white space-y-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2.5">
+              <div className="flex items-center gap-2.5">
+                <CalendarClock className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                <div className="text-sm">
+                  <div className="font-medium text-gray-900">
+                    Scheduled · {consultation.preferredDate} at {consultation.preferredTime}
+                  </div>
+                  <div className="text-[11px] text-gray-500">
+                    {consultation.preferredBranch} · confirmed from the customer&apos;s request
+                  </div>
+                </div>
+              </div>
+              <span className="text-[11px] font-medium text-sky-700">{dueLabel(consultation)}</span>
+            </div>
+            {dueSoon && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+                <Bell className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-amber-800">
+                  Reminder sent — this consultation is{" "}
+                  <span className="font-medium">{dueLabel(consultation).toLowerCase()}</span>.
+                  {!unassigned && (
+                    <>
+                      {" "}Notified <span className="font-medium">{consultation.officer}</span> and{" "}
+                      <span className="font-medium">{consultation.customer}</span>.
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Closed-state indicator (only when the consultation is closed) */}
         {isClosed && (
           <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-center gap-2 text-xs text-gray-500">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            Consultation closed
+            Consultation completed — closed after {consultation.preferredDate}
           </div>
         )}
 
@@ -736,14 +594,14 @@ function ConsultationDetailModal({
               <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-100">
                 <div className="flex items-center gap-2 text-sm text-amber-800">
                   <MessageCircle className="w-4 h-4" />
-                  This consultation isn't assigned yet. Assign an officer to start replying.
+                  Not scheduled yet. Assign a person in charge to confirm the customer&apos;s requested date.
                 </div>
                 <button
                   onClick={onPickAssignee}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700 whitespace-nowrap"
                 >
                   <Briefcase className="w-3.5 h-3.5" />
-                  Assign to person
+                  Assign &amp; confirm
                 </button>
               </div>
             ) : (
@@ -788,7 +646,7 @@ function ConsultationDetailModal({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700 font-medium"
             >
               <Briefcase className="w-3.5 h-3.5 text-gray-500" />
-              {unassigned ? "Assign to person" : "Reassign to person"}
+              {unassigned ? "Assign & confirm schedule" : "Reassign person"}
             </button>
           ) : (
             // Keep layout balanced — empty spacer when closed.
@@ -815,7 +673,7 @@ function ConsultationDetailModal({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700 font-medium"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Mark as closed
+                Mark as completed
               </button>
             )}
           </div>
@@ -869,42 +727,6 @@ function ConsultationDetailModal({
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function Bubble({
-  side,
-  name,
-  children,
-}: {
-  side: "left" | "right";
-  name: string;
-  children: React.ReactNode;
-}) {
-  const isRight = side === "right";
-  return (
-    <div className={cn("flex", isRight && "justify-end")}>
-      <div className={cn("max-w-md")}>
-        <div
-          className={cn(
-            "text-[11px] mb-1 text-gray-500",
-            isRight && "text-right"
-          )}
-        >
-          {name}
-        </div>
-        <div
-          className={cn(
-            "px-3 py-2 text-sm rounded-lg",
-            isRight
-              ? "bg-brand-600 text-white rounded-tr-sm"
-              : "bg-white border border-gray-200 text-gray-800 rounded-tl-sm"
-          )}
-        >
-          {children}
-        </div>
       </div>
     </div>
   );
@@ -983,14 +805,18 @@ function OfficerPickerModal({
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
           <div className="min-w-0">
-            <div className="text-base font-semibold text-gray-900">Assign consultant</div>
-            <div className="text-xs text-gray-500 mt-0.5">
-              Who should handle{" "}
-              <span className="font-medium text-gray-800">{consultation.customer}</span>'s
-              request?
+            <div className="text-base font-semibold text-gray-900">
+              Assign &amp; confirm schedule
             </div>
-            <div className="text-[11px] text-gray-400 mt-0.5 truncate">
-              {consultation.id} · {consultation.topic}
+            <div className="text-xs text-gray-500 mt-0.5">
+              Pick the person in charge for{" "}
+              <span className="font-medium text-gray-800">{consultation.customer}</span>. The
+              schedule is confirmed from their request.
+            </div>
+            <div className="text-[11px] text-gray-500 mt-1 inline-flex items-center gap-1.5">
+              <CalendarClock className="w-3 h-3 text-gray-400" />
+              {consultation.preferredDate} · {consultation.preferredTime} ·{" "}
+              {consultation.preferredBranch}
             </div>
           </div>
           <button

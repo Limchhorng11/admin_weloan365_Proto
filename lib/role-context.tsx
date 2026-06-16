@@ -29,7 +29,7 @@ const RoleContext = createContext<RoleContextValue | null>(null);
 export const ROLE_TO_USER: Record<string, string> = {
   admin:            "Kosal M.",
   senior_officer:   "Sophea K.",
-  credit_officer:   "Laybun N.",
+  credit_officer:   "Visal P.",
   customer_service: "Pisey C.",
 };
 
