@@ -21,15 +21,14 @@ import {
   FileText,
   Check,
   CircleDollarSign,
-  Percent,
-  Calendar,
   ShieldCheck,
-  Files,
   Pencil,
   Globe,
   Upload,
   Image as ImageIcon,
   Film,
+  HelpCircle,
+  AlertTriangle,
 } from "lucide-react";
 
 type StatusFilter = "all" | "active" | "inactive" | "draft";
@@ -602,27 +601,6 @@ function FilterPopover({
   );
 }
 
-/* Parse "• Age: 18 to 65\n• Residence: …" etc. into the 4 structured rows.
- * If the input doesn't follow this pattern, returns blanks. Used when an
- * existing product is opened in edit mode. */
-function parseEligibility(text: string): {
-  age: string;
-  residence: string;
-  income: string;
-  collateral: string;
-} {
-  const out = { age: "", residence: "", income: "", collateral: "" };
-  if (!text) return out;
-  for (const raw of text.split(/\n+/)) {
-    const line = raw.replace(/^[\s•·\-*]+/, "").trim();
-    const m = line.match(/^(age|residence|income|collateral)\s*[:：]\s*(.+)$/i);
-    if (!m) continue;
-    const key = m[1].toLowerCase() as keyof typeof out;
-    out[key] = m[2].trim();
-  }
-  return out;
-}
-
 /* ---------- create / edit product modal (CMS-style) ---------- */
 
 function CreateProductModal({
@@ -650,22 +628,20 @@ function CreateProductModal({
   const [name, setName] = useState("");
   const [descItems, setDescItems] = useState<string[]>([]);
   const [docItems, setDocItems] = useState<DocItem[]>([]);
+  const [faqItems, setFaqItems] = useState<FaqItem[]>([]);
   const [media, setMedia] = useState("");
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const mediaRef = useRef<HTMLInputElement>(null);
-  const [min, setMin] = useState("");
-  const [max, setMax] = useState("");
-  const [rateMin, setRateMin] = useState("");
-  const [rateMax, setRateMax] = useState("");
-  const [termMin, setTermMin] = useState("");
-  const [termMax, setTermMax] = useState("");
-  const [repaymentMethod, setRepaymentMethod] = useState("");
-  // Eligibility — four structured rows (composed into the legacy
-  // `eligibility` multi-line string on save).
-  const [ageRule, setAgeRule] = useState("");
-  const [residenceRule, setResidenceRule] = useState("");
-  const [incomeRule, setIncomeRule] = useState("");
-  const [collateralRule, setCollateralRule] = useState("");
+  // Reference product icon — a small square image shown beside the name.
+  const [icon, setIcon] = useState("");
+  const iconRef = useRef<HTMLInputElement>(null);
+  // Loan At A Glance — dynamic label/value rows. Defaults to the 4 standard
+  // rows; admins can rename, remove, or add their own.
+  const [glanceItems, setGlanceItems] = useState<GlanceItem[]>([]);
+  // Key Feature / Eligibility — free-form sentence rows, composed into the
+  // legacy multi-line strings on save.
+  const [kfItems, setKfItems] = useState<string[]>([]);
+  const [eligItems, setEligItems] = useState<string[]>([]);
   // status carries the persisted value of LoanProduct.status. The new
   // `activeNow` toggle is the form-level Active/Inactive switch that the
   // primary save button (Save / Update now) uses; "Save as draft" always
@@ -673,30 +649,6 @@ function CreateProductModal({
   const [status, setStatus] = useState<"active" | "inactive" | "draft">("draft");
   const [activeNow, setActiveNow] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Per-row "show in form" toggle. Hidden rows render as a collapsed label
-  // and their values are dropped on save.
-  type FieldKey =
-    | "loanSize"
-    | "interest"
-    | "loanTerm"
-    | "repaymentMethod"
-    | "age"
-    | "residence"
-    | "income"
-    | "collateral";
-  const [shown, setShown] = useState<Record<FieldKey, boolean>>({
-    loanSize: true,
-    interest: true,
-    loanTerm: true,
-    repaymentMethod: true,
-    age: true,
-    residence: true,
-    income: true,
-    collateral: true,
-  });
-  const toggleShown = (k: FieldKey) =>
-    setShown(prev => ({ ...prev, [k]: !prev[k] }));
 
   useEffect(() => {
     if (!open) return;
@@ -725,36 +677,22 @@ function CreateProductModal({
               .map(name => ({ name }))
           : []
       );
+      setFaqItems(editing.faqs ? editing.faqs.map(f => ({ ...f })) : []);
       setMedia(editing.media ?? "");
       setMediaType(editing.mediaType ?? "image");
-      setMin(String(editing.min));
-      setMax(String(editing.max));
-      // Interest + Loan Term are single-value in the form — show the max
-      // (broader) value and mirror it into min when the user edits.
-      setRateMin(String(editing.rateMax));
-      setRateMax(String(editing.rateMax));
-      setTermMin(String(editing.termMax));
-      setTermMax(String(editing.termMax));
-      setRepaymentMethod(editing.repaymentMethod ?? "");
-      // Parse the legacy "• Age: …\n• Residence: …" style into the 4 fields,
-      // falling back to leaving them blank if the structure isn't recognised.
-      const parsed = parseEligibility(editing.eligibility);
-      setAgeRule(parsed.age);
-      setResidenceRule(parsed.residence);
-      setIncomeRule(parsed.income);
-      setCollateralRule(parsed.collateral);
+      setIcon(editing.icon ?? "");
+      // Prefer saved dynamic rows; legacy products fall back to rows derived
+      // from the structured numeric fields.
+      setGlanceItems(
+        editing.atAGlance?.length
+          ? editing.atAGlance.map(g => ({ ...g }))
+          : glanceRowsFromProduct(editing)
+      );
+      // One row per "• line" of the stored strings.
+      setKfItems(linesToSentences(editing.keyFeatures));
+      setEligItems(linesToSentences(editing.eligibility));
       setStatus(editing.status);
       setActiveNow(editing.status === "active");
-      setShown({
-        loanSize: editing.min > 0 || editing.max > 0,
-        interest: editing.rateMin > 0 || editing.rateMax > 0,
-        loanTerm: editing.termMin > 0 || editing.termMax > 0,
-        repaymentMethod: !!editing.repaymentMethod,
-        age: !!parsed.age,
-        residence: !!parsed.residence,
-        income: !!parsed.income,
-        collateral: !!parsed.collateral,
-      });
       setError(null);
     } else {
       // Create mode — empty defaults, all rows visible.
@@ -763,34 +701,18 @@ function CreateProductModal({
       setCountryInput("");
       setName("");
       setDescItems([]);
-      setDocItems(DEFAULT_REQUIRED_DOCS.map(d => ({ ...d })));
+      setDocItems([]);
+      setFaqItems(DEFAULT_FAQS.map(f => ({ ...f })));
       setMedia("");
       setMediaType("image");
-      setMin("");
-      setMax("");
-      setRateMin("");
-      setRateMax("");
-      setTermMin("");
-      setTermMax("");
-      setRepaymentMethod("");
-      setAgeRule("");
-      setResidenceRule("");
-      setIncomeRule("");
-      setCollateralRule("");
+      setIcon("");
+      setGlanceItems(DEFAULT_GLANCE_ROWS.map(g => ({ ...g })));
+      setKfItems([...DEFAULT_KEY_FEATURES]);
+      setEligItems([...DEFAULT_ELIGIBILITY]);
       setStatus("draft");
       // Default the toggle to Active on create so the primary "Save" button
       // publishes the product unless the admin explicitly flips it.
       setActiveNow(true);
-      setShown({
-        loanSize: true,
-        interest: true,
-        loanTerm: true,
-        repaymentMethod: true,
-        age: true,
-        residence: true,
-        income: true,
-        collateral: true,
-      });
       setError(null);
     }
   }, [open, editing]);
@@ -815,21 +737,6 @@ function CreateProductModal({
     // create-MWL (which derives the name from the parent and the country).
     if ((isEdit || kind === "non-mwl") && !name.trim())
       return "Product name is required.";
-    if (descItems.length === 0) return "Add at least one description point.";
-    // Only validate ranges for rows the admin chose to include.
-    if (shown.loanSize) {
-      const minN = +min, maxN = +max;
-      if (!minN || !maxN || minN >= maxN)
-        return "Loan size must be valid (min < max).";
-    }
-    if (shown.interest) {
-      const rN = +rateMax;
-      if (rN <= 0) return "Interest must be greater than 0.";
-    }
-    if (shown.loanTerm) {
-      const tN = +termMax;
-      if (!tN || tN <= 0) return "Loan term must be greater than 0.";
-    }
     if (!isEdit && kind === "mwl") {
       if (!mwlParent) return "No Migrant Worker Loan parent found to attach to.";
       if (countries.length === 0)
@@ -838,34 +745,42 @@ function CreateProductModal({
     return null;
   };
 
-  // Compose the 4 eligibility rows into the legacy multi-line string. Only
-  // include rows that are toggled on and have a non-empty value.
-  const composeEligibility = (): string => {
-    const rows: [FieldKey, string, string][] = [
-      ["age", "Age", ageRule],
-      ["residence", "Residence", residenceRule],
-      ["income", "Income", incomeRule],
-      ["collateral", "Collateral", collateralRule],
-    ];
-    return rows
-      .filter(([k, , v]) => shown[k] && v.trim())
-      .map(([, label, v]) => `• ${label}: ${v.trim()}`)
+  // Compose the sentence rows into the legacy "• line" multi-line string.
+  // Empty rows are excluded.
+  const composeSentences = (items: string[]): string =>
+    items
+      .map(t => t.trim())
+      .filter(Boolean)
+      .map(t => `• ${t}`)
       .join("\n");
-  };
 
   const submit = (publish: boolean) => {
     const err = validate();
     if (err) return setError(err);
 
+    // Rows missing a title or a value are dropped on save — same contract as
+    // the old hidden rows, which saved as empty.
+    const glance = glanceItems
+      .map(g => ({ label: g.label.trim(), value: g.value.trim() }))
+      .filter(g => g.label && g.value);
+    // Best-effort numeric extraction from the free-form rows so the products
+    // table and detail drawer keep rendering amount/rate/term. Unmatched or
+    // unparsable rows save as 0 ("0–0"), same as the old hidden rows.
+    const numbersIn = (s: string) =>
+      (s.replace(/,/g, "").match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+    const rowValue = (re: RegExp) =>
+      glance.find(g => re.test(g.label))?.value ?? "";
+    const amounts = numbersIn(rowValue(/amount|size/i));
+    const rates = numbersIn(rowValue(/interest|rate/i));
+    const terms = numbersIn(rowValue(/tenure|term/i));
+
     const base = {
-      // Hidden rows save as 0 so downstream displays render "0–0" rather than
-      // surfacing stale numbers from the form.
-      min: shown.loanSize ? +min : 0,
-      max: shown.loanSize ? +max : 0,
-      rateMin: shown.interest ? +rateMin : 0,
-      rateMax: shown.interest ? +rateMax : 0,
-      termMin: shown.loanTerm ? +termMin : 0,
-      termMax: shown.loanTerm ? +termMax : 0,
+      min: amounts[0] ?? 0,
+      max: amounts[1] ?? amounts[0] ?? 0,
+      rateMin: rates[0] ?? 0,
+      rateMax: rates[1] ?? rates[0] ?? 0,
+      termMin: terms[0] ?? 0,
+      termMax: terms[1] ?? terms[0] ?? 0,
       // "Save as draft" → always draft.
       // Primary "Save" / "Update now" → uses the Active/Inactive toggle.
       status: (publish
@@ -875,8 +790,8 @@ function CreateProductModal({
         : "draft") as "active" | "inactive" | "draft",
       loans: editing?.loans ?? 0,
       description: descItems.map(s => `• ${s}`).join("\n"),
-      // Compose the 4 structured eligibility rows back to the existing field.
-      eligibility: composeEligibility(),
+      eligibility: composeSentences(eligItems),
+      keyFeatures: composeSentences(kfItems) || undefined,
       requiredDocs: docItems.map(d => d.name).join("\n"),
       requiredDocuments: docItems.length
         ? docItems.map(d => ({
@@ -885,17 +800,24 @@ function CreateProductModal({
             icon: d.icon || undefined,
           }))
         : undefined,
+      faqs: faqItems.length
+        ? faqItems.map(f => ({
+            question: f.question.trim(),
+            answer: f.answer.trim(),
+          }))
+        : undefined,
       processingFee: editing?.processingFee ?? 0,
       latePenalty: editing?.latePenalty ?? 0,
       // Early payoff is no longer offered — preserve existing value or default true.
       earlyPayoff: editing?.earlyPayoff ?? true,
-      // New structured field — saved only when the row is shown and non-empty.
-      repaymentMethod:
-        shown.repaymentMethod && repaymentMethod.trim()
-          ? repaymentMethod.trim()
-          : undefined,
+      // Repayment method is no longer edited in the form — preserve existing value.
+      repaymentMethod: editing?.repaymentMethod,
+      // Purpose mirrors the matching glance row for backward compatibility.
+      purpose: rowValue(/purpose/i) || undefined,
+      atAGlance: glance.length ? glance : undefined,
       media: media || undefined,
       mediaType: media ? mediaType : undefined,
+      icon: icon || undefined,
     };
 
     // EDIT mode — replace the existing product, keep its id/kind/parent/country.
@@ -976,6 +898,21 @@ function CreateProductModal({
       setMediaType(isVideo ? "video" : "image");
     };
     reader.readAsDataURL(file);
+    setError(null);
+  };
+
+  const onIconPick = () => iconRef.current?.click();
+  const onIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file for the product icon.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setIcon(String(reader.result || ""));
+    reader.readAsDataURL(file);
+    e.target.value = ""; // allow re-picking the same file
     setError(null);
   };
 
@@ -1133,6 +1070,64 @@ function CreateProductModal({
                 onChange={onMediaChange}
               />
             </Field>
+            <Field
+              label="Reference product icon (42 × 42 px)"
+              hint="Small icon shown beside the product name in the customer app. PNG or JPG."
+            >
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onIconPick}
+                  title={icon ? "Replace icon" : "Upload icon"}
+                  className={cn(
+                    "w-16 h-16 rounded-md flex items-center justify-center overflow-hidden transition flex-shrink-0",
+                    icon
+                      ? "border border-gray-200 bg-white hover:border-brand-300"
+                      : "border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 text-gray-500 hover:text-brand-700"
+                  )}
+                >
+                  {icon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={icon}
+                      alt="product icon preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Upload className="w-5 h-5" />
+                  )}
+                </button>
+                {icon ? (
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={onIconPick}
+                      className="text-xs text-brand-600 hover:underline font-medium"
+                    >
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIcon("")}
+                      className="text-xs text-red-600 hover:underline font-medium"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-500">
+                    Click to upload the reference product icon
+                  </span>
+                )}
+              </div>
+              <input
+                ref={iconRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onIconChange}
+              />
+            </Field>
             {isEdit || kind === "non-mwl" ? (
               <Field label="Product name *">
                 <input
@@ -1154,8 +1149,8 @@ function CreateProductModal({
               </div>
             )}
             <Field
-              label="Description *"
-              hint={`${descItems.length} point${descItems.length === 1 ? "" : "s"}. Type a point and press Enter to add. Drag to reorder.`}
+              label="Description"
+              hint={`${descItems.length} point${descItems.length === 1 ? "" : "s"}. Type a point and press Enter to add.`}
             >
               <SortableListInput
                 items={descItems}
@@ -1255,147 +1250,48 @@ function CreateProductModal({
             </Section>
           )}
 
-          {/* Key Features */}
-          <Section icon={CircleDollarSign} title="Key Features" hint="Toggle the rows you want to publish — hidden rows save as empty.">
-            <div className="border border-gray-200 rounded-md divide-y divide-gray-100 overflow-hidden">
-            <ToggleRow
-              label="Loan Size"
-              shown={shown.loanSize}
-              onToggle={() => toggleShown("loanSize")}
-            >
-              <div className="flex items-center gap-2">
-                <AffixInput
-                  prefix="$"
-                  type="number"
-                  value={min}
-                  onChange={e => setMin(e.target.value)}
-                  placeholder="100"
-                />
-                <span className="text-xs text-gray-400">–</span>
-                <AffixInput
-                  prefix="$"
-                  type="number"
-                  value={max}
-                  onChange={e => setMax(e.target.value)}
-                  placeholder="3000"
-                />
-              </div>
-            </ToggleRow>
-
-            <ToggleRow
-              label="Interest"
-              shown={shown.interest}
-              onToggle={() => toggleShown("interest")}
-            >
-              <AffixInput
-                suffix="%"
-                type="number"
-                step="0.1"
-                value={rateMax}
-                onChange={e => {
-                  // Single value writes to both rateMin and rateMax — keeps
-                  // the existing schema while the form shows just one input.
-                  setRateMin(e.target.value);
-                  setRateMax(e.target.value);
-                }}
-                placeholder="14"
-              />
-            </ToggleRow>
-
-            <ToggleRow
-              label="Loan Term"
-              shown={shown.loanTerm}
-              onToggle={() => toggleShown("loanTerm")}
-            >
-              <AffixInput
-                suffix="m"
-                type="number"
-                value={termMax}
-                onChange={e => {
-                  // Single value writes to both termMin and termMax.
-                  setTermMin(e.target.value);
-                  setTermMax(e.target.value);
-                }}
-                placeholder="48"
-              />
-            </ToggleRow>
-
-            <ToggleRow
-              label="Repayment Method"
-              shown={shown.repaymentMethod}
-              onToggle={() => toggleShown("repaymentMethod")}
-            >
-              <input
-                value={repaymentMethod}
-                onChange={e => setRepaymentMethod(e.target.value)}
-                placeholder="e.g. Flexible / Periodic principal and interest"
-                className="form-input"
-              />
-            </ToggleRow>
-            </div>
-          </Section>
-
-          {/* Eligibility */}
-          <Section icon={ShieldCheck} title="Eligibility" hint="Toggle the rows you want to publish — hidden rows save as empty.">
-            <div className="border border-gray-200 rounded-md divide-y divide-gray-100 overflow-hidden">
-            <ToggleRow
-              label="Age"
-              shown={shown.age}
-              onToggle={() => toggleShown("age")}
-            >
-              <input
-                value={ageRule}
-                onChange={e => setAgeRule(e.target.value)}
-                placeholder="18 to 65 years old"
-                className="form-input"
-              />
-            </ToggleRow>
-            <ToggleRow
-              label="Residence"
-              shown={shown.residence}
-              onToggle={() => toggleShown("residence")}
-            >
-              <input
-                value={residenceRule}
-                onChange={e => setResidenceRule(e.target.value)}
-                placeholder="Permanent residential address at NHFC's operating area"
-                className="form-input"
-              />
-            </ToggleRow>
-            <ToggleRow
-              label="Income"
-              shown={shown.income}
-              onToggle={() => toggleShown("income")}
-            >
-              <input
-                value={incomeRule}
-                onChange={e => setIncomeRule(e.target.value)}
-                placeholder="Stable and verifiable income source"
-                className="form-input"
-              />
-            </ToggleRow>
-            <ToggleRow
-              label="Collateral"
-              shown={shown.collateral}
-              onToggle={() => toggleShown("collateral")}
-            >
-              <input
-                value={collateralRule}
-                onChange={e => setCollateralRule(e.target.value)}
-                placeholder="Hard or soft title collateral"
-                className="form-input"
-              />
-            </ToggleRow>
-            </div>
-          </Section>
-
-          {/* Required documents */}
+          {/* Loan at a glance — dynamic label/value rows */}
           <Section
-            icon={Files}
-            title="Required documents"
-            hint={`${docItems.length} document${docItems.length === 1 ? "" : "s"}. Type to add, click the icon to upload, drag to reorder.`}
+            icon={CircleDollarSign}
+            title="Loan At A Glance"
+            hint={`${glanceItems.length} row${glanceItems.length === 1 ? "" : "s"}. Add your own title and value. Incomplete rows are skipped on save.`}
           >
-            <DocumentListInput items={docItems} onChange={setDocItems} />
+            <GlanceListInput items={glanceItems} onChange={setGlanceItems} />
+          </Section>
+
+          {/* Key Feature — free-form sentence rows with show/hide toggles. */}
+          <Section
+            icon={Check}
+            title="Key Feature"
+            hint={`${kfItems.length} row${kfItems.length === 1 ? "" : "s"}. Type a sentence per row.`}
+          >
+            <SentenceListInput
+              items={kfItems}
+              onChange={setKfItems}
+              placeholder="e.g. Fast approval within 24 hours"
+            />
+          </Section>
+
+          {/* Eligibility — same sentence-row pattern. */}
+          <Section
+            icon={ShieldCheck}
+            title="Eligibility"
+            hint={`${eligItems.length} row${eligItems.length === 1 ? "" : "s"}. Type a sentence per row.`}
+          >
+            <SentenceListInput
+              items={eligItems}
+              onChange={setEligItems}
+              placeholder="e.g. Age 18 to 65 years old"
+            />
+          </Section>
+
+          {/* FAQ */}
+          <Section
+            icon={HelpCircle}
+            title="FAQ"
+            hint={`${faqItems.length} question${faqItems.length === 1 ? "" : "s"}. Add a question and its answer.`}
+          >
+            <FaqListInput items={faqItems} onChange={setFaqItems} />
           </Section>
         </div>
 
@@ -1546,8 +1442,7 @@ function Field({
   );
 }
 
-/** Add-a-line list with removable, drag-to-reorder items. Used for Description
- *  points and Required documents. */
+/** Add-a-line list with removable items. Used for Description points. */
 function SortableListInput({
   items,
   onChange,
@@ -1558,8 +1453,6 @@ function SortableListInput({
   placeholder: string;
 }) {
   const [input, setInput] = useState("");
-  const [drag, setDrag] = useState<number | null>(null);
-  const [over, setOver] = useState<number | null>(null);
 
   const add = () => {
     const v = input.trim();
@@ -1568,13 +1461,6 @@ function SortableListInput({
     setInput("");
   };
   const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
-  const move = (from: number, to: number) => {
-    if (from === to) return;
-    const next = [...items];
-    const [m] = next.splice(from, 1);
-    next.splice(to, 0, m);
-    onChange(next);
-  };
 
   return (
     <>
@@ -1610,41 +1496,9 @@ function SortableListInput({
           {items.map((item, i) => (
             <li
               key={i}
-              draggable
-              onDragStart={e => {
-                setDrag(i);
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", String(i));
-              }}
-              onDragOver={e => {
-                if (drag === null || drag === i) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                if (over !== i) setOver(i);
-              }}
-              onDragLeave={() => {
-                if (over === i) setOver(null);
-              }}
-              onDrop={e => {
-                e.preventDefault();
-                if (drag !== null && drag !== i) move(drag, i);
-                setDrag(null);
-                setOver(null);
-              }}
-              onDragEnd={() => {
-                setDrag(null);
-                setOver(null);
-              }}
-              className={cn(
-                "flex items-center justify-between gap-2 rounded-md border bg-gray-50/60 px-2.5 py-2 transition",
-                over === i ? "border-brand-300 ring-1 ring-brand-500/20" : "border-gray-200",
-                drag === i && "opacity-50"
-              )}
+              className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50/60 px-2.5 py-2"
             >
-              <span className="flex items-center gap-2 min-w-0">
-                <GripVertical className="w-4 h-4 text-gray-300 cursor-grab flex-shrink-0" />
-                <span className="text-sm text-gray-700">{item}</span>
-              </span>
+              <span className="text-sm text-gray-700 min-w-0">{item}</span>
               <button
                 type="button"
                 onClick={() => remove(i)}
@@ -1663,53 +1517,75 @@ function SortableListInput({
 
 type DocItem = { name: string; note?: string; icon?: string };
 
-/** Default required documents pre-filled when creating a new product. */
-const DEFAULT_REQUIRED_DOCS: DocItem[] = [
-  { name: "Business Documents",   note: "Required when applicable" },
-  { name: "Financial information", note: "Required when applicable" },
-  { name: "Collateral documents", note: "Required when applicable" },
-  { name: "Owner identification", note: "Required when applicable" },
+type GlanceItem = { label: string; value: string };
+
+/** Default FAQ rows pre-filled when creating a new product. */
+const DEFAULT_FAQS: FaqItem[] = [
+  { question: "Can I apply before my contract?", answer: "Yes. Conditional approval may apply." },
+  { question: "Which countries are supported?", answer: "Korea, Japan, Singapore, and Israel." },
+  { question: "How fast is approval?", answer: "Up to 2 business days." },
+  { question: "What documents do I need?", answer: "ID and application documents." },
+  { question: "Do I need a guarantor?", answer: "If required by the product." },
+  { question: "When will I receive the loan?", answer: "After approval and required conditions are met." },
+  { question: "Can I borrow before my visa?", answer: "Yes, if eligible." },
+  { question: "Can I repay early?", answer: "Yes." },
+  { question: "Can I apply again?", answer: "Yes, subject to reassessment." },
 ];
 
-/** Required-documents list: add a name, upload an icon per row, remove, drag-reorder. */
-function DocumentListInput({
+/** Default Key Feature rows pre-filled when creating a new product. */
+const DEFAULT_KEY_FEATURES: string[] = [
+  "Fast review — decision within 3 business days",
+  "Flexible repayment: monthly or irregular",
+  "Collateral required",
+  "Co-borrower required",
+];
+
+/** Default Eligibility rows pre-filled when creating a new product. */
+const DEFAULT_ELIGIBILITY: string[] = [
+  "Cambodian national or registered business",
+  "Minimum 6 months of trading history",
+  "Valid business registration for amounts above USD 5,000",
+  "No active default on existing loans",
+];
+
+/** Parse a legacy "• line\n• line" string into sentence rows. */
+function linesToSentences(text?: string): string[] {
+  return (text ?? "")
+    .split(/\r?\n/)
+    .map(s => s.replace(/^[•\-]\s*/, "").trim())
+    .filter(Boolean);
+}
+
+/** Sentence list: one sentence per row, inline edit, and confirm-guarded
+ *  delete (matching Loan At A Glance). */
+function SentenceListInput({
   items,
   onChange,
+  placeholder,
 }: {
-  items: DocItem[];
-  onChange: (items: DocItem[]) => void;
+  items: string[];
+  onChange: (items: string[]) => void;
+  placeholder: string;
 }) {
   const [input, setInput] = useState("");
-  const [drag, setDrag] = useState<number | null>(null);
-  const [over, setOver] = useState<number | null>(null);
+  // Row pending delete confirmation — these rows feed the customer's mobile
+  // product page, so a filled row never deletes on a single (mis)click.
+  const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
 
   const add = () => {
     const v = input.trim();
     if (!v) return;
-    onChange([...items, { name: v, note: "Required when applicable" }]);
+    onChange([...items, v]);
     setInput("");
   };
   const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
-  const setIcon = (i: number, icon: string) =>
-    onChange(items.map((it, idx) => (idx === i ? { ...it, icon } : it)));
-  const setNote = (i: number, note: string) =>
-    onChange(items.map((it, idx) => (idx === i ? { ...it, note } : it)));
-  const move = (from: number, to: number) => {
-    if (from === to) return;
-    const next = [...items];
-    const [m] = next.splice(from, 1);
-    next.splice(to, 0, m);
-    onChange(next);
+  const askRemove = (i: number) => {
+    // Empty rows carry no data — delete them without ceremony.
+    if (!items[i].trim()) return remove(i);
+    setConfirmRemove(i);
   };
-  const onPickIcon = (i: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = () => setIcon(i, String(reader.result || ""));
-      reader.readAsDataURL(file);
-    }
-    e.target.value = ""; // allow re-picking the same file
-  };
+  const patch = (i: number, text: string) =>
+    onChange(items.map((it, idx) => (idx === i ? text : it)));
 
   return (
     <>
@@ -1723,7 +1599,7 @@ function DocumentListInput({
               add();
             }
           }}
-          placeholder="e.g. Business Documents"
+          placeholder={placeholder}
           className="form-input flex-1"
         />
         <button
@@ -1731,7 +1607,7 @@ function DocumentListInput({
           onClick={add}
           disabled={!input.trim()}
           className={cn(
-            "px-3 py-2 text-sm font-medium rounded-md border",
+            "px-3 py-2 text-sm font-medium rounded-md border flex-shrink-0",
             input.trim()
               ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
               : "border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed"
@@ -1745,77 +1621,18 @@ function DocumentListInput({
           {items.map((item, i) => (
             <li
               key={i}
-              draggable
-              onDragStart={e => {
-                setDrag(i);
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", String(i));
-              }}
-              onDragOver={e => {
-                if (drag === null || drag === i) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                if (over !== i) setOver(i);
-              }}
-              onDragLeave={() => {
-                if (over === i) setOver(null);
-              }}
-              onDrop={e => {
-                e.preventDefault();
-                if (drag !== null && drag !== i) move(drag, i);
-                setDrag(null);
-                setOver(null);
-              }}
-              onDragEnd={() => {
-                setDrag(null);
-                setOver(null);
-              }}
-              className={cn(
-                "flex items-center justify-between gap-2 rounded-md border bg-gray-50/60 px-2.5 py-2 transition",
-                over === i ? "border-brand-300 ring-1 ring-brand-500/20" : "border-gray-200",
-                drag === i && "opacity-50"
-              )}
+              className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50/60 px-2.5 py-2"
             >
-              <span className="flex items-center gap-2 min-w-0 flex-1">
-                <GripVertical className="w-4 h-4 text-gray-300 cursor-grab flex-shrink-0" />
-                {/* Click to upload an icon from the local device */}
-                <label
-                  title="Upload icon"
-                  className={cn(
-                    "h-8 rounded-md border border-gray-200 bg-white flex items-center cursor-pointer overflow-hidden hover:border-brand-300 flex-shrink-0 self-start",
-                    item.icon ? "w-8 justify-center" : "gap-1.5 px-2"
-                  )}
-                >
-                  {item.icon ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.icon} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <>
-                      <Upload className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                      <span className="text-[11px] text-gray-500 whitespace-nowrap">Upload icon</span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={e => onPickIcon(i, e)}
-                  />
-                </label>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-gray-700 truncate">{item.name}</span>
-                  <input
-                    value={item.note ?? ""}
-                    onChange={e => setNote(i, e.target.value)}
-                    placeholder="Required when applicable"
-                    className="mt-0.5 w-full text-xs text-gray-500 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 placeholder:text-gray-400"
-                  />
-                </span>
-              </span>
+              <input
+                value={item}
+                onChange={e => patch(i, e.target.value)}
+                placeholder={placeholder}
+                className="flex-1 min-w-0 text-sm text-gray-700 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 placeholder:text-gray-400"
+              />
               <button
                 type="button"
-                onClick={() => remove(i)}
-                className="text-gray-400 hover:text-red-600 flex-shrink-0 self-start"
+                onClick={() => askRemove(i)}
+                className="text-gray-400 hover:text-red-600 flex-shrink-0"
                 aria-label="Remove"
               >
                 <X className="w-4 h-4" />
@@ -1824,107 +1641,361 @@ function DocumentListInput({
           ))}
         </ul>
       )}
+      {confirmRemove !== null && items[confirmRemove] !== undefined && (
+        <ConfirmDialog
+          title={`Remove "${
+            items[confirmRemove].trim().length > 48
+              ? items[confirmRemove].trim().slice(0, 48) + "…"
+              : items[confirmRemove].trim()
+          }"?`}
+          message="This row is shown on the customer's mobile product page. Once removed, it disappears from the app when you save."
+          confirmLabel="Remove row"
+          onCancel={() => setConfirmRemove(null)}
+          onConfirm={() => {
+            remove(confirmRemove);
+            setConfirmRemove(null);
+          }}
+        />
+      )}
     </>
   );
 }
 
-/* Input with an optional prefix (e.g. "$") or suffix (e.g. "%", "m") symbol.
- * Uses a flex layout so the symbol and the value share the same baseline and
- * stay vertically centered together — no absolute-positioning alignment quirks. */
-function AffixInput({
-  prefix,
-  suffix,
-  className,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & {
-  prefix?: string;
-  suffix?: string;
+/** Default "Loan At A Glance" rows pre-filled when creating a new product. */
+const DEFAULT_GLANCE_ROWS: GlanceItem[] = [
+  { label: "Interest Rate", value: "" },
+  { label: "Loan Amount", value: "" },
+  { label: "Tenure", value: "" },
+  { label: "Purpose", value: "" },
+];
+
+/** Example values shown as placeholders for the well-known default rows. */
+const GLANCE_VALUE_HINTS: Record<string, string> = {
+  "interest rate": "From 0.98% / month",
+  "loan amount": "USD 500 – USD 15,000",
+  tenure: "36 months",
+  purpose: "Overseas job expenses",
+};
+
+const glanceHintFor = (label: string) =>
+  GLANCE_VALUE_HINTS[label.trim().toLowerCase()] ?? "Value";
+
+/** Derive glance rows from a legacy product's structured numeric fields. */
+function glanceRowsFromProduct(p: LoanProduct): GlanceItem[] {
+  const usd = (n: number) => `USD ${n.toLocaleString()}`;
+  return [
+    {
+      label: "Interest Rate",
+      value: p.rateMax > 0 ? `From ${p.rateMax}% / month` : "",
+    },
+    {
+      label: "Loan Amount",
+      value:
+        p.min > 0 || p.max > 0
+          ? p.min === p.max
+            ? usd(p.max)
+            : `${usd(p.min)} – ${usd(p.max)}`
+          : "",
+    },
+    {
+      label: "Tenure",
+      value: p.termMax > 0 ? `${p.termMax} months` : "",
+    },
+    { label: "Purpose", value: p.purpose ?? "" },
+  ];
+}
+
+/** Loan At A Glance list: add a title + value row, edit inline, remove, drag-reorder. */
+function GlanceListInput({
+  items,
+  onChange,
+}: {
+  items: GlanceItem[];
+  onChange: (items: GlanceItem[]) => void;
 }) {
+  const [label, setLabel] = useState("");
+  const [value, setValue] = useState("");
+  // Row pending delete confirmation. These rows feed the customer's mobile
+  // product page, so a filled row never deletes on a single (mis)click.
+  const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
+
+  const canAdd = !!label.trim() && !!value.trim();
+  const add = () => {
+    if (!canAdd) return;
+    onChange([...items, { label: label.trim(), value: value.trim() }]);
+    setLabel("");
+    setValue("");
+  };
+  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
+  const askRemove = (i: number) => {
+    // Empty rows carry no data — delete them without ceremony.
+    const it = items[i];
+    if (!it.label.trim() && !it.value.trim()) return remove(i);
+    setConfirmRemove(i);
+  };
+  const patch = (i: number, p: Partial<GlanceItem>) =>
+    onChange(items.map((it, idx) => (idx === i ? { ...it, ...p } : it)));
+
   return (
-    <label
-      className={cn(
-        "flex items-center gap-1.5 w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md transition cursor-text",
-        "focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20",
-        className
+    <>
+      <div className="rounded-md border border-gray-200 bg-gray-50/60 p-2.5 flex flex-col sm:flex-row gap-2">
+        <input
+          value={label}
+          onChange={e => setLabel(e.target.value)}
+          placeholder="Title, e.g. Processing Fee"
+          className="form-input min-w-0 sm:flex-1"
+        />
+        <input
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder="Value, e.g. 2% of loan amount"
+          className="form-input min-w-0 sm:flex-[2]"
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!canAdd}
+          className={cn(
+            "px-3 py-2 text-sm font-medium rounded-md border flex-shrink-0",
+            canAdd
+              ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
+              : "border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed"
+          )}
+        >
+          Add
+        </button>
+      </div>
+      {items.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {items.map((item, i) => (
+            <li
+              key={i}
+              className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50/60 px-2.5 py-2"
+            >
+              <input
+                value={item.label}
+                onChange={e => patch(i, { label: e.target.value })}
+                placeholder="Title"
+                className="w-1/3 min-w-0 text-xs font-medium text-gray-700 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 placeholder:text-gray-400"
+              />
+              <input
+                value={item.value}
+                onChange={e => patch(i, { value: e.target.value })}
+                placeholder={glanceHintFor(item.label)}
+                className="flex-1 min-w-0 text-sm text-gray-700 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 placeholder:text-gray-400"
+              />
+              <button
+                type="button"
+                onClick={() => askRemove(i)}
+                className="text-gray-400 hover:text-red-600 flex-shrink-0"
+                aria-label="Remove"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
-    >
-      {prefix && (
-        <span className="text-gray-500 select-none flex-shrink-0">{prefix}</span>
+      {confirmRemove !== null && items[confirmRemove] && (
+        <ConfirmDialog
+          title={`Remove "${items[confirmRemove].label.trim() || "this row"}"?`}
+          message="This row is shown on the customer's mobile product page. Once removed, it disappears from the app when you save."
+          confirmLabel="Remove row"
+          onCancel={() => setConfirmRemove(null)}
+          onConfirm={() => {
+            remove(confirmRemove);
+            setConfirmRemove(null);
+          }}
+        />
       )}
-      <input
-        {...props}
-        className="flex-1 min-w-0 bg-transparent outline-none border-0 p-0 text-sm placeholder:text-gray-400"
-      />
-      {suffix && (
-        <span className="text-gray-500 select-none flex-shrink-0">{suffix}</span>
-      )}
-    </label>
+    </>
   );
 }
 
-/* Row inside a Key Features / Eligibility section. Has a show/hide toggle:
- *   - shown  → renders the children (inputs) under the label
- *   - hidden → collapses to a muted single line
- *
- *   The row itself has no border — wrap a group of rows in a single
- *   `border border-gray-200 rounded-md divide-y divide-gray-100` container
- *   so they read as one card. */
-function ToggleRow({
-  label,
-  shown,
-  onToggle,
-  children,
+/* Small destructive-action confirmation, layered above the product modal
+ * (z-50) so it reads as a child of the form. */
+function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  onCancel,
+  onConfirm,
 }: {
-  label: string;
-  shown: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
 }) {
   return (
-    <div className={cn("px-3 py-2.5", !shown && "bg-gray-50/60")}>
-      <div className="flex items-center justify-between gap-3">
-        <label
-          className={cn(
-            "text-xs font-medium",
-            shown ? "text-gray-700" : "text-gray-400"
-          )}
-        >
-          {label}
-        </label>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={shown}
-          onClick={onToggle}
-          title={shown ? "Hide this field" : "Show this field"}
-          className={cn(
-            "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
-            shown ? "bg-brand-600" : "bg-gray-300"
-          )}
-        >
-          <span
-            className={cn(
-              "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
-              shown ? "translate-x-[18px]" : "translate-x-0.5"
-            )}
-          />
-        </button>
-      </div>
-      {/* Always render children — when toggled off, dim and disable instead
-       *   of hiding so the layout doesn't shift. */}
+    <div
+      className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
       <div
-        className={cn(
-          "mt-2 transition-opacity",
-          !shown && "opacity-50 pointer-events-none select-none"
-        )}
-        aria-disabled={!shown}
+        className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
       >
-        {children}
+        <div className="p-5">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-gray-900">{title}</div>
+              <div className="text-xs text-gray-600 mt-1">{message}</div>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-3 py-1.5 text-sm bg-rose-600 text-white rounded-md hover:bg-rose-700 font-medium"
+          >
+            {confirmLabel}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
+type FaqItem = { question: string; answer: string };
+
+/** FAQ list: type a question + answer, add, edit inline, remove, drag-reorder. */
+function FaqListInput({
+  items,
+  onChange,
+}: {
+  items: FaqItem[];
+  onChange: (items: FaqItem[]) => void;
+}) {
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  // Row pending delete confirmation — these rows feed the customer's mobile
+  // product page, so a filled row never deletes on a single (mis)click.
+  const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
+
+  const canAdd = !!question.trim() && !!answer.trim();
+  const add = () => {
+    if (!canAdd) return;
+    onChange([...items, { question: question.trim(), answer: answer.trim() }]);
+    setQuestion("");
+    setAnswer("");
+  };
+  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
+  const askRemove = (i: number) => {
+    // Empty rows carry no data — delete them without ceremony.
+    const it = items[i];
+    if (!it.question.trim() && !it.answer.trim()) return remove(i);
+    setConfirmRemove(i);
+  };
+  const patch = (i: number, p: Partial<FaqItem>) =>
+    onChange(items.map((it, idx) => (idx === i ? { ...it, ...p } : it)));
+
+  return (
+    <>
+      <div className="rounded-md border border-gray-200 bg-gray-50/60 p-2.5 space-y-2">
+        <input
+          value={question}
+          onChange={e => setQuestion(e.target.value)}
+          placeholder="Question, e.g. What documents do I need?"
+          className="form-input"
+        />
+        <div className="flex items-center gap-2">
+          <input
+            value={answer}
+            onChange={e => setAnswer(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+            placeholder="Answer customers will see"
+            className="form-input flex-1 min-w-0"
+          />
+          <button
+            type="button"
+            onClick={add}
+            disabled={!canAdd}
+            className={cn(
+              "px-3 py-2 text-sm font-medium rounded-md border flex-shrink-0",
+              canAdd
+                ? "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
+                : "border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed"
+            )}
+          >
+            Add
+          </button>
+        </div>
+      </div>
+      {items.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {items.map((item, i) => (
+            <li
+              key={i}
+              className="flex items-start justify-between gap-2 rounded-md border border-gray-200 bg-gray-50/60 px-2.5 py-2"
+            >
+              <span className="flex items-start gap-2 min-w-0 flex-1">
+                <span className="min-w-0 flex-1">
+                  <input
+                    value={item.question}
+                    onChange={e => patch(i, { question: e.target.value })}
+                    placeholder="Question"
+                    className="w-full text-sm text-gray-700 font-medium bg-transparent border-0 p-0 focus:outline-none focus:ring-0 placeholder:text-gray-400"
+                  />
+                  <input
+                    value={item.answer}
+                    onChange={e => patch(i, { answer: e.target.value })}
+                    placeholder="Answer"
+                    className="mt-0.5 w-full text-xs text-gray-500 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 placeholder:text-gray-400"
+                  />
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => askRemove(i)}
+                className="text-gray-400 hover:text-red-600 flex-shrink-0 mt-0.5"
+                aria-label="Remove"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {confirmRemove !== null && items[confirmRemove] && (
+        <ConfirmDialog
+          title={`Remove "${
+            items[confirmRemove].question.trim().length > 48
+              ? items[confirmRemove].question.trim().slice(0, 48) + "…"
+              : items[confirmRemove].question.trim() || "this question"
+          }"?`}
+          message="This question is shown on the customer's mobile product page. Once removed, it disappears from the app when you save."
+          confirmLabel="Remove row"
+          onCancel={() => setConfirmRemove(null)}
+          onConfirm={() => {
+            remove(confirmRemove);
+            setConfirmRemove(null);
+          }}
+        />
+      )}
+    </>
+  );
+}
 
 /* ---------- detail product modal ---------- */
 
@@ -1956,6 +2027,21 @@ function DetailProductModal({
       .split(/\r?\n/)
       .map(line => line.replace(/^[•\-\*]\s*/, "").trim())
       .filter(Boolean);
+
+  // Prefer the saved dynamic rows; legacy products fall back to rows derived
+  // from the structured numeric fields. Rows without a value are hidden.
+  const glance = (
+    product.atAGlance?.length ? product.atAGlance : glanceRowsFromProduct(product)
+  ).filter(g => g.value);
+  // Products without saved rows fall back to the same defaults the create
+  // form pre-fills, so the detail view always mirrors the form's sections.
+  const keyFeatureLines = product.keyFeatures
+    ? linesOf(product.keyFeatures)
+    : DEFAULT_KEY_FEATURES;
+  const eligibilityLines = product.eligibility
+    ? linesOf(product.eligibility)
+    : DEFAULT_ELIGIBILITY;
+  const faqs = product.faqs?.length ? product.faqs : DEFAULT_FAQS;
 
   return (
     <div
@@ -2028,71 +2114,110 @@ function DetailProductModal({
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-thin p-6 space-y-6">
-          {/* Description */}
+          {/* Image or video */}
           <div>
-            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2">
-              Description
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
+              <ImageIcon className="w-3 h-3" />
+              Image or video
             </div>
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {product.description}
-            </p>
+            {product.media ? (
+              product.mediaType === "video" ? (
+                <video
+                  src={product.media}
+                  controls
+                  className="w-full max-h-56 rounded-md border border-gray-200 bg-black object-contain"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={product.media}
+                  alt="product media"
+                  className="w-full max-h-56 object-cover rounded-md border border-gray-200"
+                />
+              )
+            ) : (
+              <div className="h-24 rounded-md border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1 text-gray-400">
+                <ImageIcon className="w-4 h-4" />
+                <span className="text-xs">No image or video uploaded yet</span>
+              </div>
+            )}
           </div>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Stat
-              icon={CircleDollarSign}
-              label="Amount range"
-              value={
-                product.min === product.max
-                  ? `$${product.max.toLocaleString()}`
-                  : `$${product.min.toLocaleString()} – $${product.max.toLocaleString()}`
-              }
-            />
-            <Stat
-              icon={Percent}
-              label="Interest rate"
-              value={
-                product.rateMin === product.rateMax
-                  ? `${product.rateMax}%`
-                  : `${product.rateMin}% – ${product.rateMax}%`
-              }
-            />
-            <Stat
-              icon={Calendar}
-              label="Term"
-              value={
-                product.termMin === product.termMax
-                  ? `${product.termMax} months`
-                  : `${product.termMin} – ${product.termMax} months`
-              }
-            />
-            <Stat
-              icon={Percent}
-              label="Processing fee"
-              value={`${product.processingFee}%`}
-            />
-            <Stat
-              icon={Percent}
-              label="Late penalty"
-              value={`${product.latePenalty}% / month`}
-            />
-            <Stat
-              icon={product.earlyPayoff ? Check : X}
-              label="Early payoff"
-              value={product.earlyPayoff ? "Allowed" : "Not allowed"}
-            />
+          {/* Reference product icon */}
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
+              <ImageIcon className="w-3 h-3" />
+              Reference product icon (42 × 42 px)
+            </div>
+            <div className="flex items-center gap-3">
+              {product.icon ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={product.icon}
+                    alt="product icon"
+                    className="w-[42px] h-[42px] rounded-lg border border-gray-200 object-cover flex-shrink-0"
+                  />
+                  <span className="text-xs text-gray-500">
+                    Shown beside the product name in the customer app.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="w-[42px] h-[42px] rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 flex-shrink-0">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs text-gray-400">No icon uploaded yet</span>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Eligibility */}
-          {product.eligibility && (
+          {/* Description */}
+          {product.description && (
             <div>
               <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
-                <ShieldCheck className="w-3 h-3" />
-                Eligibility criteria
+                <FileText className="w-3 h-3" />
+                Description
+              </div>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {product.description}
+              </p>
+            </div>
+          )}
+
+          {/* Loan at a glance — label/value rows, matching the create form. */}
+          {glance.length > 0 && (
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
+                <CircleDollarSign className="w-3 h-3" />
+                Loan at a glance
+              </div>
+              <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+                {glance.map((g, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-3 px-3 py-2.5"
+                  >
+                    <span className="text-xs text-gray-500 flex-shrink-0">{g.label}</span>
+                    <span className="text-sm font-semibold text-gray-900 text-right">
+                      {g.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Key feature */}
+          {keyFeatureLines.length > 0 && (
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
+                <Check className="w-3 h-3" />
+                Key feature
               </div>
               <ul className="space-y-1.5">
-                {linesOf(product.eligibility).map((line, i) => (
+                {keyFeatureLines.map((line, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
                     <Check className="w-3.5 h-3.5 text-emerald-600 mt-1 flex-shrink-0" />
                     <span>{line}</span>
@@ -2102,42 +2227,36 @@ function DetailProductModal({
             </div>
           )}
 
-          {/* Required documents */}
-          {(product.requiredDocuments?.length || product.requiredDocs) && (
+          {/* Eligibility */}
+          {eligibilityLines.length > 0 && (
             <div>
               <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
-                <Files className="w-3 h-3" />
-                Required documents
+                <ShieldCheck className="w-3 h-3" />
+                Eligibility
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {(product.requiredDocuments?.length
-                  ? product.requiredDocuments
-                  : linesOf(product.requiredDocs).map(name => ({
-                      name,
-                      note: undefined as string | undefined,
-                      icon: undefined as string | undefined,
-                    }))
-                ).map((doc, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2.5 px-3 py-2 border border-gray-200 rounded-md"
-                  >
-                    {doc.icon ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={doc.icon}
-                        alt=""
-                        className="w-6 h-6 rounded object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                      <div className="text-sm text-gray-800 truncate">{doc.name}</div>
-                      {doc.note && (
-                        <div className="text-xs text-gray-500 truncate">{doc.note}</div>
-                      )}
-                    </div>
+              <ul className="space-y-1.5">
+                {eligibilityLines.map((line, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 mt-1 flex-shrink-0" />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* FAQ */}
+          {faqs.length > 0 && (
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
+                <HelpCircle className="w-3 h-3" />
+                FAQ
+              </div>
+              <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+                {faqs.map((f, i) => (
+                  <div key={i} className="px-3 py-2.5">
+                    <div className="text-sm font-medium text-gray-900">{f.question}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{f.answer}</div>
                   </div>
                 ))}
               </div>
@@ -2191,22 +2310,3 @@ function DetailProductModal({
   );
 }
 
-function Stat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-      <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
-        <Icon className="w-3.5 h-3.5" />
-        {label}
-      </div>
-      <div className="text-sm font-semibold text-gray-900 mt-1">{value}</div>
-    </div>
-  );
-}

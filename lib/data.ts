@@ -350,6 +350,8 @@ export type LoanProduct = {
   description: string;
   /** Customer eligibility criteria (one per line). */
   eligibility: string;
+  /** Key feature highlights (one "• line" per row, same format as eligibility). */
+  keyFeatures?: string;
   /** Documents the customer needs to provide (one per line).
    *  Repurposed as "Benefits" in newer forms — kept under this key for
    *  backwards compatibility with seeded data. */
@@ -359,6 +361,11 @@ export type LoanProduct = {
   earlyPayoff: boolean;    // is early payoff allowed
   /** Repayment method (e.g. "Flexible", "Periodic principal and interest"). */
   repaymentMethod?: string;
+  /** Loan purpose shown at a glance (e.g. "Overseas job expenses"). */
+  purpose?: string;
+  /** Dynamic "Loan At A Glance" rows — admin-defined label/value pairs
+   *  (e.g. "Interest Rate" → "From 0.98% / month"). */
+  atAGlance?: { label: string; value: string }[];
   /** Product kind — defaults to "non-mwl" in legacy records. */
   kind?: ProductKind;
   /** For mwl-sub: destination country. May be a legacy MWL_COUNTRIES code
@@ -369,10 +376,14 @@ export type LoanProduct = {
   /** Optional product media — an uploaded image or video (data URL in the prototype). */
   media?: string;
   mediaType?: "image" | "video";
+  /** Reference product icon shown beside the product name (data URL in the prototype). */
+  icon?: string;
   /** Structured required documents with an optional caption + uploaded icon
    *  (data URL). `requiredDocs` above is kept as the newline-joined names for
    *  backward compatibility. */
   requiredDocuments?: { name: string; note?: string; icon?: string }[];
+  /** Product FAQ — question/answer pairs shown on the customer product page. */
+  faqs?: { question: string; answer: string }[];
 };
 
 export const PRODUCTS: LoanProduct[] = [
