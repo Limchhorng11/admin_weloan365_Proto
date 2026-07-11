@@ -62,6 +62,24 @@ export default function ProductsPage() {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+  // Confirmation dialog after a drag reorder — "Moved X from position A to
+  // B". Stays open (like the rest of the app's modals) until the admin
+  // dismisses it, rather than auto-disappearing.
+  const [reorderNotice, setReorderNotice] = useState<string | null>(null);
+
+  // MWL country sub-rows are collapsed under their parent by default — the
+  // chevron toggles a parent id in/out of this set. Keeps the table scannable
+  // when there are several destination countries per parent.
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => {
+    setExpandedParents(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const detail = detailId ? products.find(p => p.id === detailId) ?? null : null;
 
   // Apply filters + search
@@ -122,34 +140,40 @@ export default function ProductsPage() {
    * (or to the very end when target is null). */
   const moveTopLevelTo = (draggedId: string, targetId: string | null) => {
     if (draggedId === targetId) return;
-    setProducts(prev => {
-      // Group into parent-plus-subs blocks so we move a whole family at once.
-      const blocks: LoanProduct[][] = [];
-      for (const p of prev) {
-        if (p.kind === "mwl-sub") {
-          const last = blocks[blocks.length - 1];
-          if (last && last[0].id === p.parentId) last.push(p);
-          else blocks.push([p]);
-        } else {
-          blocks.push([p]);
-        }
-      }
-      const srcIdx = blocks.findIndex(b => b[0].id === draggedId);
-      if (srcIdx === -1) return prev;
-      const [moved] = blocks.splice(srcIdx, 1);
-      if (targetId === null) {
-        blocks.push(moved);
+    // Computed from the current `products` snapshot rather than inside a
+    // setProducts updater — the updater callback runs after this handler
+    // returns, so a toast message assigned in there wouldn't be readable
+    // here yet. A single drag gesture only calls this once, so reading the
+    // render's own `products` value directly is safe.
+    const blocks: LoanProduct[][] = [];
+    for (const p of products) {
+      if (p.kind === "mwl-sub") {
+        const last = blocks[blocks.length - 1];
+        if (last && last[0].id === p.parentId) last.push(p);
+        else blocks.push([p]);
       } else {
-        const dstIdx = blocks.findIndex(b => b[0].id === targetId);
-        if (dstIdx === -1) {
-          // Target vanished — restore original position.
-          blocks.splice(srcIdx, 0, moved);
-        } else {
-          blocks.splice(dstIdx, 0, moved);
-        }
+        blocks.push([p]);
       }
-      return blocks.flat();
-    });
+    }
+    const srcIdx = blocks.findIndex(b => b[0].id === draggedId);
+    if (srcIdx === -1) return;
+    const [moved] = blocks.splice(srcIdx, 1);
+    if (targetId === null) {
+      blocks.push(moved);
+    } else {
+      const dstIdx = blocks.findIndex(b => b[0].id === targetId);
+      if (dstIdx === -1) {
+        // Target vanished — restore original position.
+        blocks.splice(srcIdx, 0, moved);
+      } else {
+        blocks.splice(dstIdx, 0, moved);
+      }
+    }
+    const finalIdx = blocks.findIndex(b => b[0].id === draggedId);
+    setProducts(blocks.flat());
+    if (finalIdx !== -1 && finalIdx !== srcIdx) {
+      setReorderNotice(`Moved "${moved[0].name}" from position ${srcIdx + 1} to ${finalIdx + 1}`);
+    }
   };
 
   return (
@@ -255,7 +279,7 @@ export default function ProductsPage() {
                 <th className="w-16 px-3 py-3 text-left text-[12px] font-medium text-gray-500">
                   #
                 </th>
-                {["Name", "Amount range", "Rate", "Term", "Active loans", "Status"].map(h => (
+                {["Name", "Amount range", "Rate", "Term", "Status"].map(h => (
                   <th key={h} className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap">
                     {h}
                   </th>
@@ -270,7 +294,14 @@ export default function ProductsPage() {
                 const topLevelIds = products
                   .filter(p => p.kind !== "mwl-sub")
                   .map(p => p.id);
-                return sortForGrouping(filtered, products).map(p => {
+                // While searching, force every parent open so a matching
+                // country sub-row isn't hidden behind a collapsed chevron.
+                const isSearching = query.trim() !== "";
+                return sortForGrouping(
+                  filtered,
+                  products,
+                  isSearching ? null : expandedParents
+                ).map(p => {
                 const isParent = p.kind === "mwl-parent";
                 const isSub    = p.kind === "mwl-sub";
                 const country  = isSub
@@ -279,6 +310,7 @@ export default function ProductsPage() {
                 const childCount = isParent
                   ? products.filter(x => x.parentId === p.id).length
                   : 0;
+                const isExpanded = isSearching || expandedParents.has(p.id);
                 const topIdx = isSub ? -1 : topLevelIds.indexOf(p.id);
                 const positionNumber = topIdx === -1 ? null : topIdx + 1;
                 const isDragging = draggedId === p.id;
@@ -381,28 +413,48 @@ export default function ProductsPage() {
                           {p.name}
                         </span>
                         {isParent && childCount > 0 && (
-                          <span className="text-[11px] text-gray-400">
+                          <button
+                            type="button"
+                            aria-label={isExpanded ? "Collapse countries" : "Expand countries"}
+                            aria-expanded={isExpanded}
+                            onClick={e => {
+                              e.stopPropagation();
+                              toggleExpanded(p.id);
+                            }}
+                            className="flex items-center gap-0.5 px-1.5 py-0.5 -my-0.5 rounded text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex-shrink-0"
+                          >
                             · {childCount} {childCount === 1 ? "country" : "countries"}
-                          </span>
+                            <ChevronDown
+                              className={cn(
+                                "w-3.5 h-3.5 transition-transform",
+                                !isExpanded && "-rotate-90"
+                              )}
+                            />
+                          </button>
                         )}
                       </div>
                     </td>
                     <td className={cn("px-6 py-3", cellTone)}>
-                      {p.min === p.max
-                        ? `$${p.max.toLocaleString()}`
-                        : `$${p.min.toLocaleString()} – $${p.max.toLocaleString()}`}
+                      {!isSub && (
+                        p.min === p.max
+                          ? `$${p.max.toLocaleString()}`
+                          : `$${p.min.toLocaleString()} – $${p.max.toLocaleString()}`
+                      )}
                     </td>
                     <td className={cn("px-6 py-3", cellTone)}>
-                      {p.rateMin === p.rateMax
-                        ? `${p.rateMax}%`
-                        : `${p.rateMin}% – ${p.rateMax}%`}
+                      {!isSub && (
+                        p.rateMin === p.rateMax
+                          ? `${p.rateMax}%`
+                          : `${p.rateMin}% – ${p.rateMax}%`
+                      )}
                     </td>
                     <td className={cn("px-6 py-3", cellTone)}>
-                      {p.termMin === p.termMax
-                        ? `${p.termMax}m`
-                        : `${p.termMin}–${p.termMax}m`}
+                      {!isSub && (
+                        p.termMin === p.termMax
+                          ? `${p.termMax}m`
+                          : `${p.termMin}–${p.termMax}m`
+                      )}
                     </td>
-                    <td className={cn("px-6 py-3", cellTone)}>{p.loans}</td>
                     <td className="px-6 py-3">
                       <StatusBadge
                         status={
@@ -450,6 +502,13 @@ export default function ProductsPage() {
         onUpdateStatus={handleUpdateStatus}
         onEdit={handleEdit}
       />
+
+      {reorderNotice && (
+        <ReorderConfirmDialog
+          message={reorderNotice}
+          onConfirm={() => setReorderNotice(null)}
+        />
+      )}
     </div>
   );
 }
@@ -465,6 +524,9 @@ export default function ProductsPage() {
 function sortForGrouping(
   visible: LoanProduct[],
   all: LoanProduct[],
+  // Parent ids whose country sub-rows should be appended. `null` means
+  // "expand every parent" (used while a search query is active).
+  expandedParents: Set<string> | null,
 ): LoanProduct[] {
   const visibleIds = new Set(visible.map(p => p.id));
   const out: LoanProduct[] = [];
@@ -477,7 +539,8 @@ function sortForGrouping(
       continue;
     out.push(p);
     seen.add(p.id);
-    if (p.kind === "mwl-parent") {
+    const isExpanded = expandedParents === null || expandedParents.has(p.id);
+    if (p.kind === "mwl-parent" && isExpanded) {
       // Append the matching sub-products (preserve their source order).
       for (const child of all) {
         if (
@@ -492,6 +555,52 @@ function sortForGrouping(
     }
   }
   return out;
+}
+
+/* ---------- reorder confirm dialog ---------- */
+
+// Matches the app's standard modal shell (fixed backdrop + centered white
+// card, see ConfirmDialog in components/users-roles-view.tsx) rather than a
+// toast — the reorder already happened, so this is an acknowledgement, not
+// a yes/no choice, hence the single Confirm action.
+function ReorderConfirmDialog({
+  message,
+  onConfirm,
+}: {
+  message: string;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4"
+      onClick={onConfirm}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-5">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+              <Check className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-gray-900">Order updated</div>
+              <div className="text-xs text-gray-600 mt-1">{message}</div>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onConfirm}
+            className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* ---------- chip ---------- */
