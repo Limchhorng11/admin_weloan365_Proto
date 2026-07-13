@@ -2082,8 +2082,6 @@ function DetailProductModal({
                       : "Draft"
                   }
                 />
-                <span>·</span>
-                <span>{product.loans} active loans</span>
                 {product.kind === "mwl-parent" && (
                   <>
                     <span>·</span>

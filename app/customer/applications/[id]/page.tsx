@@ -9,7 +9,7 @@ import {
   XCircle,
   X,
   MessageCircle,
-  FileCheck2,
+  FileText,
   Eye,
   Info,
   Plus,
@@ -56,6 +56,14 @@ type TabKey =
   | "officer"
   | "restructure";
 
+/** NON-MWL = any product outside the MWL family and not the Staff Loan.
+ *  The three product types (NON-MWL / MWL / Staff) show different detail data. */
+function isNonMwlProduct(productName: string): boolean {
+  const p = PRODUCTS.find(x => x.name === productName);
+  const isMwl = p?.kind === "mwl-parent" || p?.kind === "mwl-sub";
+  return !isMwl && productName !== "Staff Loan";
+}
+
 export default function ApplicationDetailPage({
   params,
 }: {
@@ -74,6 +82,8 @@ export default function ApplicationDetailPage({
         // Repayment and its reminders are only meaningful once a loan exists —
         // hide while in Progress (and also on rejected loans, see below).
         if ((t.key === "repayment" || t.key === "reminders") && a.status === "Progress") return false;
+        // NON-MWL applications in progress have no guarantor step at all.
+        if (t.key === "guarantor" && a.status === "Progress" && isNonMwlProduct(a.product)) return false;
         // For rejected loans, only surface the tabs relevant to the rejection record.
         if (a.status === "Rejected") {
           const REJECTED_TABS: TabKey[] = ["status", "kyc", "audit", "officer"];
@@ -565,89 +575,262 @@ function docPlaceholder(label: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+/** Compact document card — icon, name, preview. Shared by every "Uploaded
+ *  documents" list on this page (KYC docs, MWL docs, guarantor docs, and
+ *  signed contracts) so they read as one consistent design. */
+function DocCard({ doc, onOpen }: { doc: KycDoc; onOpen: (d: KycDoc) => void }) {
+  return (
+    <button
+      onClick={() => onOpen(doc)}
+      className="group text-left border border-gray-200 rounded-lg p-3 flex items-center gap-3 hover:border-brand-300 hover:bg-gray-50 transition"
+    >
+      <span className="w-9 h-9 rounded-lg bg-red-50 text-red-500 flex items-center justify-center flex-shrink-0">
+        <FileText className="w-4 h-4" />
+      </span>
+      <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900 truncate">
+        {doc.name}
+      </div>
+      <Eye className="w-4 h-4 text-gray-300 group-hover:text-brand-600 flex-shrink-0" />
+    </button>
+  );
+}
+
 function KycTab({ a }: { a: Application }) {
   // Pull personal information from the linked customer record so the customer
   // detail page and this loan application detail always show the same data.
   const customer = CUSTOMERS.find(c => c.id === a.cid);
   // The loan product the customer applied for (for its name + allowed range).
   const product = PRODUCTS.find(p => p.name === a.product);
-  // Documents the customer uploads through the mobile KYC form.
-  const docs: KycDoc[] = [
-    { name: "National ID",            status: "verified", image: docPlaceholder("National ID") },
-    { name: "Selfie with National ID", status: "verified", image: docPlaceholder("Selfie with National ID") },
-    { name: "Family book",            status: "verified", image: docPlaceholder("Family Book") },
+  // Product type — the personal-information rows differ per type
+  // (NON-MWL / MWL / Staff). The Staff layout is still to be specced.
+  const isNonMwl = isNonMwlProduct(a.product);
+  const isMwl = product?.kind === "mwl-parent" || product?.kind === "mwl-sub";
+  // Loan-request figures for the NON-MWL layout. `a.rate` is % APR — the
+  // customer app shows the monthly rate and an amortized monthly installment.
+  const monthlyRatePct = a.rate / 12;
+  const r = monthlyRatePct / 100;
+  const estMonthly = (a.amount * r) / (1 - Math.pow(1 + r, -a.term));
+  const tenureYears = a.term / 12;
+  const tenureLabel = `${a.term} months · ${
+    Number.isInteger(tenureYears) ? tenureYears : tenureYears.toFixed(1)
+  } ${tenureYears === 1 ? "yr" : "yrs"}`;
+  // MWL loan-request figures — flat monthly interest with an interest-only
+  // period before departure, then equal installments for the remaining term.
+  const interestOnlyMonths = 3;
+  const mwlTotalRepayable = a.amount + a.amount * r * a.term;
+  const mwlInterestOnlyPay = a.amount * r;
+  const mwlRegularPay =
+    (mwlTotalRepayable - interestOnlyMonths * mwlInterestOnlyPay) /
+    (a.term - interestOnlyMonths);
+  const destFlag =
+    { "South Korea": "🇰🇷", Korea: "🇰🇷", Japan: "🇯🇵", Singapore: "🇸🇬" }[
+      a.destination ?? ""
+    ] ?? "";
+  // Documents the customer uploads through the mobile KYC form, per type, at
+  // the Progress stage. NON-MWL applications have not uploaded anything yet;
+  // MWL applications submit two documents pre-departure; Staff applications
+  // submit the standard KYC set.
+  const nonMwlKycDocs: KycDoc[] = [];
+  const mwlKycDocs: KycDoc[] = [
+    { name: "National ID - Front",       status: "verified", image: docPlaceholder("National ID - Front") },
+    { name: "Family / Residential Book", status: "verified", image: docPlaceholder("Family / Residential Book") },
   ];
+  const staffKycDocs: KycDoc[] = [
+    { name: "National ID",             status: "verified", image: docPlaceholder("National ID") },
+    { name: "Selfie with National ID", status: "verified", image: docPlaceholder("Selfie with National ID") },
+    { name: "Family book",             status: "verified", image: docPlaceholder("Family Book") },
+  ];
+  // Approved loans additionally surface the signed loan paperwork — mirrors
+  // the customer app's document list. Each type gets its own contract set.
+  const nonMwlContractDocs: KycDoc[] = [
+    "Payment Schedule",
+    "Loan Contract",
+    "1st Restructured Contract",
+    "Hypothec Contract",
+    "Guarantee Contract",
+  ].map(name => ({ name, status: "verified", image: docPlaceholder(name) }));
+  const mwlContractDocs: KycDoc[] = [
+    "Payment Schedule",
+    "Loan Contract",
+    "Guarantee Contract",
+  ].map(name => ({ name, status: "verified", image: docPlaceholder(name) }));
+  // Split so the UI can label which documents came from the application
+  // itself (Progress) vs. which were added once the loan was Approved —
+  // Approved never discards the Progress uploads, it only adds to them.
+  const progressDocs: KycDoc[] = isNonMwl ? nonMwlKycDocs : isMwl ? mwlKycDocs : staffKycDocs;
+  const approvedOnlyDocs: KycDoc[] =
+    a.status !== "Approved"
+      ? []
+      : isNonMwl
+      ? nonMwlContractDocs
+      : isMwl
+      ? mwlContractDocs
+      : []; // Staff has no separate contract set yet.
   const [preview, setPreview] = useState<KycDoc | null>(null);
 
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
         <div>
-          <SectionLabel>Personal information (KYC)</SectionLabel>
+          <SectionLabel>Personal information</SectionLabel>
           <dl className="divide-y divide-gray-100">
-            {/* Exactly the fields submitted on the customer's loan-application form */}
-            <Row label="Full name" value={customer?.name ?? a.name} />
-            <Row label="Phone" value={<span className="font-mono text-xs">{customer?.phone ?? "—"}</span>} />
-            <Row label="City" value={customer?.profile.address.cityProvince ?? "—"} />
-            <Row label="Current occupation" value={customer?.occupation ?? "—"} />
-            <Row label="Marital status" value={customer?.maritalStatus ?? "—"} />
-            <Row label="Select branch" value={a.branch} />
+            {isNonMwl ? (
+              /* NON-MWL — compact summary matching the mobile app design. */
+              <>
+                <Row label="Product" value={a.product} />
+                <Row label="Borrower" value={customer?.name ?? a.name} />
+                {/* Co-borrower is committed at approval time. */}
+                {a.status === "Approved" && (
+                  <Row label="Co-Borrower" value="Malis Chan" />
+                )}
+                <Row label="Phone" value={<span className="font-mono text-xs">{customer?.phone ?? "—"}</span>} />
+                <Row label="Branch" value={a.branch} />
+              </>
+            ) : isMwl ? (
+              /* MWL — pre-departure summary, per the customer app. Same rows
+                 for both Progress and Approved. */
+              <>
+                <Row
+                  label="Destination"
+                  value={
+                    a.destination ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        {destFlag && <span>{destFlag}</span>}
+                        {a.destination}
+                      </span>
+                    ) : (
+                      "—"
+                    )
+                  }
+                />
+                <Row label="Loan Request" value={`USD ${a.amount.toLocaleString()}`} />
+                <Row label="Borrower" value={customer?.name ?? a.name} />
+                <Row label="Marital Status" value={customer?.maritalStatus ?? "—"} />
+                <Row label="Phone" value={<span className="font-mono text-xs">{customer?.phone ?? "—"}</span>} />
+                <Row label="Branch" value={a.branch} />
+              </>
+            ) : (
+              /* Staff — full KYC rows (layout still to be specced). */
+              <>
+                <Row label="Full name" value={customer?.name ?? a.name} />
+                <Row label="Phone" value={<span className="font-mono text-xs">{customer?.phone ?? "—"}</span>} />
+                <Row label="City" value={customer?.profile.address.cityProvince ?? "—"} />
+                <Row label="Current occupation" value={customer?.occupation ?? "—"} />
+                <Row label="Marital status" value={customer?.maritalStatus ?? "—"} />
+                <Row label="Select branch" value={a.branch} />
+              </>
+            )}
           </dl>
         </div>
         <div>
           {/* Loan request — what the customer applied for */}
           <SectionLabel>Loan request</SectionLabel>
           <dl className="divide-y divide-gray-100">
-              <Row label="Loan product" value={a.product} />
-              <Row
-                label="Request amount"
-                value={
-                  <span className="inline-flex items-baseline gap-1.5">
+            {isNonMwl ? (
+              /* NON-MWL — mirrors the customer app's loan-request summary. */
+              <>
+                <Row label="Currency" value="USD" />
+                <Row
+                  label="Requested Amount"
+                  value={
                     <span className="font-semibold text-gray-900">
                       ${a.amount.toLocaleString()}
                     </span>
-                    <span className="text-[10px] text-gray-400">USD</span>
-                  </span>
-                }
-              />
-              {product && (
-                <Row
-                  label="Allowed range"
-                  value={`$${product.min.toLocaleString()} – $${product.max.toLocaleString()}`}
+                  }
                 />
-              )}
+                <Row label="Interest Rate" value={`${monthlyRatePct.toFixed(2)}% / mo`} />
+                <Row label="Loan Tenure" value={tenureLabel} />
+                <Row
+                  label="Est. Monthly"
+                  value={
+                    <span className="font-semibold text-brand-600">
+                      ${estMonthly.toFixed(2)}
+                    </span>
+                  }
+                />
+              </>
+            ) : isMwl ? (
+              /* MWL — interest-only repayment breakdown. Same rows for both
+                 Progress and Approved. */
+              <>
+                <Row label="Currency" value="USD" />
+                <Row label="Interest Rate" value={`${monthlyRatePct.toFixed(2)}% / month`} />
+                <Row label="Tenure" value={`${a.term} months`} />
+                <Row label="Interest-only" value={`${interestOnlyMonths} months`} />
+                <Row label="Est. interest-only" value={`$${mwlInterestOnlyPay.toFixed(2)} / mo`} />
+                <Row label="Est. regular" value={`$${mwlRegularPay.toFixed(2)} / mo`} />
+                <Row
+                  label="Total repayable"
+                  value={
+                    <span className="font-semibold text-gray-900">
+                      ${mwlTotalRepayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  }
+                />
+              </>
+            ) : (
+              /* Staff — existing rows (layout still to be specced). */
+              <>
+                <Row label="Loan product" value={a.product} />
+                <Row
+                  label="Request amount"
+                  value={
+                    <span className="inline-flex items-baseline gap-1.5">
+                      <span className="font-semibold text-gray-900">
+                        ${a.amount.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-gray-400">USD</span>
+                    </span>
+                  }
+                />
+                {product && (
+                  <Row
+                    label="Allowed range"
+                    value={`$${product.min.toLocaleString()} – $${product.max.toLocaleString()}`}
+                  />
+                )}
+              </>
+            )}
           </dl>
         </div>
       </div>
 
       <div className="mt-8">
         <SectionLabel>Uploaded documents</SectionLabel>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {docs.map(d => (
-            <button
-              key={d.name}
-              onClick={() => setPreview(d)}
-              className="group text-left border border-gray-200 rounded-lg p-3 flex items-center gap-3 hover:border-brand-300 hover:bg-gray-50 transition"
-            >
-              <div className="w-11 h-11 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
-                <img src={d.image} alt={d.name} className="w-full h-full object-cover" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 truncate">{d.name}</div>
-                <div
-                  className={cn(
-                    "text-[11px] inline-flex items-center gap-1",
-                    d.status === "verified" ? "text-emerald-600" : "text-amber-600"
-                  )}
-                >
-                  <FileCheck2 className="w-3 h-3" />
-                  {d.status === "verified" ? "Verified" : "Pending"}
+        {progressDocs.length === 0 && approvedOnlyDocs.length === 0 ? (
+          /* NON-MWL in progress — nothing uploaded yet. */
+          <div className="h-24 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-xs text-gray-400">
+            No documents uploaded yet
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {progressDocs.length > 0 && (
+              <div>
+                {/* Remark: which stage these documents came from. */}
+                <div className="text-xs font-medium text-gray-500 mb-2">
+                  Application documents
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {progressDocs.map(d => (
+                    <DocCard key={d.name} doc={d} onOpen={setPreview} />
+                  ))}
                 </div>
               </div>
-              <Eye className="w-4 h-4 text-gray-300 group-hover:text-brand-600 flex-shrink-0" />
-            </button>
-          ))}
-        </div>
+            )}
+            {approvedOnlyDocs.length > 0 && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 mb-2">
+                  Loan documents
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {approvedOnlyDocs.map(d => (
+                    <DocCard key={d.name} doc={d} onOpen={setPreview} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Full-image preview + download */}
@@ -663,14 +846,6 @@ function KycTab({ a }: { a: Application }) {
             <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-900 truncate">{preview.name}</div>
-                <div
-                  className={cn(
-                    "text-[11px]",
-                    preview.status === "verified" ? "text-emerald-600" : "text-amber-600"
-                  )}
-                >
-                  {preview.status === "verified" ? "Verified" : "Pending"}
-                </div>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <a
@@ -711,10 +886,22 @@ function GuarantorTab({ a }: { a: Application }) {
   const guarantor = {
     name: "Krong Kampuchea",
     phone: "+855 012 482 991",
-    relationship: "Spouse",
+    relationship: "Spouse (1st)",
   };
 
   const initials = guarantor.name.split(" ").map(s => s[0]).join("");
+
+  // MWL applications in progress collect the guarantor's National ID
+  // alongside the borrower's own documents (see KycTab).
+  const product = PRODUCTS.find(p => p.name === a.product);
+  const isMwl = product?.kind === "mwl-parent" || product?.kind === "mwl-sub";
+  const showGuarantorDocs = isMwl && a.status === "Progress";
+  const guarantorDoc: KycDoc = {
+    name: "National ID",
+    status: "verified",
+    image: docPlaceholder("Guarantor National ID"),
+  };
+  const [preview, setPreview] = useState<KycDoc | null>(null);
 
   return (
     <div>
@@ -738,6 +925,58 @@ function GuarantorTab({ a }: { a: Application }) {
           <Row label="Guarantee for" value={<span className="font-medium text-gray-700">{a.name}</span>} />
         </dl>
       </div>
+
+      {showGuarantorDocs && (
+        <div className="mt-8">
+          <SectionLabel>Uploaded documents</SectionLabel>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <DocCard doc={guarantorDoc} onOpen={setPreview} />
+          </div>
+        </div>
+      )}
+
+      {/* Full-image preview + download */}
+      {preview && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setPreview(null)}
+        >
+          <div
+            className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900 truncate">{preview.name}</div>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <a
+                  href={preview.image}
+                  download={`${preview.name}.svg`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700"
+                >
+                  <Download className="w-4 h-4 text-gray-500" />
+                  Download
+                </a>
+                <button
+                  onClick={() => setPreview(null)}
+                  className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-gray-50 p-4 flex items-center justify-center">
+              <img
+                src={preview.image}
+                alt={preview.name}
+                className="max-w-full max-h-[70vh] rounded-md shadow-sm bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

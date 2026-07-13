@@ -26,11 +26,27 @@ export type Application = {
   sent: string;
   officer: string;
   status: ApplicationStatus;
+  /** MWL applications only — overseas destination country the worker is
+   *  departing to (e.g. "South Korea", "Japan"). */
+  destination?: string;
   /** Set when an approved loan's borrower has requested re-structure. */
   restructureRequest?: RestructureRequest;
 };
 
 export const APPLICATIONS: Application[] = [
+  /* ── Type × status matrix — the 3 product types (Staff / MWL / NON-MWL)
+        each with a Progress and an Approved application, kept at the top of
+        the table so every type-specific detail layout is one click away. ── */
+
+  // Staff — Progress / Approved
+  { id: "APP-10301", cid: "C-0429", name: "Sreymom Chea", product: "Staff Loan", amount: 6000, term: 24, rate: 8.5, score: 802, branch: "HQ", range: "$6,000", sent: "Apr 14, 2026", officer: "Visal P.", status: "Progress" },
+  { id: "APP-10304", cid: "C-0432", name: "Kimheng Sao", product: "Staff Loan", amount: 10000, term: 36, rate: 9.0, score: 815, branch: "HQ", range: "$10,000", sent: "Apr 12, 2026", officer: "Sophea K.", status: "Approved" },
+
+  // MWL — Progress / Approved
+  { id: "APP-10303", cid: "C-0431", name: "Kunthea Sok", product: "Migrant Worker Loan", amount: 4000, term: 18, rate: 13.0, score: 668, branch: "Phnom Penh — Central", range: "$4,000", sent: "Apr 17, 2026", officer: "Ratanak L.", status: "Progress", destination: "Japan" },
+  { id: "APP-10302", cid: "C-0430", name: "Piseth Vong", product: "Migrant Worker Loan", amount: 5500, term: 24, rate: 12.5, score: 705, branch: "Phnom Penh — Central", range: "$5,500", sent: "Apr 13, 2026", officer: "Sophea K.", status: "Approved", destination: "South Korea" },
+
+  // NON-MWL — Progress / Approved
   { id: "APP-10293", cid: "C-0421", name: "Sokha Chan",  product: "Micro Loan (ML)",  amount: 2500,  term: 12, rate: 14.5, score: 712, branch: "Phnom Penh — Central",  range: "$2,500",  sent: "Apr 21, 2026", officer: "Visal P.",  status: "Progress" },
   {
     id: "APP-10231", cid: "C-0421", name: "Sokha Chan",  product: "Micro Loan (ML)",  amount: 1500,  term: 6,  rate: 13.5, score: 712, branch: "Phnom Penh — Central",  range: "$1,500",  sent: "Nov 4, 2025",  officer: "Sophea K.",  status: "Approved",
@@ -64,6 +80,7 @@ export const APPLICATIONS: Application[] = [
     },
   },
   { id: "APP-10299", cid: "C-0425", name: "Narith Kim",  product: "Micro Loan (ML)",  amount: 4000,  term: 12, rate: 15.0, score: 640, branch: "Phnom Penh — Central",  range: "$4,000",  sent: "Apr 16, 2026", officer: "Visal P.",  status: "Rejected" },
+  { id: "APP-10300", cid: "C-0433", name: "Chantha Neang", product: "Housing Loan (HL)", amount: 45000, term: 120, rate: 9.5, score: 775, branch: "Phnom Penh — Toul Kork", range: "$45,000", sent: "Apr 15, 2026", officer: "Ratanak L.", status: "Approved" },
 ];
 
 export const CHART_DATA: { label: string; value: number; highlight?: boolean }[] = [
@@ -242,6 +259,62 @@ export const CUSTOMERS: Customer[] = [
     devices: [
       { platform: "android", model: "Oppo A77",             os: "ColorOS 12",  lastSeen: "1 day ago"  },
       { platform: "ios",     model: "iPhone SE (2nd gen)",  os: "iOS 16.7",    lastSeen: "2 months ago" },
+    ],
+  },
+  // ── Applicants backing the type × status matrix in APPLICATIONS ──
+  {
+    id: "C-0429", name: "Sreymom Chea", phone: "+855 78 234 561", email: "sreymom.c@nonghyup.com.kh", kyc: "verified", loans: 0, joined: "2024-08-01", branch: "HQ",
+    nationalId: "200334 ••• 8812", dob: "1994-02-17", address: "#77, St. 360, BKK3, Phnom Penh", occupation: "Credit Analyst (NHFC)", monthlyIncome: 1400, bankAccount: "ABA •••• 5521", maritalStatus: "Single",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Chamkarmon", commune: "Sangkat BKK 3", village: "Phum 4", houseStreet: "No. 77 · St. 360" },
+      employment: { type: "Employed", companyName: "NongHyup Finance (Cambodia)", businessType: "Financial Services", businessNature: "Microfinance", incomeSource: "Salary", incomeRange: "$1,000 – $1,500 / month" },
+    },
+    devices: [
+      { platform: "android", model: "Samsung Galaxy S23",   os: "Android 14",  lastSeen: "5 min ago"  },
+    ],
+  },
+  {
+    id: "C-0430", name: "Piseth Vong",  phone: "+855 93 447 210", email: "piseth@mail.com", kyc: "verified", loans: 1, joined: "2025-11-20", branch: "Phnom Penh — Central",
+    nationalId: "199745 ••• 3307", dob: "1997-06-30", address: "#12, St. 217, Meanchey, Phnom Penh", occupation: "Factory worker (departing to Korea)", monthlyIncome: 450, bankAccount: "Wing •••• 8830", maritalStatus: "Married",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Meanchey", commune: "Sangkat Stung Meanchey", village: "Phum 3", houseStreet: "No. 12 · St. 217" },
+      employment: { type: "Employed", companyName: "Evergreen Garment", businessType: "Manufacturing", businessNature: "Garment Factory", incomeSource: "Salary", incomeRange: "Under $500 / month" },
+    },
+    devices: [
+      { platform: "android", model: "Oppo A78",             os: "ColorOS 13",  lastSeen: "3 hr ago"   },
+    ],
+  },
+  {
+    id: "C-0431", name: "Kunthea Sok",  phone: "+855 69 552 348", email: "kunthea@mail.com", kyc: "pending", loans: 0, joined: "2026-03-05", branch: "Phnom Penh — Central",
+    nationalId: "200521 ••• 9954", dob: "1999-01-08", address: "#31, St. 371, Stung Meanchey, Phnom Penh", occupation: "Seamstress (departing to Japan)", monthlyIncome: 400, bankAccount: "—", maritalStatus: "Single",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Meanchey", commune: "Sangkat Boeung Tumpun", village: "Phum 6", houseStreet: "No. 31 · St. 371" },
+      employment: { type: "Employed", companyName: "Golden Needle Apparel", businessType: "Manufacturing", businessNature: "Garment Factory", incomeSource: "Salary", incomeRange: "Under $500 / month" },
+    },
+    devices: [
+      { platform: "android", model: "Vivo Y22",             os: "Android 13",  lastSeen: "1 day ago"  },
+    ],
+  },
+  {
+    id: "C-0432", name: "Kimheng Sao",  phone: "+855 12 890 774", email: "kimheng.s@nonghyup.com.kh", kyc: "verified", loans: 1, joined: "2022-05-16", branch: "HQ",
+    nationalId: "198912 ••• 2245", dob: "1989-12-03", address: "#204, St. 63, BKK1, Phnom Penh", occupation: "Branch Operations Manager (NHFC)", monthlyIncome: 2200, bankAccount: "ABA •••• 0093", maritalStatus: "Married",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Chamkarmon", commune: "Sangkat BKK 1", village: "Phum 2", houseStreet: "No. 204 · St. 63" },
+      employment: { type: "Employed", companyName: "NongHyup Finance (Cambodia)", businessType: "Financial Services", businessNature: "Microfinance", incomeSource: "Salary", incomeRange: "$2,000 – $2,500 / month" },
+    },
+    devices: [
+      { platform: "ios",     model: "iPhone 13",            os: "iOS 17.4",    lastSeen: "Today"      },
+    ],
+  },
+  {
+    id: "C-0433", name: "Chantha Neang", phone: "+855 81 660 254", email: "chantha@mail.com", kyc: "verified", loans: 1, joined: "2023-10-09", branch: "Phnom Penh — Toul Kork",
+    nationalId: "199234 ••• 5568", dob: "1992-04-21", address: "#88, St. 315, Toul Kork, Phnom Penh", occupation: "Civil engineer", monthlyIncome: 1800, bankAccount: "ACLEDA •••• 4417", maritalStatus: "Married",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Toul Kork", commune: "Sangkat Boeung Kak 2", village: "Phum 7", houseStreet: "No. 88 · St. 315" },
+      employment: { type: "Employed", companyName: "Mekong Build Co.", businessType: "Construction", businessNature: "Civil Engineering", incomeSource: "Salary", incomeRange: "$1,500 – $2,000 / month" },
+    },
+    devices: [
+      { platform: "android", model: "Xiaomi 13",            os: "MIUI 14",     lastSeen: "2 days ago" },
     ],
   },
 ];
@@ -474,6 +547,28 @@ export const PRODUCTS: LoanProduct[] = [
       "National ID\nProof of income\nProperty sale & purchase agreement\nLand title (soft or hard)",
     processingFee: 1.0,
     latePenalty: 2.0,
+    earlyPayoff: true,
+  },
+  {
+    id: "LP-11",
+    name: "Staff Loan",
+    min: 500, max: 20000,
+    rateMin: 8.0, rateMax: 10.0,
+    termMin: 6, termMax: 60,
+    status: "active", loans: 0,
+    description:
+      "Staff Loan is an exclusive benefit for NHFC employees, supporting personal " +
+      "needs such as housing, education, and emergencies at preferential rates, " +
+      "offered in both US Dollars and Khmer Riel.",
+    eligibility:
+      "• Full-time NHFC employee\n" +
+      "• Minimum 12 months of employment\n" +
+      "• Good performance record\n" +
+      "• No active default on existing loans",
+    requiredDocs:
+      "National ID\nEmployee card\nSalary statement (last 6 months)\nEmployment contract",
+    processingFee: 0.5,
+    latePenalty: 1.0,
     earlyPayoff: true,
   },
 
