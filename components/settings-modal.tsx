@@ -474,7 +474,16 @@ function VersionRow({
 
 type FlowField = { name: string; show: boolean; required?: boolean };
 /** a page can group its fields into named sections (e.g. Step 1 = "Tell us about you" + "Choose your branch") */
-type FlowSection = { name: string; show: boolean; fields: FlowField[] };
+type FlowSection = {
+  name: string;
+  show: boolean;
+  fields: FlowField[];
+  /** when set, the section renders as a single free-text block (like the
+   *  page-level confirmation message) instead of a list of toggleable
+   *  fields — for copy such as an info checklist shown to the customer,
+   *  where the operator should be able to rewrite the whole block at once. */
+  text?: string;
+};
 type FlowPage = {
   name: string;
   show: boolean;
@@ -488,8 +497,12 @@ type FlowPage = {
   messageLabel?: string;
   /** placeholder tokens offered for this message; auto-filled for the customer */
   placeholders?: string[];
+  /** when present, shows a toggleable "Mascot illustration" row above the
+   *  message editor — the brand mascot artwork shown at the top of this
+   *  screen in the customer app. */
+  mascot?: boolean;
 };
-type FlowKind = "mwl" | "nonMwl";
+type FlowKind = "mwl" | "nonMwl" | "staff";
 
 const DEFAULT_PLACEHOLDERS = ["{name}", "{product}", "{phone}"];
 
@@ -497,84 +510,173 @@ const DEFAULT_PLACEHOLDERS = ["{name}", "{product}", "{phone}"];
 const req = (name: string): FlowField => ({ name, show: true, required: true });
 const opt = (name: string): FlowField => ({ name, show: true });
 
+/** MWL (migrant worker loan) flow — destination + loan estimate on one page,
+ *  personal info + documents on the next, then guarantor → review → submit.
+ *  Submission doesn't end in a signature: the guarantor confirms over SMS
+ *  (see "Application submitted"), so there's no separate E-Signature step. */
 const MWL_PAGES: FlowPage[] = [
-  { name: "Step 1 — Tell us about you", show: true, fields: [], sections: [
-    { name: "Where are you heading?", show: true, fields: [
-      opt("Korea — EPS · most active"),
-      opt("Japan — SSW / Technical intern"),
-      opt("Singapore — Work Permit / S Pass"),
-    ] },
+  { name: "Step 1 — Your loan", show: true, fields: [], sections: [
     { name: "Your info", show: true, fields: [
-      req("First name"), req("Last name"), req("Mobile number"),
-      req("City"), req("Current occupation"), req("Marital status"),
-      req("Select branch"),
+      req("Where are you heading?"),
+      req("Nearest branch"), req("Currency"), req("Interest-only period"),
     ] },
-    { name: "Upload your documents", show: true, fields: [
-      req("National ID Card"), req("Selfie with NID"), opt("Family Book"),
-    ] },
-  ] },
-  { name: "Step 2 — Loan request", show: true, fields: [
-    req("Requested amount (within product range)"), req("Currency"),
-    req("Loan term"), opt("Monthly interest (auto)"),
-    req("Repayment method"), opt("Payment estimate / repayment table"),
-  ] },
-  { name: "Step 3 — Add your guarantor", show: true, fields: [
-    req("Full name"), req("Mobile number"), req("Relationship"),
-  ] },
-  { name: "Review your application", show: true, fields: [], sections: [
-    { name: "Customer info", show: true, fields: [
-      opt("Full name"), opt("Phone"), opt("City"),
-      opt("Current occupation"), opt("Marital status"), opt("Select branch"),
-    ] },
-    { name: "Loan request", show: true, fields: [
-      opt("Amount"), opt("Loan term"), opt("Monthly interest"), opt("Repayment method"),
-    ] },
-    { name: "Guarantor", show: true, fields: [
-      opt("Full name"), opt("Mobile number"), opt("Relationship"),
+    { name: "Estimate your repayment", show: true, fields: [
+      opt("Interest rate"), req("Amount"), req("Loan tenure"), opt("Estimated monthly payment"),
     ] },
   ] },
-  { name: "E-Signature", show: true, fields: [ req("Draw signature") ] },
-  { name: "Application submitted", show: true, system: true, fields: [],
+  { name: "Step 2 — About you", show: true, fields: [], sections: [
+    { name: "Your info", show: true, fields: [
+      req("Last name"), req("First name"), req("Marital status"), req("Phone number"),
+    ] },
+    { name: "Upload ID & Family Book", show: true, fields: [
+      req("National ID — Front"), req("Family / Residential Book"),
+    ] },
+  ] },
+  { name: "Step 3 — Add your guarantor", show: true, fields: [], sections: [
+    { name: "Guarantor info", show: true, fields: [
+      req("Last name"), req("First name"), req("Relationship"),
+      req("Phone number"), req("Guarantor's National ID"),
+      opt("What your guarantor will do"),
+    ] },
+  ] },
+  { name: "Step 4 — Confirm", show: true, fields: [], sections: [
+    { name: "Review summary", show: true, fields: [
+      opt("Destination"), opt("Currency"), opt("Loan request"), opt("Borrower"),
+      opt("Marital status"), opt("Phone"), opt("Branch"), opt("Documents"),
+      opt("Guarantor"), opt("Relationship"),
+    ] },
+    { name: "Indicative terms", show: true, fields: [
+      opt("Interest rate"), opt("Tenure"), opt("Interest-only"),
+      opt("Est. interest-only"), opt("Est. regular"), opt("Total repayable"),
+    ] },
+    { name: "Consent", show: true, fields: [
+      req("Consent to credit check & guarantor contact"),
+    ] },
+  ] },
+  { name: "Application submitted — pending guarantor confirmation", show: true, system: true, mascot: true, fields: [
+      opt("Guarantor SMS sent"),
+    ],
     messageLabel: "Confirmation message",
+    placeholders: ["{name}", "{product}", "{phone}", "{reference}", "{guarantor}"],
     description:
-      "Thank you, {name}. Your {product} application has been submitted. " +
-      "Our loan officer will contact you at {phone} within 1 business day." },
+      "Thank you, {name}. Your {product} application ({reference}) has been submitted " +
+      "and is pending guarantor confirmation — we've sent an SMS to {guarantor} to confirm." },
+
+  /* ── The rest of the flow happens on the guarantor's own phone, kicked off
+        by the SMS link above — not toggled by the borrower's page flow. ── */
+  { name: "Guarantor SMS", show: true, system: true, fields: [],
+    messageLabel: "SMS message",
+    placeholders: ["{branch}", "{product}", "{destination}", "{link}", "{support_phone}"],
+    description:
+      "NHFC: {branch} has listed you as a guarantor for an {product} ({destination}) loan application.\n\n" +
+      "Please review and confirm securely using the link below:\n{link}\n\n" +
+      "This process takes less than 2 minutes. Need help? Call us free of charge:\n{support_phone}" },
+  { name: "Guarantor request", show: true, fields: [
+    opt("Borrower"), opt("Phone"), opt("Loan amount"), opt("Purpose"), opt("Destination"),
+  ] },
+  { name: "Confirm as guarantor (1/2) — Loan details", show: true, fields: [], sections: [
+    { name: "The loan you're backing", show: true, fields: [
+      opt("Destination"), opt("Amount"), opt("Tenure"),
+      opt("Interest Only Payment"), opt("Interest"),
+    ] },
+    { name: "What being a guarantor means", show: true, fields: [
+      opt("Confirm relationship & support"),
+      opt("Repay if borrower can't"),
+      opt("Credit check consent (CBC)"),
+    ] },
+  ] },
+  { name: "Confirm as guarantor (2/2) — Verify", show: true, fields: [
+    opt("National ID — Front"),
+    req("Guarantor consent statement"),
+  ] },
+  { name: "Guarantor confirmed", show: true, system: true, mascot: true, fields: [], sections: [
+    { name: "What happens next", show: true, fields: [],
+      text:
+        "• Your branch officer will collect your National ID by SMS or in person\n" +
+        "• NH runs the credit checks\n" +
+        "• A branch officer assesses the application\n" +
+        "• Both you and the borrower are notified of the decision" },
+  ],
+    messageLabel: "Confirmation message",
+    placeholders: ["{name}", "{borrower}"],
+    description:
+      "Thank you. You're now the guarantor for {borrower}'s loan. NH will continue processing the application." },
+
+  /* ── Back on the borrower's device: their "Application submitted" status
+        card (row 5) updates live once the guarantor completes the steps
+        above, instead of opening a new page. ── */
+  { name: "Application received — guarantor confirmed", show: true, system: true, mascot: true, fields: [
+      opt("Guarantor status"),
+    ],
+    messageLabel: "Status message",
+    placeholders: ["{name}", "{guarantor}", "{reference}"],
+    description: "Guarantor confirmed — application moving to Assessment." },
 ];
 
-/** Non-MWL (quick / domestic) flow — two steps for the customer:
- *  Step 1 "Tell us about you" (personal info + document uploads) →
- *  Step 2 "Loan request" (amount, term, repayment) → request received. */
+/** Non-MWL (quick / domestic) flow — the simpler, no-guarantor flow used by
+ *  Micro / SME / Housing loans:
+ *  Step 1 "Tell us about you" (your info + a live repayment estimate, no
+ *  guarantor or occupation/marital fields — those only apply to MWL) →
+ *  Review → request received. */
 const NON_MWL_PAGES: FlowPage[] = [
   { name: "Step 1 — Tell us about you", show: true, fields: [], sections: [
     { name: "Your info", show: true, fields: [
       req("First name"), req("Last name"), req("Mobile number"),
-      req("City"), req("Current occupation"), req("Marital status"),
-      req("Select branch"),
+      req("Select branch"), req("Currency"),
     ] },
-    { name: "Upload your documents", show: true, fields: [
-      req("National ID Card"), req("Selfie with NID"), opt("Family book"),
+    { name: "Estimate your repayment", show: true, fields: [
+      opt("Interest rate"), req("Amount"), req("Loan tenure"),
+      opt("Estimated monthly payment"),
     ] },
-  ] },
-  { name: "Step 2 — Loan request", show: true, fields: [
-    req("Requested amount (within product range)"), req("Currency"),
-    req("Loan term"), opt("Monthly interest (auto)"),
-    req("Repayment method"), opt("Payment estimate / repayment table"),
   ] },
   { name: "Review your application", show: true, fields: [], sections: [
-    { name: "Customer info", show: true, fields: [
-      opt("Full name"), opt("Phone"), opt("City"),
-      opt("Current occupation"), opt("Marital status"), opt("Select branch"),
+    { name: "Applicant", show: true, fields: [
+      opt("Product"), opt("Borrower"), opt("Phone"), opt("Branch"),
     ] },
     { name: "Loan request", show: true, fields: [
-      opt("Amount"), opt("Loan term"), opt("Monthly interest"), opt("Repayment method"),
+      opt("Currency"), opt("Requested amount"), opt("Interest rate"),
+      opt("Loan tenure"), opt("Est. monthly"),
     ] },
   ] },
-  { name: "E-Signature", show: true, fields: [ req("Draw signature") ] },
-  { name: "Request received", show: true, system: true, fields: [],
+  { name: "Request received", show: true, system: true, mascot: true, fields: [],
     messageLabel: "Confirmation message",
     description:
       "Thank you, {name}. Your loan request for {product} has been submitted. " +
       "Our loan officer will contact you at {phone} within 1 business day." },
+];
+
+/** Staff Loan flow — an NHFC-employee benefit: identity is already known
+ *  from HR records, so this is a single-page request (amount + tenure)
+ *  repaid by payroll deduction, with no guarantor or document upload. */
+const STAFF_PAGES: FlowPage[] = [
+  { name: "Step 1 — Your information", show: true, fields: [], sections: [
+    { name: "Employee info", show: true, fields: [
+      opt("Full name"), opt("Branch / Department"), opt("Employee ID"), opt("Monthly salary"),
+    ] },
+    { name: "Estimate your repayment", show: true, fields: [
+      opt("Interest rate"), req("Amount"), req("Loan tenure"),
+      opt("Upfront fee"), opt("CBC fee"), opt("Net amount"), opt("Estimated monthly payment"),
+    ] },
+    { name: "Disbursement", show: true, fields: [
+      opt("Disbursed to payroll account"),
+    ] },
+  ] },
+  { name: "Step 2 — Review & confirm", show: true, fields: [], sections: [
+    { name: "Your loan", show: true, fields: [
+      opt("Loan amount"), opt("Upfront fee"), opt("CBC fee"),
+      opt("Released to your payroll account"), opt("Term"),
+      opt("Monthly repayment (auto-deducted)"), opt("1st payroll deduction"),
+    ] },
+    { name: "Disbursement", show: true, fields: [
+      opt("Disbursed to payroll account"),
+    ] },
+    { name: "Consent", show: true, fields: [
+      req("Agree to Loan Terms & salary deduction, CBC consent, and e-sign"),
+    ] },
+  ] },
+  { name: "Step 3 — Face ID", show: true, fields: [
+    req("Face ID scan"),
+  ] },
 ];
 
 function SwitchToggle({
@@ -613,6 +715,7 @@ function MenuView() {
   const [flows, setFlows] = useState<Record<FlowKind, FlowPage[]>>({
     mwl: MWL_PAGES,
     nonMwl: NON_MWL_PAGES,
+    staff: STAFF_PAGES,
   });
   const [tab, setTab] = useState<FlowKind>("mwl");
   const [openIdx, setOpenIdx] = useState<number | null>(null);
@@ -629,6 +732,12 @@ function MenuView() {
     setFlows(prev => ({
       ...prev,
       [tab]: prev[tab].map((p, i) => (i === idx ? { ...p, show: !p.show } : p)),
+    }));
+
+  const toggleMascot = (idx: number) =>
+    setFlows(prev => ({
+      ...prev,
+      [tab]: prev[tab].map((p, i) => (i === idx ? { ...p, mascot: !p.mascot } : p)),
     }));
 
   const toggleField = (pageIdx: number, fieldIdx: number) =>
@@ -683,6 +792,19 @@ function MenuView() {
       ),
     }));
 
+  const updateSectionText = (pageIdx: number, secIdx: number, value: string) =>
+    setFlows(prev => ({
+      ...prev,
+      [tab]: prev[tab].map((p, i) =>
+        i === pageIdx
+          ? {
+              ...p,
+              sections: p.sections?.map((s, k) => (k === secIdx ? { ...s, text: value } : s)),
+            }
+          : p
+      ),
+    }));
+
   const updateDescription = (pageIdx: number, value: string) =>
     setFlows(prev => ({
       ...prev,
@@ -724,6 +846,7 @@ function MenuView() {
   const TABS: { key: FlowKind; label: string }[] = [
     { key: "mwl", label: "MWL" },
     { key: "nonMwl", label: "NON-MWL" },
+    { key: "staff", label: "STAFF LOAN" },
   ];
 
   return (
@@ -765,7 +888,7 @@ function MenuView() {
       <Card className="!p-0">
         <div className="px-5 py-3 border-b border-gray-200">
           <div className="font-medium text-gray-900 text-sm">
-            {tab === "mwl" ? "MWL application pages" : "Non-MWL application pages"}
+            {tab === "mwl" ? "MWL application pages" : tab === "nonMwl" ? "Non-MWL application pages" : "Staff Loan application pages"}
           </div>
           <div className="text-xs text-gray-500 mt-0.5">
             {pages.length} pages · {enabledCount} enabled
@@ -835,99 +958,14 @@ function MenuView() {
 
                 {open && (
                   <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/50 rounded-b-lg space-y-3">
-                    {p.sections ? (
-                      <div className="space-y-3">
-                        {p.sections.map((s, si) => (
-                          <div key={s.name}>
-                            <div className="flex items-center justify-between px-1 mb-1">
-                              <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                                {s.name}
-                              </div>
-                              <SwitchToggle
-                                checked={s.show}
-                                onChange={() => toggleSection(idx, si)}
-                              />
-                            </div>
-                            <div
-                              className={cn(
-                                "divide-y divide-gray-100 rounded-md border border-gray-100 bg-white px-2",
-                                !s.show && "opacity-50"
-                              )}
-                            >
-                              {s.fields.map((f, j) => (
-                                <div
-                                  key={f.name}
-                                  className="flex items-center justify-between py-2 px-1"
-                                >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span
-                                      className={cn(
-                                        "text-sm truncate",
-                                        f.show && s.show
-                                          ? "text-gray-800"
-                                          : "text-gray-400 line-through"
-                                      )}
-                                    >
-                                      {f.name}
-                                    </span>
-                                    {f.required && (
-                                      <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
-                                        Required
-                                      </span>
-                                    )}
-                                  </div>
-                                  <SwitchToggle
-                                    checked={f.show}
-                                    disabled={!s.show}
-                                    onChange={() => toggleSectionField(idx, si, j)}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                        <div className="text-[11px] text-gray-400 px-1">
-                          Turn a section off to hide it and all its fields. &ldquo;Required&rdquo; is a label only — any field can be hidden.
+                    {p.mascot !== undefined && (
+                      <div className="rounded-md border border-gray-100 bg-white px-2">
+                        <div className="flex items-center justify-between py-2 px-1">
+                          <span className="text-sm text-gray-800">Mascot illustration</span>
+                          <SwitchToggle checked={p.mascot} onChange={() => toggleMascot(idx)} />
                         </div>
                       </div>
-                    ) : p.fields.length > 0 ? (
-                      <div>
-                        <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 px-1 mb-1">
-                          Fields
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                          {p.fields.map((f, j) => (
-                            <div
-                              key={f.name}
-                              className="flex items-center justify-between py-2 px-1"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span
-                                  className={cn(
-                                    "text-sm truncate",
-                                    f.show ? "text-gray-800" : "text-gray-400 line-through"
-                                  )}
-                                >
-                                  {f.name}
-                                </span>
-                                {f.required && (
-                                  <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
-                                    Required
-                                  </span>
-                                )}
-                              </div>
-                              <SwitchToggle
-                                checked={f.show}
-                                onChange={() => toggleField(idx, j)}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <div className="text-[11px] text-gray-400 px-1 mt-1.5">
-                          &ldquo;Required&rdquo; is a label only — any field can be hidden.
-                        </div>
-                      </div>
-                    ) : null}
+                    )}
 
                     {hasMessage && (
                       <div>
@@ -993,6 +1031,114 @@ function MenuView() {
                         </div>
                       </div>
                     )}
+
+                    {p.sections ? (
+                      <div className="space-y-3">
+                        {p.sections.map((s, si) => (
+                          <div key={s.name}>
+                            <div className="flex items-center justify-between px-1 mb-1">
+                              <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                                {s.name}
+                              </div>
+                              <SwitchToggle
+                                checked={s.show}
+                                onChange={() => toggleSection(idx, si)}
+                              />
+                            </div>
+                            {s.text !== undefined ? (
+                              <textarea
+                                value={s.text}
+                                onChange={e => updateSectionText(idx, si, e.target.value)}
+                                disabled={!s.show}
+                                rows={4}
+                                className={cn(
+                                  "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white resize-y",
+                                  "focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+                                  !s.show && "opacity-50"
+                                )}
+                              />
+                            ) : (
+                              <div
+                                className={cn(
+                                  "divide-y divide-gray-100 rounded-md border border-gray-100 bg-white px-2",
+                                  !s.show && "opacity-50"
+                                )}
+                              >
+                                {s.fields.map((f, j) => (
+                                  <div
+                                    key={j}
+                                    className="flex items-center justify-between py-2 px-1 gap-2"
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                      <span
+                                        className={cn(
+                                          "text-sm truncate",
+                                          f.show && s.show
+                                            ? "text-gray-800"
+                                            : "text-gray-400 line-through"
+                                        )}
+                                      >
+                                        {f.name}
+                                      </span>
+                                      {f.required && (
+                                        <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
+                                          Required
+                                        </span>
+                                      )}
+                                    </div>
+                                    <SwitchToggle
+                                      checked={f.show}
+                                      disabled={!s.show}
+                                      onChange={() => toggleSectionField(idx, si, j)}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        <div className="text-[11px] text-gray-400 px-1">
+                          Turn a section off to hide it and all its fields. &ldquo;Required&rdquo; is a label only — any field can be hidden.
+                        </div>
+                      </div>
+                    ) : p.fields.length > 0 ? (
+                      <div>
+                        <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 px-1 mb-1">
+                          Fields
+                        </div>
+                        <div className="divide-y divide-gray-100 rounded-md border border-gray-100 bg-white px-2">
+                          {p.fields.map((f, j) => (
+                            <div
+                              key={f.name}
+                              className="flex items-center justify-between py-2 px-1"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className={cn(
+                                    "text-sm truncate",
+                                    f.show ? "text-gray-800" : "text-gray-400 line-through"
+                                  )}
+                                >
+                                  {f.name}
+                                </span>
+                                {f.required && (
+                                  <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
+                                    Required
+                                  </span>
+                                )}
+                              </div>
+                              <SwitchToggle
+                                checked={f.show}
+                                onChange={() => toggleField(idx, j)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-[11px] text-gray-400 px-1 mt-1.5">
+                          &ldquo;Required&rdquo; is a label only — any field can be hidden.
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
