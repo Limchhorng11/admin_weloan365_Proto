@@ -163,9 +163,37 @@ export type Customer = {
   /** ISO date (YYYY-MM-DD) when the customer self-deleted their account.
    *  Only set when `accountStatus === "suspended"`. */
   deletedAt?: string;
+  /** Set when the customer signed up using a Credit Officer's referral code
+   *  (see `User.code` in the Referral program). Omitted for direct signups. */
+  referral?: {
+    /** The 5-char CO referral code entered at signup. */
+    code: string;
+    /** Referring officer's name, denormalized for display. */
+    officer: string;
+    /** ISO date the referral code was used. */
+    date: string;
+    /** The referral reward is only credited once the referred customer's
+     *  first loan is disbursed — before that it sits as "pending". */
+    rewardStatus: "pending" | "credited";
+  };
 };
 
 export const CUSTOMERS: Customer[] = [
+  // Row 1 — freshly onboarded, KYC verified, but hasn't applied for a loan
+  // yet: the "0 loans" case for a normal active account (as opposed to
+  // Chenda Oum below, whose 0 loans comes from a suspended account).
+  {
+    id: "C-0434", name: "Sopheak Ly",   phone: "+855 15 620 048", email: "sopheak.ly@mail.com", kyc: "verified", loans: 0, joined: "2026-07-10", branch: "Phnom Penh — Central",
+    nationalId: "200147 ••• 4482", dob: "2000-09-12", address: "#152, St. 271, Phnom Penh", occupation: "Graphic designer", monthlyIncome: 650, bankAccount: "ABA •••• 7734", maritalStatus: "Single",
+    profile: {
+      address: { cityProvince: "Phnom Penh", district: "Khan Chamkarmon", commune: "Sangkat Tuol Tumpung", village: "Phum 3", houseStreet: "No. 152 · St. 271" },
+      employment: { type: "Employed", companyName: "Pixel Studio", businessType: "Creative Services", businessNature: "Design Agency", incomeSource: "Salary", incomeRange: "$500 – $1,000 / month" },
+    },
+    devices: [
+      { platform: "android", model: "Samsung Galaxy A54", os: "Android 14",   lastSeen: "Today"       },
+    ],
+    referral: { code: "10247", officer: "Visal P.", date: "2026-07-10", rewardStatus: "pending" },
+  },
   {
     id: "C-0421", name: "Sokha Chan",   phone: "+855 12 345 678", email: "sokha@mail.com",  kyc: "verified", loans: 2, joined: "2023-06-11", branch: "Phnom Penh — Central",
     nationalId: "200112 ••• 4521", dob: "1993-08-12", address: "#123, St. 271, Sangkat BKK1, Phnom Penh", occupation: "Retail supervisor", monthlyIncome: 850, bankAccount: "ABA •••• 1284", maritalStatus: "Married",
@@ -177,6 +205,7 @@ export const CUSTOMERS: Customer[] = [
       { platform: "ios",     model: "iPhone 14",            os: "iOS 17.4",    lastSeen: "2 min ago"  },
       { platform: "android", model: "Galaxy Tab A8",        os: "Android 13",  lastSeen: "12 days ago" },
     ],
+    referral: { code: "10248", officer: "Sophea K.", date: "2023-06-11", rewardStatus: "credited" },
   },
   {
     id: "C-0422", name: "Dara Meas",    phone: "+855 17 998 221", email: "dara@mail.com",   kyc: "verified", loans: 1, joined: "2024-01-03", branch: "Siem Reap",
@@ -199,6 +228,7 @@ export const CUSTOMERS: Customer[] = [
     devices: [
       { platform: "android", model: "Huawei P50",           os: "HarmonyOS 3", lastSeen: "Yesterday"  },
     ],
+    referral: { code: "10312", officer: "Ratanak L.", date: "2025-02-28", rewardStatus: "pending" },
   },
   // Row 4 — Chenda self-deleted her account from the mobile app on 2026-04-26.
   // We keep the record (compliance + audit) but the row reads as muted in the UI

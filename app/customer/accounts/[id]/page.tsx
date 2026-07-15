@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { ChangePinModal } from "@/components/change-pin-modal";
 import { useRole } from "@/lib/role-context";
 import { useFeedbackResponses } from "@/lib/feedback-store";
+import { formatDate } from "@/lib/utils";
 
 export default function CustomerDetailPage({
   params,
@@ -90,19 +91,106 @@ export default function CustomerDetailPage({
 
       {/* Profile information */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-card p-6">
-          <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
-            Personal information
-          </div>
-          <dl className="divide-y divide-gray-100">
-            {/* Exactly the fields submitted on the customer's loan-application form */}
-            <Row label="Full name" value={c.name} />
-            <Row label="Phone" value={<span className="font-mono text-xs">{c.phone}</span>} />
-            <Row label="City" value={c.profile.address.cityProvince} />
-            <Row label="Current occupation" value={c.occupation} />
-            <Row label="Marital status" value={c.maritalStatus} />
-            <Row label="Select branch" value={c.branch} />
-          </dl>
+        <div className="lg:col-span-2 space-y-6">
+          {c.loans === 0 ? (
+            // New customer — no loan history yet, so nothing beyond the basic
+            // signup details has been collected. The full KYC / employment
+            // profile below is only captured on a customer's first loan
+            // application.
+            <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
+              <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
+                Personal information
+              </div>
+              <dl className="divide-y divide-gray-100">
+                <Row label="Full name" value={c.name} />
+                <Row label="Phone" value={<span className="font-mono text-xs">{c.phone}</span>} />
+              </dl>
+              <div className="mt-4 text-xs text-gray-400">
+                Full profile is collected when the customer submits their first loan application.
+              </div>
+            </div>
+          ) : null}
+
+          {c.loans === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
+              <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
+                Referral
+              </div>
+              {c.referral ? (
+                <dl className="divide-y divide-gray-100">
+                  <Row label="Referral code" value={<span className="font-mono text-xs">{c.referral.code}</span>} />
+                  <Row label="Referred by" value={c.referral.officer} />
+                </dl>
+              ) : (
+                <div className="text-xs text-gray-400">Direct signup — no referral.</div>
+              )}
+              {c.referral && (
+                <div className="mt-4 text-xs text-gray-400">
+                  Reward is credited to the officer once this customer's first loan is disbursed.
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
+                <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
+                  Personal profile
+                </div>
+                <dl className="divide-y divide-gray-100">
+                  <Row label="Full name" value={c.name} />
+                  <Row label="Mobile" value={<span className="font-mono text-xs">{c.phone}</span>} />
+                  <Row label="National ID" value={<span className="font-mono text-xs">{c.nationalId}</span>} />
+                  <Row label="Birth date" value={formatDate(c.dob)} />
+                  <Row label="Marital status" value={c.maritalStatus} />
+                  <Row label="Address" value={c.address} />
+                  <Row label="Branch" value={c.branch} />
+                </dl>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
+                <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
+                  Residential address
+                </div>
+                <dl className="divide-y divide-gray-100">
+                  <Row label="City / Province" value={c.profile.address.cityProvince} />
+                  <Row label="District / Khan" value={c.profile.address.district} />
+                  <Row label="Commune / Sangkat" value={c.profile.address.commune} />
+                  <Row label="Village" value={c.profile.address.village} />
+                  <Row label="House No · Street No" value={c.profile.address.houseStreet} />
+                </dl>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
+                <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
+                  Employment details
+                </div>
+                <dl className="divide-y divide-gray-100">
+                  <Row label="Employment type" value={c.profile.employment.type} />
+                  <Row label="Occupation / Position" value={c.occupation} />
+                  <Row label="Company name" value={c.profile.employment.companyName} />
+                  <Row label="Business type" value={c.profile.employment.businessType} />
+                  <Row label="Business nature" value={c.profile.employment.businessNature} />
+                  <Row label="Main source of income" value={c.profile.employment.incomeSource} />
+                  <Row label="Monthly range" value={c.profile.employment.incomeRange} />
+                </dl>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
+                <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-4">
+                  Referral
+                </div>
+                {c.referral ? (
+                  <dl className="divide-y divide-gray-100">
+                    <Row label="Referral code" value={<span className="font-mono text-xs">{c.referral.code}</span>} />
+                    <Row label="Referred by" value={c.referral.officer} />
+                    <Row label="Referral date" value={formatDate(c.referral.date)} />
+                  </dl>
+                ) : (
+                  <div className="text-xs text-gray-400">Direct signup — no referral.</div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6 space-y-5">
