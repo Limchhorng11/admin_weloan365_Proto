@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
@@ -124,6 +124,16 @@ function loadList(): Consult[] {
 }
 
 export default function ConsultationsPage() {
+  // useSearchParams() (for the ?open= notification deep-link) requires a
+  // Suspense boundary during static export/build.
+  return (
+    <Suspense fallback={null}>
+      <ConsultationsPageInner />
+    </Suspense>
+  );
+}
+
+function ConsultationsPageInner() {
   const { user, can } = useRole();
   const { addNotification } = useNotifications();
   const canAssign = can("consultation.assign");
