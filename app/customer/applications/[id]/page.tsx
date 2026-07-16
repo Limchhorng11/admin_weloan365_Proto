@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -94,7 +94,13 @@ export default function ApplicationDetailPage({
     [can, a.status]
   );
 
-  const [tab, setTab] = useState<TabKey>("status");
+  // Deep link support — e.g. a "Payment overdue" notification opens
+  // /customer/applications/APP-XXXXX?tab=repayment directly on that tab.
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab") as TabKey | null;
+  const [tab, setTab] = useState<TabKey>(
+    requestedTab && TABS.some(t => t.key === requestedTab) ? requestedTab : "status"
+  );
   const [rejectOpen, setRejectOpen] = useState(false);
   // Keep the active tab valid when the role changes.
   useEffect(() => {

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { CONSULTATIONS, CUSTOMERS, USERS } from "@/lib/data";
 import { useRole } from "@/lib/role-context";
+import { useNotifications } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 import {
   X,
@@ -21,11 +23,12 @@ import {
   Crown,
   Building2,
   Briefcase,
-  Pencil,
   Bell,
   CalendarClock,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  SlidersHorizontal,
 } from "lucide-react";
 
 const PAGE_SIZE = 8;
@@ -103,46 +106,115 @@ function dueLabel(c: Consult): string {
   return c.preferredDate;
 }
 
+type StatusFilter = "all" | DisplayStatus;
+type Filters = { status: StatusFilter };
+const EMPTY_FILTERS: Filters = { status: "all" };
+
+// Persisted to localStorage so assignments/closures survive the
+// sign-in-as-a-role switch on the login screen, which remounts this page.
+const LIST_STORAGE_KEY = "weloan_consultations";
+
+function loadList(): Consult[] {
+  try {
+    const raw = localStorage.getItem(LIST_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Consult[]) : CONSULTATIONS;
+  } catch {
+    return CONSULTATIONS;
+  }
+}
+
 export default function ConsultationsPage() {
-  const { user } = useRole();
+  const { user, can } = useRole();
+  const { addNotification } = useNotifications();
+  const canAssign = can("consultation.assign");
 
   /* ----- Consultation state ----- */
   const [list, setList] = useState<Consult[]>(CONSULTATIONS);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setList(loadList());
+    setHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(LIST_STORAGE_KEY, JSON.stringify(list));
+    } catch {
+      /* ignore (storage disabled) */
+    }
+  }, [list, hydrated]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const active = openId ? list.find(c => c.id === openId) ?? null : null;
   const pickerConsult = pickerFor ? list.find(c => c.id === pickerFor) ?? null : null;
 
-  /* ----- Consultations, newest first ----- */
-  const sorted = useMemo(
-    () => [...list].sort((a, b) => parseTs(b.requested) - parseTs(a.requested)),
-    [list]
+  // Opened via a notification link — jump straight to that consultation.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (!hydrated) return;
+    const openParam = searchParams.get("open");
+    if (openParam && list.some(c => c.id === openParam)) {
+      setOpenId(openParam);
+      router.replace("/customer/consultations", { scroll: false });
+    }
+  }, [hydrated, searchParams, list, router]);
+
+  /* ----- Search + filter ----- */
+  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeFilterCount = filters.status !== "all" ? 1 : 0;
+
+  // Officers who can't assign only handle consultations already in their
+  // charge — the list scopes down to their own rows instead of everyone's.
+  const scoped = useMemo(
+    () => (canAssign ? list : list.filter(c => c.officer === user.name)),
+    [list, canAssign, user.name]
   );
 
-  const pendingCount = list.filter(c => displayStatus(c) === "Pending").length;
-  const waitingCount = list.filter(c => displayStatus(c) === "Waiting").length;
-  const dueSoonCount = list.filter(isDueSoon).length;
+  /* ----- Consultations, newest first, then search + status filter ----- */
+  const sorted = useMemo(
+    () => [...scoped].sort((a, b) => parseTs(b.requested) - parseTs(a.requested)),
+    [scoped]
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return sorted.filter(c => {
+      if (filters.status !== "all" && displayStatus(c) !== filters.status) return false;
+      if (q && !`${c.customer} ${c.topic} ${c.officer} ${c.id}`.toLowerCase().includes(q))
+        return false;
+      return true;
+    });
+  }, [sorted, query, filters]);
+
+  const pendingCount = scoped.filter(c => displayStatus(c) === "Pending").length;
+  const waitingCount = scoped.filter(c => displayStatus(c) === "Waiting").length;
+  const dueSoonCount = scoped.filter(isDueSoon).length;
 
   /* ----- Pagination ----- */
   const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
+  useEffect(() => setPage(1), [query, filters]);
 
   const paginated = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return sorted.slice(start, start + PAGE_SIZE);
-  }, [sorted, page]);
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
-  const firstIdx = sorted.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const lastIdx = Math.min(page * PAGE_SIZE, sorted.length);
+  const firstIdx = filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastIdx = Math.min(page * PAGE_SIZE, filtered.length);
 
   /* ----- Consultation mutators ----- */
   // Assigning a person also confirms the schedule from the customer's request:
   // the consultation moves to "waiting" (or straight to "closed" if the
   // requested date has already passed).
-  const assignOfficer = (id: string, officer: string) =>
+  const assignOfficer = (id: string, officer: string) => {
+    const consult = list.find(c => c.id === id);
     setList(prev =>
       prev.map(c => {
         if (c.id !== id) return c;
@@ -151,6 +223,16 @@ export default function ConsultationsPage() {
         return { ...c, officer, status: du !== null && du < 0 ? "closed" : "waiting" };
       })
     );
+    if (consult && officer !== consult.officer) {
+      addNotification({
+        title: `You were assigned to ${consult.customer}'s consultation`,
+        meta: "Just now",
+        kind: "info",
+        forUser: officer,
+        href: `/customer/consultations?open=${consult.id}`,
+      });
+    }
+  };
 
   const closeConsultation = (id: string) =>
     setList(prev => prev.map(c => (c.id === id ? { ...c, status: "closed" } : c)));
@@ -185,12 +267,60 @@ export default function ConsultationsPage() {
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-gray-200">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">All consultations</h2>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {filtered.length === scoped.length
+                ? `${scoped.length} consultations`
+                : `${filtered.length} of ${scoped.length} consultations`}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-auto">
+              <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
+              <input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search consultations..."
+                className="pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 w-full sm:w-56"
+              />
+            </div>
+
+            <ConsultFilterPopover
+              open={filterOpen}
+              onOpenChange={setFilterOpen}
+              filters={filters}
+              onChange={setFilters}
+              activeCount={activeFilterCount}
+            />
+          </div>
+        </div>
+
+        {/* Active filter chips */}
+        {activeFilterCount > 0 && (
+          <div className="px-6 py-2.5 bg-gray-50/60 border-b border-gray-200 flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] text-gray-500">Filters:</span>
+            <ConsultChip
+              label={`Status: ${filters.status}`}
+              onClear={() => setFilters(EMPTY_FILTERS)}
+            />
+            <button
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              className="text-[11px] text-brand-600 hover:underline font-medium ml-1"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
+
         {/* Table (md and up) */}
         <div className="overflow-x-auto hidden md:block">
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-200">
-                {["Customer", "Subject", "Schedule", "Officer", "Status", "Action"].map(h => (
+                {["Customer", "Purpose", "Schedule", "Officer", "Status", "Action"].map(h => (
                   <th
                     key={h}
                     className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap"
@@ -204,7 +334,18 @@ export default function ConsultationsPage() {
               {paginated.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-16 text-center text-sm text-gray-500">
-                    No consultations.
+                    <div>No consultations match.</div>
+                    {(query || activeFilterCount > 0) && (
+                      <button
+                        onClick={() => {
+                          setQuery("");
+                          setFilters(EMPTY_FILTERS);
+                        }}
+                        className="mt-3 px-3 py-1.5 text-xs font-medium text-brand-600 border border-brand-200 rounded-md hover:bg-brand-50"
+                      >
+                        Clear search &amp; filters
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -213,6 +354,7 @@ export default function ConsultationsPage() {
                     key={c.id}
                     c={c}
                     currentUserName={user.name}
+                    canAssign={canAssign}
                     onOpen={() => setOpenId(c.id)}
                   />
                 ))
@@ -225,7 +367,18 @@ export default function ConsultationsPage() {
         <div className="md:hidden divide-y divide-gray-100">
           {paginated.length === 0 ? (
             <div className="px-4 py-16 text-center text-sm text-gray-500">
-              No consultations.
+              <div>No consultations match.</div>
+              {(query || activeFilterCount > 0) && (
+                <button
+                  onClick={() => {
+                    setQuery("");
+                    setFilters(EMPTY_FILTERS);
+                  }}
+                  className="mt-3 px-3 py-1.5 text-xs font-medium text-brand-600 border border-brand-200 rounded-md hover:bg-brand-50"
+                >
+                  Clear search &amp; filters
+                </button>
+              )}
             </div>
           ) : (
             paginated.map(c => {
@@ -255,7 +408,7 @@ export default function ConsultationsPage() {
                       onClick={() => setOpenId(c.id)}
                       className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline font-medium"
                     >
-                      {status === "Pending" ? "Assign" : "View"}
+                      {status === "Pending" && canAssign ? "Assign" : "View"}
                     </button>
                   </div>
                 </div>
@@ -271,7 +424,7 @@ export default function ConsultationsPage() {
             <span className="font-medium text-gray-700">
               {firstIdx}-{lastIdx}
             </span>{" "}
-            of <span className="font-medium text-gray-700">{sorted.length}</span>
+            of <span className="font-medium text-gray-700">{filtered.length}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500">
@@ -341,15 +494,113 @@ export default function ConsultationsPage() {
   );
 }
 
+/* ---------- filter chip + popover ---------- */
+
+function ConsultChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[11px] font-medium border border-brand-100">
+      {label}
+      <button onClick={onClear} className="hover:bg-brand-100 rounded-full p-0.5">
+        <X className="w-2.5 h-2.5" />
+      </button>
+    </span>
+  );
+}
+
+function ConsultFilterPopover({
+  open,
+  onOpenChange,
+  filters,
+  onChange,
+  activeCount,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  filters: Filters;
+  onChange: (f: Filters) => void;
+  activeCount: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onOpenChange(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onOpenChange]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => onOpenChange(!open)}
+        className={cn(
+          "flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md text-gray-700",
+          open ? "bg-gray-50 border-gray-300" : "bg-white border-gray-200 hover:bg-gray-50"
+        )}
+      >
+        <SlidersHorizontal className="w-4 h-4 text-gray-500" />
+        <span>Filter</span>
+        {activeCount > 0 && (
+          <span className="text-[10px] font-medium bg-brand-600 text-white rounded-full px-1.5 py-0.5">
+            {activeCount}
+          </span>
+        )}
+        <ChevronDown className={cn("w-3 h-3 text-gray-400 transition", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-[220px] bg-white border border-gray-200 rounded-lg shadow-xl z-30">
+          <div className="px-4 py-3 border-b border-gray-200">
+            <div className="font-semibold text-sm text-gray-900">Filter consultations</div>
+            <div className="text-[11px] text-gray-500 mt-0.5">Filter by status.</div>
+          </div>
+          <div className="p-4">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2">
+              Status
+            </div>
+            <div className="grid grid-cols-1 gap-1.5">
+              {(["all", "Pending", "Waiting", "Closed"] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => onChange({ status: s })}
+                  className={cn(
+                    "px-2 py-1.5 text-xs rounded-md border text-left",
+                    filters.status === s
+                      ? "bg-brand-50 border-brand-300 text-brand-700 font-medium"
+                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  {s === "all" ? "All" : s}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- consultation table row ---------- */
 
 function ConsultRow({
   c,
   currentUserName,
+  canAssign,
   onOpen,
 }: {
   c: Consult;
   currentUserName: string;
+  canAssign: boolean;
   onOpen: () => void;
 }) {
   const isMine = c.officer === currentUserName;
@@ -364,7 +615,7 @@ function ConsultRow({
       <td className="px-6 py-3.5 font-medium text-gray-900">
         <div className="flex items-center gap-1.5">
           {c.customer}
-          {isMine && (
+          {isMine && canAssign && (
             <span className="text-[10px] font-medium bg-brand-50 text-brand-700 rounded-full px-1.5 py-0.5">
               You
             </span>
@@ -403,7 +654,7 @@ function ConsultRow({
           }}
           className="text-xs text-brand-600 hover:underline font-medium whitespace-nowrap"
         >
-          {status === "Pending" ? "Assign" : "View"}
+          {status === "Pending" && canAssign ? "Assign" : "View"}
         </button>
       </td>
     </tr>
@@ -425,7 +676,9 @@ function ConsultationDetailModal({
   onPickAssignee: () => void;
   onReopen: () => void;
 }) {
-  const { user } = useRole();
+  const { user, can } = useRole();
+  const canAssign = can("consultation.assign");
+  const canClose = can("consultation.close");
   const [reply, setReply] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -512,7 +765,7 @@ function ConsultationDetailModal({
             </div>
           </div>
           <dl className="border border-gray-200 rounded-lg divide-y divide-gray-100">
-            <InfoRow label="Topic" value={consultation.topic} />
+            <InfoRow label="Purpose" value={consultation.topic} />
             <InfoRow label="Preferred date" value={consultation.preferredDate} />
             <InfoRow label="Preferred time" value={consultation.preferredTime} />
             <InfoRow label="Preferred branch" value={consultation.preferredBranch} />
@@ -594,15 +847,20 @@ function ConsultationDetailModal({
               <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-100">
                 <div className="flex items-center gap-2 text-sm text-amber-800">
                   <MessageCircle className="w-4 h-4" />
-                  Not scheduled yet. Assign a person in charge to confirm the customer&apos;s requested date.
+                  Not scheduled yet.{" "}
+                  {canAssign
+                    ? "Assign a person in charge to confirm the customer's requested date."
+                    : "Waiting for a person in charge to be assigned."}
                 </div>
-                <button
-                  onClick={onPickAssignee}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700 whitespace-nowrap"
-                >
-                  <Briefcase className="w-3.5 h-3.5" />
-                  Assign &amp; confirm
-                </button>
+                {canAssign && (
+                  <button
+                    onClick={onPickAssignee}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700 whitespace-nowrap"
+                  >
+                    <Briefcase className="w-3.5 h-3.5" />
+                    Assign &amp; confirm
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex items-end gap-2">
@@ -640,7 +898,7 @@ function ConsultationDetailModal({
 
         {/* Footer actions */}
         <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50/60">
-          {!isClosed ? (
+          {!isClosed && canAssign ? (
             <button
               onClick={onPickAssignee}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700 font-medium"
@@ -649,25 +907,11 @@ function ConsultationDetailModal({
               {unassigned ? "Assign & confirm schedule" : "Reassign person"}
             </button>
           ) : (
-            // Keep layout balanced — empty spacer when closed.
+            // Keep layout balanced — empty spacer when closed or not permitted.
             <div />
           )}
           <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 font-medium"
-            >
-              Close
-            </button>
-            {isClosed ? (
-              <button
-                onClick={onReopen}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 bg-white text-gray-700 rounded-md hover:bg-gray-50 font-medium"
-              >
-                <Pencil className="w-3.5 h-3.5 text-gray-500" />
-                Edit
-              </button>
-            ) : (
+            {!isClosed && canClose && (
               <button
                 onClick={() => setConfirmClose(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700 font-medium"
@@ -771,12 +1015,13 @@ function OfficerPickerModal({
   if (!consultation) return null;
 
   // Only active staff can take consultations.
-  // Cashiers and Compliance typically wouldn't field customer consultations,
-  // so filter to roles that interact with customers.
+  // Customer Service typically wouldn't field loan consultations, so filter
+  // to the roles that do — matches the app's actual seeded roles (Credit
+  // Officer, Senior Officer, Admin), not the approval-chain labels used
+  // elsewhere (Senior Credit Officer / Branch Manager aren't real roles here).
   const CONSULTING_ROLES = new Set([
     "Credit Officer",
-    "Senior Credit Officer",
-    "Branch Manager",
+    "Senior Officer",
     "Admin",
   ]);
   const officers: Officer[] = USERS.filter(

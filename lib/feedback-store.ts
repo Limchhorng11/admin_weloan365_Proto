@@ -3,14 +3,30 @@
 import { useSyncExternalStore } from "react";
 import { FEEDBACK } from "./data";
 
+/** Officers can edit a reply for this many hours after it was first sent. */
+export const REPLY_EDIT_WINDOW_HOURS = 12;
+
 export type FeedbackResponse = {
   message: string;
   sentAt: string;
+  /** When the reply was first sent — fixed, doesn't move on later edits. Anchors the 12h edit window. */
+  repliedAt: string;
   /** Officer who made the most recent reply/edit. */
   by?: string;
-  /** Once an officer edits a reply, it's finalised and can only be reviewed. */
-  locked?: boolean;
 };
+
+/* Parse "2026-04-21 09:12" or "2026-04-21" into a sortable timestamp. */
+export function parseTs(s: string): number {
+  if (!s) return 0;
+  const isoish = s.includes(" ") ? s.replace(" ", "T") : s;
+  const n = Date.parse(isoish);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function withinReplyEditWindow(repliedAt: string): boolean {
+  const hours = (Date.now() - parseTs(repliedAt)) / 3_600_000;
+  return hours < REPLY_EDIT_WINDOW_HOURS;
+}
 
 /**
  * Shared, in-memory store for officer replies to customer feedback.
@@ -23,24 +39,27 @@ export type FeedbackResponse = {
  * the store lives in module memory: it persists across client-side navigation
  * but resets on a full page reload.
  */
+// FB-028 is the flagship "recent reply" example — seeded as sent an hour ago
+// so it loads inside the edit window and demonstrates the Edit response flow.
+const RECENT_DEMO_ID = "FB-028";
+
 let store: Record<string, FeedbackResponse> = Object.fromEntries(
-  FEEDBACK.filter(f => f.response).map(f => [
-    f.id,
-    { message: f.response!, sentAt: f.date, by: "Support team" },
-  ])
+  FEEDBACK.filter(f => f.response).map(f => {
+    const isRecentDemo = f.id === RECENT_DEMO_ID;
+    const sentAt = isRecentDemo
+      ? new Date(Date.now() - 60 * 60 * 1000).toISOString().slice(0, 16).replace("T", " ")
+      : f.date;
+    return [f.id, { message: f.response!, sentAt, repliedAt: sentAt, by: "Support team" }];
+  })
 );
 
 const listeners = new Set<() => void>();
 
-export function setFeedbackResponse(
-  id: string,
-  message: string,
-  sentAt: string,
-  locked = false,
-  by?: string
-) {
+export function setFeedbackResponse(id: string, message: string, sentAt: string, by?: string) {
+  // First reply anchors the edit window; later edits keep that anchor.
+  const repliedAt = store[id]?.repliedAt ?? sentAt;
   // Replace the object reference so useSyncExternalStore detects the change.
-  store = { ...store, [id]: { message, sentAt, locked, by } };
+  store = { ...store, [id]: { message, sentAt, repliedAt, by } };
   listeners.forEach(l => l());
 }
 

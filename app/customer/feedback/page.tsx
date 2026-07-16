@@ -37,9 +37,7 @@ export default function FeedbackPage() {
   const activeFeedback = openId ? FEEDBACK.find(f => f.id === openId) ?? null : null;
 
   const submitResponse = (id: string, message: string) => {
-    // First reply stays editable; editing an existing reply finalises (locks) it.
-    const isEdit = !!responses[id];
-    setFeedbackResponse(id, message, nowStamp(), isEdit, user.name);
+    setFeedbackResponse(id, message, nowStamp(), user.name);
     setOpenId(null);
   };
 
@@ -89,8 +87,8 @@ export default function FeedbackPage() {
   return (
     <div className="space-y-6 max-w-[1400px]">
       <PageHeader
-        title="Feedback"
-        subtitle={`${FEEDBACK.length} feedback · ${unrepliedCount} unreplied`}
+        title="Complaint"
+        subtitle={`${FEEDBACK.length} complaints · ${unrepliedCount} unreplied`}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
@@ -99,7 +97,7 @@ export default function FeedbackPage() {
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-200">
-                {["Customer", "Comment", "Date", "Status", "Action"].map(h => (
+                {["Customer", "Subject", "Comment", "Date", "Status", "Action"].map(h => (
                   <th
                     key={h}
                     className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap"
@@ -112,8 +110,8 @@ export default function FeedbackPage() {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center text-sm text-gray-500">
-                    No feedback.
+                  <td colSpan={6} className="px-6 py-16 text-center text-sm text-gray-500">
+                    No complaints.
                   </td>
                 </tr>
               ) : (
@@ -135,7 +133,7 @@ export default function FeedbackPage() {
         {/* Cards (mobile) */}
         <div className="md:hidden divide-y divide-gray-100">
           {paginated.length === 0 ? (
-            <div className="px-4 py-16 text-center text-sm text-gray-500">No feedback.</div>
+            <div className="px-4 py-16 text-center text-sm text-gray-500">No complaints.</div>
           ) : (
             paginated.map(f => {
               const responded = !!responses[f.id];
@@ -149,6 +147,7 @@ export default function FeedbackPage() {
                     <span className="text-sm font-medium text-gray-900">{f.customer}</span>
                     <span className="text-[11px] text-gray-400 whitespace-nowrap">{f.date}</span>
                   </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">{f.subject}</div>
                   <div className="text-xs text-gray-600 mt-1 line-clamp-2">{clip(f.text, 90)}</div>
                   <div className="mt-2.5 flex items-center justify-between">
                     <StatusBadge status={responded ? "Replied" : "No reply"} />
@@ -270,6 +269,7 @@ function FeedbackRow({
       onClick={onOpen}
     >
       <td className="px-6 py-3.5 font-medium text-gray-900">{f.customer}</td>
+      <td className="px-6 py-3.5 text-gray-600 whitespace-nowrap">{f.subject}</td>
       <td className="px-6 py-3.5 text-gray-600 max-w-[360px]">
         <div className="truncate">{clip(f.text, 90)}</div>
       </td>

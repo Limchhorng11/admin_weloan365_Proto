@@ -704,7 +704,7 @@ export const CONSULTATIONS = [
   {
     id: "RC-221",
     customer: "Sokha Chan",
-    topic: "Micro Loan options",
+    topic: "Loan Application Guidance",
     requested: "2026-04-21 09:12",
     status: "open",
     officer: "Unassigned",
@@ -717,7 +717,7 @@ export const CONSULTATIONS = [
   {
     id: "RC-220",
     customer: "Dara Meas",
-    topic: "SME expansion financing",
+    topic: "General Inquiry",
     requested: "2026-04-20 14:03",
     status: "waiting",
     officer: "Visal P.",
@@ -729,7 +729,7 @@ export const CONSULTATIONS = [
   {
     id: "RC-219",
     customer: "Pisey Ros",
-    topic: "Housing Loan inquiry",
+    topic: "Loan Application Guidance",
     requested: "2026-04-19 11:45",
     status: "closed",
     officer: "Sophea K.",
@@ -741,7 +741,7 @@ export const CONSULTATIONS = [
   {
     id: "RC-218",
     customer: "Chenda Oum",
-    topic: "First-time borrower",
+    topic: "Account & Document Support",
     requested: "2026-04-18 16:20",
     status: "closed",
     officer: "Visal P.",
@@ -752,10 +752,23 @@ export const CONSULTATIONS = [
   },
 ];
 
+/** Categories customers pick when submitting feedback in the mobile app. */
+export const FEEDBACK_SUBJECTS = [
+  "Suggestion",
+  "Loan processing delay",
+  "Incorrect charges or fees",
+  "Staff conduct",
+  "Payment not recorded",
+  "App or digital service issue",
+  "Data privacy concern",
+  "Other",
+] as const;
+
 export type Feedback = {
   id: string;
   customer: string;
   rating: number;
+  subject: (typeof FEEDBACK_SUBJECTS)[number];
   text: string;
   date: string;
   /** Officer reply, if any — drives the "Replied / No reply" status shared by
@@ -764,30 +777,30 @@ export type Feedback = {
 };
 
 export const FEEDBACK: Feedback[] = [
-  { id: "FB-028", customer: "Sokha Chan",  rating: 5, text: "Outstanding service, will recommend to family.",  date: "2026-04-21", response: "Thank you for the kind words, Sokha — we're delighted you had a great experience!" },
-  { id: "FB-027", customer: "Pisey Ros",   rating: 5, text: "Fast approval, friendly officer.",                date: "2026-04-20" },
-  { id: "FB-026", customer: "Dara Meas",   rating: 4, text: "Process was clear but took a few extra days.",    date: "2026-04-19" },
-  { id: "FB-025", customer: "Vichet Lim",  rating: 5, text: "Loved the new app — very easy to track payments.",date: "2026-04-19" },
-  { id: "FB-024", customer: "Sokha Chan",  rating: 4, text: "Good experience overall.",                        date: "2026-04-18" },
-  { id: "FB-023", customer: "Narith Kim",  rating: 2, text: "Rejection reason was not clear.",                 date: "2026-04-18", response: "Sorry the reason wasn't clear — we've sent a detailed explanation in the app." },
-  { id: "FB-022", customer: "Bopha Sok",   rating: 5, text: "App is easy to use, payments smooth.",            date: "2026-04-17" },
-  { id: "FB-021", customer: "Rithy Pen",   rating: 4, text: "Helpful staff, smooth disbursement.",             date: "2026-04-16" },
-  { id: "FB-020", customer: "Chenda Oum",  rating: 3, text: "Average. Hoped for a faster response on chat.",   date: "2026-04-15" },
-  { id: "FB-019", customer: "Pisey Ros",   rating: 5, text: "Excellent customer support.",                     date: "2026-04-12" },
-  { id: "FB-018", customer: "Sokha Chan",  rating: 4, text: "Documents upload could be simpler.",              date: "2026-04-10" },
-  { id: "FB-017", customer: "Vichet Lim",  rating: 5, text: "Quick KYC verification.",                         date: "2026-04-08" },
-  { id: "FB-016", customer: "Dara Meas",   rating: 3, text: "Interest rate slightly higher than competitors.", date: "2026-04-05" },
-  { id: "FB-015", customer: "Bopha Sok",   rating: 5, text: "Birthday discount was a nice touch!",             date: "2026-04-02" },
-  { id: "FB-014", customer: "Narith Kim",  rating: 1, text: "Long wait time for review.",                      date: "2026-03-28", response: "Apologies for the wait — we've added reviewers to speed things up." },
-  { id: "FB-013", customer: "Rithy Pen",   rating: 4, text: "Smooth onboarding, branch staff were polite.",    date: "2026-03-25" },
-  { id: "FB-012", customer: "Pisey Ros",   rating: 5, text: "ABA Pay integration works great.",                date: "2026-03-22" },
-  { id: "FB-011", customer: "Vichet Lim",  rating: 4, text: "Push notifications are helpful reminders.",       date: "2026-03-18" },
-  { id: "FB-010", customer: "Chenda Oum",  rating: 2, text: "App crashed twice while uploading documents.",    date: "2026-03-14", response: "Thanks for reporting this — the upload crash is fixed in the latest update." },
-  { id: "FB-009", customer: "Sokha Chan",  rating: 5, text: "Best loan experience so far.",                    date: "2026-03-10", response: "That means a lot — thank you, Sokha!" },
-  { id: "FB-008", customer: "Dara Meas",   rating: 4, text: "Branch locator would be more useful with map.",   date: "2026-03-05" },
-  { id: "FB-007", customer: "Bopha Sok",   rating: 3, text: "Statement download could include CSV format.",    date: "2026-02-28" },
-  { id: "FB-006", customer: "Rithy Pen",   rating: 5, text: "Renewal was painless.",                           date: "2026-02-22" },
-  { id: "FB-005", customer: "Pisey Ros",   rating: 4, text: "Khmer translation could be more natural.",        date: "2026-02-15" },
+  { id: "FB-028", customer: "Sokha Chan",  rating: 5, subject: "Staff conduct",                  text: "Outstanding service, will recommend to family.",  date: "2026-04-21", response: "Thank you for the kind words, Sokha — we're delighted you had a great experience!" },
+  { id: "FB-027", customer: "Pisey Ros",   rating: 5, subject: "Staff conduct",                  text: "Fast approval, friendly officer.",                date: "2026-04-20" },
+  { id: "FB-026", customer: "Dara Meas",   rating: 4, subject: "Loan processing delay",          text: "Process was clear but took a few extra days.",    date: "2026-04-19" },
+  { id: "FB-025", customer: "Vichet Lim",  rating: 5, subject: "App or digital service issue",   text: "Loved the new app — very easy to track payments.",date: "2026-04-19" },
+  { id: "FB-024", customer: "Sokha Chan",  rating: 4, subject: "Other",                          text: "Good experience overall.",                        date: "2026-04-18" },
+  { id: "FB-023", customer: "Narith Kim",  rating: 2, subject: "Loan processing delay",          text: "Rejection reason was not clear.",                 date: "2026-04-18", response: "Sorry the reason wasn't clear — we've sent a detailed explanation in the app." },
+  { id: "FB-022", customer: "Bopha Sok",   rating: 5, subject: "App or digital service issue",   text: "App is easy to use, payments smooth.",            date: "2026-04-17" },
+  { id: "FB-021", customer: "Rithy Pen",   rating: 4, subject: "Staff conduct",                  text: "Helpful staff, smooth disbursement.",             date: "2026-04-16" },
+  { id: "FB-020", customer: "Chenda Oum",  rating: 3, subject: "Suggestion",                     text: "Average. Hoped for a faster response on chat.",   date: "2026-04-15" },
+  { id: "FB-019", customer: "Pisey Ros",   rating: 5, subject: "Staff conduct",                  text: "Excellent customer support.",                     date: "2026-04-12" },
+  { id: "FB-018", customer: "Sokha Chan",  rating: 4, subject: "Suggestion",                     text: "Documents upload could be simpler.",              date: "2026-04-10" },
+  { id: "FB-017", customer: "Vichet Lim",  rating: 5, subject: "Data privacy concern",           text: "Quick KYC verification.",                         date: "2026-04-08" },
+  { id: "FB-016", customer: "Dara Meas",   rating: 3, subject: "Incorrect charges or fees",      text: "Interest rate slightly higher than competitors.", date: "2026-04-05" },
+  { id: "FB-015", customer: "Bopha Sok",   rating: 5, subject: "Other",                          text: "Birthday discount was a nice touch!",             date: "2026-04-02" },
+  { id: "FB-014", customer: "Narith Kim",  rating: 1, subject: "Loan processing delay",          text: "Long wait time for review.",                      date: "2026-03-28", response: "Apologies for the wait — we've added reviewers to speed things up." },
+  { id: "FB-013", customer: "Rithy Pen",   rating: 4, subject: "Staff conduct",                  text: "Smooth onboarding, branch staff were polite.",    date: "2026-03-25" },
+  { id: "FB-012", customer: "Pisey Ros",   rating: 5, subject: "App or digital service issue",   text: "ABA Pay integration works great.",                date: "2026-03-22" },
+  { id: "FB-011", customer: "Vichet Lim",  rating: 4, subject: "App or digital service issue",   text: "Push notifications are helpful reminders.",       date: "2026-03-18" },
+  { id: "FB-010", customer: "Chenda Oum",  rating: 2, subject: "App or digital service issue",   text: "App crashed twice while uploading documents.",    date: "2026-03-14", response: "Thanks for reporting this — the upload crash is fixed in the latest update." },
+  { id: "FB-009", customer: "Sokha Chan",  rating: 5, subject: "Other",                          text: "Best loan experience so far.",                    date: "2026-03-10", response: "That means a lot — thank you, Sokha!" },
+  { id: "FB-008", customer: "Dara Meas",   rating: 4, subject: "Suggestion",                     text: "Branch locator would be more useful with map.",   date: "2026-03-05" },
+  { id: "FB-007", customer: "Bopha Sok",   rating: 3, subject: "Payment not recorded",           text: "Statement download could include CSV format.",    date: "2026-02-28" },
+  { id: "FB-006", customer: "Rithy Pen",   rating: 5, subject: "Loan processing delay",          text: "Renewal was painless.",                           date: "2026-02-22" },
+  { id: "FB-005", customer: "Pisey Ros",   rating: 4, subject: "Suggestion",                     text: "Khmer translation could be more natural.",        date: "2026-02-15" },
 ];
 
 export const CHATS = [
@@ -802,27 +815,72 @@ export const CHATS = [
    All customer-app posts — categorised. Single editor handles everything.
    ==================================================================== */
 
-export const POST_CATEGORIES = [
-  { id: "blog", label: "Blog", tone: "blue"    },
-  { id: "news", label: "News", tone: "violet"  },
-  { id: "tips", label: "Tips", tone: "emerald" },
-  { id: "edu",  label: "Edu",  tone: "amber"   },
-  { id: "csr",  label: "CSR",  tone: "rose"    },
-] as const;
+export type PostCategoryId = string;
 
-export type PostCategoryId = (typeof POST_CATEGORIES)[number]["id"];
+/** Which page manages the category: "media" = Blog Posts, "csr" = CSR Activity. */
+export type PostCategoryGroup = "media" | "csr";
+
+/** `tone` is one of the fixed swatch names in CATEGORY_TONE /
+ *  CATEGORY_OVERLAY_TONE (see components/posts-manager.tsx). */
+export type PostCategory = {
+  id: PostCategoryId;
+  label: string;
+  tone: string;
+  group: PostCategoryGroup;
+};
+
+/** Seed list only — admins can add/remove categories at runtime from the
+ *  post editor (see PostsManager), so this isn't the full set of ids that
+ *  may end up on a Post.category. */
+export const POST_CATEGORIES: PostCategory[] = [
+  { id: "blog", label: "Blog", tone: "blue",    group: "media" },
+  { id: "news", label: "News", tone: "violet",  group: "media" },
+  { id: "tips", label: "Tips", tone: "emerald", group: "media" },
+  { id: "edu",  label: "Edu",  tone: "amber",   group: "media" },
+  // CSR Activity sub-categories, shown as the badge on CSR posts in the
+  // customer app (e.g. "COMMUNITY WELFARE" over the header photo).
+  { id: "community-welfare", label: "Community Welfare", tone: "rose", group: "csr" },
+  { id: "public-service",    label: "Public Service",    tone: "blue", group: "csr" },
+];
 export type PostStatus = "Published" | "Scheduled" | "Draft";
+
+/** Posts publish in 3 languages for the customer mobile app. English is the
+ *  canonical/required language; Khmer and Korean are optional translations
+ *  filled in as they become available. */
+export type Locale = "en" | "km" | "ko";
+
+export const LOCALES: { code: Locale; label: string; flag: string }[] = [
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "km", label: "Khmer",   flag: "🇰🇭" },
+  { code: "ko", label: "Korean",  flag: "🇰🇷" },
+];
+
+export type LocalizedText = Record<Locale, string>;
+
+export const emptyLocalizedText = (): LocalizedText => ({ en: "", km: "", ko: "" });
+
+/** One item of a post's header media (image or video URL / data: URL). */
+export type PostMedia = { url: string; type: "image" | "video" };
 
 export type Post = {
   id: string;
-  title: string;
+  title: LocalizedText;
   category: PostCategoryId;
   /** Body uses lightweight markdown (## headings, **bold**, *italic*, - lists). */
-  body: string;
+  body: LocalizedText;
   /** Short summary shown in feed cards. */
-  excerpt: string;
-  /** Image URL or data: URL placeholder for the post's thumbnail. */
-  thumbnail: string;
+  excerpt: LocalizedText;
+  /** Header media — the customer app shows several as a swipeable carousel
+   *  (e.g. a "1/4" photo counter). First item doubles as the table thumbnail. */
+  media: PostMedia[];
+  /** Optional place name shown under the title (e.g. CSR activity location). */
+  location?: string;
+  /** CSR posts only — a short pull-quote highlighted in the article. */
+  quotation?: string;
+  /** Optional secondary block shown below the article body (e.g. "A continued
+   *  commitment" follow-up note on a CSR activity post). */
+  secondaryTitle?: LocalizedText;
+  secondaryBody?: LocalizedText;
   author: string;
   status: PostStatus;
   /** Display date for the list (or "—" when not yet published / no schedule). */
@@ -830,15 +888,20 @@ export type Post = {
   views: number;
 };
 
+/** Seed posts were authored in English only — wrap as a localized record with
+ *  Khmer/Korean left blank until translated. */
+const en = (text: string): LocalizedText => ({ en: text, km: "", ko: "" });
+
 export const POSTS: Post[] = [
   {
     id: "P-014",
-    title: "5 tips before taking your first loan",
+    title: en("5 tips before taking your first loan"),
     category: "tips",
-    excerpt: "Plan ahead, know your numbers, and pick the right product.",
-    body:
-      "## Plan ahead\nUnderstanding your monthly budget before applying makes the entire process smoother.\n\n## Know your numbers\nCheck your **debt-to-income ratio** — lenders look for under 40%.\n\n- Calculate your total monthly debt\n- Divide by your gross monthly income\n- Multiply by 100 to get the percentage\n\n## Pick the right product\nMatch the loan to the purpose — short term for emergencies, longer term for assets.",
-    thumbnail: "",
+    excerpt: en("Plan ahead, know your numbers, and pick the right product."),
+    body: en(
+      "## Plan ahead\nUnderstanding your monthly budget before applying makes the entire process smoother.\n\n## Know your numbers\nCheck your **debt-to-income ratio** — lenders look for under 40%.\n\n- Calculate your total monthly debt\n- Divide by your gross monthly income\n- Multiply by 100 to get the percentage\n\n## Pick the right product\nMatch the loan to the purpose — short term for emergencies, longer term for assets."
+    ),
+    media: [],
     author: "Sophea K.",
     status: "Published",
     date: "2026-04-15",
@@ -846,12 +909,13 @@ export const POSTS: Post[] = [
   },
   {
     id: "P-013",
-    title: "Khmer New Year holiday schedule",
+    title: en("Khmer New Year holiday schedule"),
     category: "news",
-    excerpt: "All branches will be closed Apr 13–15. Mobile app remains available.",
-    body:
-      "All WeLoan365 branches will be **closed for Khmer New Year** from Apr 13 to Apr 15, 2026.\n\n- The mobile app remains fully available\n- Loan payments processed automatically continue\n- In-app chat will be staffed at reduced capacity\n\nWe wish all our customers a happy and prosperous new year!",
-    thumbnail: "",
+    excerpt: en("All branches will be closed Apr 13–15. Mobile app remains available."),
+    body: en(
+      "All WeLoan365 branches will be **closed for Khmer New Year** from Apr 13 to Apr 15, 2026.\n\n- The mobile app remains fully available\n- Loan payments processed automatically continue\n- In-app chat will be staffed at reduced capacity\n\nWe wish all our customers a happy and prosperous new year!"
+    ),
+    media: [],
     author: "Admin",
     status: "Published",
     date: "2026-04-10",
@@ -859,12 +923,13 @@ export const POSTS: Post[] = [
   },
   {
     id: "P-012",
-    title: "Understanding APR vs flat rate",
+    title: en("Understanding APR vs flat rate"),
     category: "blog",
-    excerpt: "What's the difference, and which is better for you?",
-    body:
-      "APR (Annual Percentage Rate) is the **true cost** of a loan, expressed as a yearly rate.\n\nFlat rate looks simpler but can be deceiving — the actual cost is usually higher than the headline number.\n\n## Quick comparison\n- *Flat 10% × 1 year* ≈ APR of ~18%\n- Always compare loans using APR\n\nAsk your loan officer to walk through both numbers before you sign.",
-    thumbnail: "",
+    excerpt: en("What's the difference, and which is better for you?"),
+    body: en(
+      "APR (Annual Percentage Rate) is the **true cost** of a loan, expressed as a yearly rate.\n\nFlat rate looks simpler but can be deceiving — the actual cost is usually higher than the headline number.\n\n## Quick comparison\n- *Flat 10% × 1 year* ≈ APR of ~18%\n- Always compare loans using APR\n\nAsk your loan officer to walk through both numbers before you sign."
+    ),
+    media: [],
     author: "Visal P.",
     status: "Published",
     date: "2026-04-08",
@@ -872,12 +937,13 @@ export const POSTS: Post[] = [
   },
   {
     id: "P-011",
-    title: "New Housing Loan launching soon",
+    title: en("New Housing Loan launching soon"),
     category: "news",
-    excerpt: "Long-term financing for home purchase, up to $300,000. Launching May 1.",
-    body:
-      "We're launching the **Housing Loan (HL)** product on May 1, 2026.\n\nKey features:\n- Rate from **9% APR**\n- Term up to 240 months (20 years)\n- Hard or soft title collateral required\n- For house purchase in NHFC's operating areas\n\nVisit any branch from May 1 to apply.",
-    thumbnail: "",
+    excerpt: en("Long-term financing for home purchase, up to $300,000. Launching May 1."),
+    body: en(
+      "We're launching the **Housing Loan (HL)** product on May 1, 2026.\n\nKey features:\n- Rate from **9% APR**\n- Term up to 240 months (20 years)\n- Hard or soft title collateral required\n- For house purchase in NHFC's operating areas\n\nVisit any branch from May 1 to apply."
+    ),
+    media: [],
     author: "Admin",
     status: "Scheduled",
     date: "2026-04-25",
@@ -885,12 +951,13 @@ export const POSTS: Post[] = [
   },
   {
     id: "P-010",
-    title: "Branch hours update — Siem Reap",
+    title: en("Branch hours update — Siem Reap"),
     category: "news",
-    excerpt: "Extended Saturday hours starting April.",
-    body:
-      "The Siem Reap branch will now be open on **Saturdays** from 8:00 AM to 1:00 PM, in addition to weekday hours.\n\nNo appointment required — walk-ins welcome.",
-    thumbnail: "",
+    excerpt: en("Extended Saturday hours starting April."),
+    body: en(
+      "The Siem Reap branch will now be open on **Saturdays** from 8:00 AM to 1:00 PM, in addition to weekday hours.\n\nNo appointment required — walk-ins welcome."
+    ),
+    media: [],
     author: "Ratanak L.",
     status: "Published",
     date: "2026-04-02",
@@ -898,12 +965,13 @@ export const POSTS: Post[] = [
   },
   {
     id: "P-009",
-    title: "Birthday rate discount — limited time",
-    category: "csr",
-    excerpt: "Customers get 0.5% off on new loans during their birthday month.",
-    body:
-      "🎂 Celebrate your birthday with us — get **0.5% off** your APR on any new loan, valid for the entire month of your birthday.\n\n- Available on Micro Loan (ML), Small Business Loan (SBL), and SME loans\n- Stack with referral rewards\n- Apply in-app or at any branch",
-    thumbnail: "",
+    title: en("Birthday rate discount — limited time"),
+    category: "public-service",
+    excerpt: en("Customers get 0.5% off on new loans during their birthday month."),
+    body: en(
+      "🎂 Celebrate your birthday with us — get **0.5% off** your APR on any new loan, valid for the entire month of your birthday.\n\n- Available on Micro Loan (ML), Small Business Loan (SBL), and SME loans\n- Stack with referral rewards\n- Apply in-app or at any branch"
+    ),
+    media: [],
     author: "Sophea K.",
     status: "Draft",
     date: "—",
@@ -911,13 +979,15 @@ export const POSTS: Post[] = [
   },
   {
     id: "P-007",
-    title: "Scholarships for rural students — 2026 program",
-    category: "csr",
-    excerpt:
-      "WeLoan365 awards 50 scholarships to high-school students in rural provinces.",
-    body:
-      "As part of our community commitment, WeLoan365 will award **50 full scholarships** for the 2026 academic year to outstanding high-school students from rural provinces.\n\n## Who is eligible\n- Grade 11 or 12 students in NHFC operating areas\n- Demonstrated financial need\n- Minimum GPA 3.0\n\n## How to apply\n- Visit any branch with a letter from your school principal\n- Application deadline: June 30, 2026\n\nGiving back to the communities we serve is at the heart of who we are.",
-    thumbnail: "",
+    title: en("Scholarships for rural students — 2026 program"),
+    category: "community-welfare",
+    excerpt: en(
+      "WeLoan365 awards 50 scholarships to high-school students in rural provinces."
+    ),
+    body: en(
+      "As part of our community commitment, WeLoan365 will award **50 full scholarships** for the 2026 academic year to outstanding high-school students from rural provinces.\n\n## Who is eligible\n- Grade 11 or 12 students in NHFC operating areas\n- Demonstrated financial need\n- Minimum GPA 3.0\n\n## How to apply\n- Visit any branch with a letter from your school principal\n- Application deadline: June 30, 2026\n\nGiving back to the communities we serve is at the heart of who we are."
+    ),
+    media: [],
     author: "Admin",
     status: "Published",
     date: "2026-04-05",
@@ -925,13 +995,15 @@ export const POSTS: Post[] = [
   },
   {
     id: "P-006",
-    title: "Budgeting 101 — the 50/30/20 rule",
+    title: en("Budgeting 101 — the 50/30/20 rule"),
     category: "edu",
-    excerpt:
-      "A simple framework to split your income between needs, wants, and savings.",
-    body:
-      "The **50/30/20 rule** is a simple way to budget your monthly income:\n\n## 50% — Needs\nRent, utilities, groceries, transport, insurance.\n\n## 30% — Wants\nDining out, entertainment, hobbies, subscriptions.\n\n## 20% — Savings & debt repayment\nEmergency fund, retirement, paying down loans faster than required.\n\nThis isn't rigid — adjust the ratios to your situation. The point is to *spend with intention*, not by accident.",
-    thumbnail: "",
+    excerpt: en(
+      "A simple framework to split your income between needs, wants, and savings."
+    ),
+    body: en(
+      "The **50/30/20 rule** is a simple way to budget your monthly income:\n\n## 50% — Needs\nRent, utilities, groceries, transport, insurance.\n\n## 30% — Wants\nDining out, entertainment, hobbies, subscriptions.\n\n## 20% — Savings & debt repayment\nEmergency fund, retirement, paying down loans faster than required.\n\nThis isn't rigid — adjust the ratios to your situation. The point is to *spend with intention*, not by accident."
+    ),
+    media: [],
     author: "Sophea K.",
     status: "Published",
     date: "2026-03-28",
@@ -939,12 +1011,13 @@ export const POSTS: Post[] = [
   },
   {
     id: "P-008",
-    title: "How to improve your credit score",
+    title: en("How to improve your credit score"),
     category: "tips",
-    excerpt: "Small habits that move your score in the right direction.",
-    body:
-      "Improving your credit score takes time, but a few habits compound quickly:\n\n## Pay on time\nThis is the single biggest factor.\n\n## Keep utilisation low\nUse less than 30% of available credit on any line.\n\n## Avoid opening too many accounts at once\nEach hard inquiry costs you a few points.",
-    thumbnail: "",
+    excerpt: en("Small habits that move your score in the right direction."),
+    body: en(
+      "Improving your credit score takes time, but a few habits compound quickly:\n\n## Pay on time\nThis is the single biggest factor.\n\n## Keep utilisation low\nUse less than 30% of available credit on any line.\n\n## Avoid opening too many accounts at once\nEach hard inquiry costs you a few points."
+    ),
+    media: [],
     author: "Sophea K.",
     status: "Draft",
     date: "—",
@@ -1006,7 +1079,7 @@ export type PermissionCategory =
   | "Overview"
   | "Customer — All Accounts"
   | "Customer — Consultations"
-  | "Customer — Feedback & Rate"
+  | "Customer — Complaint & Rate"
   | "Loan Application"
   | "Loan Product"
   | "Blog Posts"
@@ -1025,12 +1098,11 @@ export const PERMISSIONS: Permission[] = [
   /* ---------- CUSTOMER — Consultations ---------- */
   { key: "consultation.view",   label: "View consultation requests", category: "Customer — Consultations" },
   { key: "consultation.assign", label: "Assign / reassign officer",  category: "Customer — Consultations" },
-  { key: "consultation.reply",  label: "Reply to customer",          category: "Customer — Consultations" },
-  { key: "consultation.close",  label: "Mark consultation closed",   category: "Customer — Consultations" },
+  { key: "consultation.close",  label: "Mark as completed",          category: "Customer — Consultations" },
 
   /* ---------- CUSTOMER — Feedback & Rate ---------- */
-  { key: "feedback.view",  label: "View customer feedback", category: "Customer — Feedback & Rate" },
-  { key: "feedback.reply", label: "Reply to feedback",      category: "Customer — Feedback & Rate" },
+  { key: "feedback.view",  label: "View customer complaints", category: "Customer — Complaint & Rate" },
+  { key: "feedback.reply", label: "Reply to complaint",       category: "Customer — Complaint & Rate" },
 
   /* ---------- LOAN APPLICATION ---------- */
   { key: "loan.view",        label: "View applications",          category: "Loan Application" },
@@ -1078,7 +1150,6 @@ export const PERMISSION_REQUIRES: Record<string, string> = {
   "report.export": "report.view",
   "customer.pin_reset": "customer.view",
   "consultation.assign": "consultation.view",
-  "consultation.reply": "consultation.view",
   "consultation.close": "consultation.view",
   "feedback.reply": "feedback.view",
   "loan.review": "loan.view",
@@ -1132,7 +1203,7 @@ export const ROLES: Role[] = [
     permissions: [
       "report.view", "report.export",
       "customer.view",
-      "consultation.view", "consultation.assign", "consultation.reply", "consultation.close",
+      "consultation.view", "consultation.assign", "consultation.close",
       "feedback.view",
       "loan.view", "loan.review", "loan.approve", "loan.reject",
       "loan.reassign", "loan.restructure",
@@ -1153,8 +1224,7 @@ export const ROLES: Role[] = [
     permissions: [
       "report.view",
       "customer.view",
-      "consultation.view", "consultation.reply",
-      "feedback.view",
+      "consultation.view", "consultation.close",
       "loan.view", "loan.review",
       "payment.view",
       "product.view",
@@ -1168,11 +1238,10 @@ export const ROLES: Role[] = [
   {
     key: "customer_service",
     name: "Customer Service",
-    description: "Assist customers with their accounts, consultations, and repayments.",
+    description: "Assist customers with their accounts and repayments.",
     approvalLimit: 0,
     permissions: [
       "customer.view", "customer.pin_reset",
-      "consultation.view", "consultation.reply", "consultation.close",
       "feedback.view", "feedback.reply",
       "payment.view", "payment.record",
       "post.view", "post.manage",
@@ -1226,6 +1295,12 @@ export const BRANCHES: Branch[] = [
 
 export type PromotionStatus = "Active" | "Inactive";
 
+/** The single action button shown on a promotion in the customer app —
+ *  either deep-links to a loan product's detail page, or dials a number. */
+export type PromotionCta =
+  | { type: "loan"; productId: string }
+  | { type: "call"; phone: string };
+
 export type Promotion = {
   id: string;
   title: string;
@@ -1239,6 +1314,8 @@ export type Promotion = {
   /** Staff user who created / last edited this promotion. Mirrors the
    *  `author` field on blog posts so the table can show accountability. */
   author: string;
+  /** Choice button — what tapping this promotion does in the customer app. */
+  cta: PromotionCta;
 };
 
 export const PROMOTIONS: Promotion[] = [
@@ -1251,6 +1328,7 @@ export const PROMOTIONS: Promotion[] = [
     date: "2026-04-10",
     deadline: "2026-04-30",
     author: "Sophea K.",
+    cta: { type: "loan", productId: "LP-07" }, // Micro Loan (ML)
   },
   {
     id: "PM-002",
@@ -1260,6 +1338,7 @@ export const PROMOTIONS: Promotion[] = [
     status: "Active",
     date: "2026-03-22",
     author: "Visal P.",
+    cta: { type: "call", phone: "+855 23 999 000" },
   },
   {
     id: "PM-003",
@@ -1270,6 +1349,7 @@ export const PROMOTIONS: Promotion[] = [
     date: "2026-02-14",
     deadline: "2026-12-31",
     author: "Sophea K.",
+    cta: { type: "call", phone: "+855 23 999 000" },
   },
   {
     id: "PM-004",
@@ -1279,5 +1359,6 @@ export const PROMOTIONS: Promotion[] = [
     status: "Inactive",
     date: "2026-01-05",
     author: "Admin",
+    cta: { type: "loan", productId: "LP-10" }, // Housing Loan (HL)
   },
 ];

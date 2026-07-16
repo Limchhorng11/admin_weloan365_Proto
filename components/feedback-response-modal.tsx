@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { X, Send, Pencil, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Feedback } from "@/lib/data";
-import type { FeedbackResponse } from "@/lib/feedback-store";
+import { REPLY_EDIT_WINDOW_HOURS, withinReplyEditWindow, type FeedbackResponse } from "@/lib/feedback-store";
 
 /**
  * Feedback reply flow:
- *   • No reply yet      → compose mode (write + send).
- *   • Replied           → review mode (read-only) with an "Edit response"
- *                         button. Editing is allowed exactly once.
- *   • Edited (locked)   → review mode, read-only, no edit — the reply is final.
+ *   • No reply yet        → compose mode (write + send).
+ *   • Replied, within 12h → review mode (read-only) with an "Edit response"
+ *                           button, editable as many times as needed.
+ *   • Past the 12h window → review mode, read-only, no edit — the reply is final.
  */
 export function FeedbackResponseModal({
   feedback,
@@ -48,7 +48,8 @@ export function FeedbackResponseModal({
   if (!feedback) return null;
 
   const hasReply = !!existing;
-  const locked = !!existing?.locked;
+  const editWindowOpen = !!existing && withinReplyEditWindow(existing.repliedAt);
+  const locked = hasReply && !editWindowOpen;
   const composeMode = !hasReply && canReply; // first reply (only if allowed)
   const isEditing = composeMode || editing; // textarea shown
   const canSend = (() => {
@@ -57,7 +58,7 @@ export function FeedbackResponseModal({
   })();
 
   const title = composeMode
-    ? "Reply to feedback"
+    ? "Reply to complaint"
     : editing
       ? "Edit response"
       : "Customer response";
@@ -109,9 +110,7 @@ export function FeedbackResponseModal({
                 </div>
                 <div className="text-sm font-medium text-gray-900">{feedback.customer}</div>
               </div>
-              <div className="text-[11px] text-gray-500 font-mono">
-                {feedback.id} · {feedback.date}
-              </div>
+              <div className="text-[11px] text-gray-500 font-mono">{feedback.date}</div>
             </div>
             <div className="text-sm text-gray-700 mt-1">{feedback.text}</div>
           </div>
@@ -135,7 +134,7 @@ export function FeedbackResponseModal({
                 onChange={e => setMessage(e.target.value)}
                 rows={5}
                 maxLength={280}
-                placeholder="Thank you for your feedback. We'll look into this and follow up shortly..."
+                placeholder="Thank you for your complaint. We'll look into this and follow up shortly..."
                 className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
               <div className="text-[11px] text-gray-400 mt-1">
@@ -168,9 +167,12 @@ export function FeedbackResponseModal({
                   {existing?.sentAt}
                 </span>
                 {locked && (
-                  <span className="inline-flex items-center gap-1 text-gray-400">
+                  <span
+                    className="inline-flex items-center gap-1 text-gray-400"
+                    title={`Editable for ${REPLY_EDIT_WINDOW_HOURS}h after the reply was sent`}
+                  >
                     <Lock className="w-3 h-3" />
-                    Final
+                    Edit window closed
                   </span>
                 )}
               </div>
@@ -222,8 +224,12 @@ export function FeedbackResponseModal({
               <Pencil className="w-3.5 h-3.5" />
               Edit response
             </button>
+          ) : locked ? (
+            <span className="text-xs text-gray-400">
+              After {REPLY_EDIT_WINDOW_HOURS} hours of the reply, it can no longer be updated.
+            </span>
           ) : (
-            // Locked, view-only, or nothing to reply to — no edit action.
+            // View-only, or nothing to reply to — no edit action.
             <span />
           )}
         </div>

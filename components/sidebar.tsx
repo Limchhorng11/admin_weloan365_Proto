@@ -16,6 +16,7 @@ import {
   MessageSquareText,
   Star,
   UserCircle2,
+  HeartHandshake,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -53,13 +54,22 @@ const NAV: { section: string; items: NavItem[] }[] = [
           { label: "All Accounts", href: "/customer/accounts", icon: UserCircle2, permission: "customer.view" },
           // Consultations and Feedback are separate sections, each with its own table.
           { label: "Consultation", href: "/customer/consultations", icon: MessageSquareText, permission: "consultation.view" },
-          { label: "Feedback", href: "/customer/feedback", icon: Star, permission: "feedback.view" },
+          { label: "Complaint", href: "/customer/feedback", icon: Star, permission: "feedback.view" },
         ],
       },
       { label: "Loan Application", href: "/customer/applications", icon: FileText, permission: "loan.view" },
       { label: "Loan Product", href: "/loan-product", icon: Package, permission: "loan.view" },
-      { label: "Blog Posts", href: "/content/posts", icon: Newspaper, permission: "post.manage" },
-      { label: "Promotion", href: "/content/promotions", icon: Megaphone, permission: "promotion.manage" },
+      {
+        label: "Media",
+        icon: Newspaper,
+        children: [
+          { label: "Promotion", href: "/content/promotions", icon: Megaphone, permission: "promotion.manage" },
+          { label: "Blog Posts", href: "/content/posts", icon: Newspaper, permission: "post.manage" },
+          // Own route — reuses the Blog Posts editor/table with the category
+          // locked to CSR (see app/content/csr/page.tsx).
+          { label: "CSR", href: "/content/csr", icon: HeartHandshake, permission: "post.manage" },
+        ],
+      },
     ],
   },
 ];
@@ -96,11 +106,7 @@ export function Sidebar({
       g.items.forEach(it => {
         if (
           "children" in it &&
-          it.children?.some(
-            c =>
-              pathname.startsWith(c.href) ||
-              c.matchHrefs?.some(h => pathname.startsWith(h))
-          )
+          it.children?.some(c => pathname.startsWith(c.href) || c.matchHrefs?.some(h => pathname.startsWith(h)))
         ) {
           state[it.label] = true;
         }
@@ -113,9 +119,7 @@ export function Sidebar({
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const matchesPath = (href: string) =>
-    href === "/"
-      ? pathname === "/"
-      : pathname === href || pathname.startsWith(href + "/");
+    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 
   const isActive = (href?: string, matchHrefs?: string[]) => {
     if (!href) return false;

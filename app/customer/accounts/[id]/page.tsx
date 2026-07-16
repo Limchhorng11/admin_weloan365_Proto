@@ -230,13 +230,13 @@ export default function CustomerDetailPage({
             )}
           </div>
 
-          {/* Feedback */}
+          {/* Complaint */}
           <div className="pt-4 border-t border-gray-100">
             <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-3">
-              Feedback
+              Complaint
             </div>
             {custFeedback.length === 0 ? (
-              <div className="text-xs text-gray-400">No feedback yet.</div>
+              <div className="text-xs text-gray-400">No complaints yet.</div>
             ) : (
               <ul className="space-y-2.5 max-h-72 overflow-y-auto scrollbar-thin pr-1">
                 {custFeedback.map(fb => (
@@ -264,7 +264,7 @@ export default function CustomerDetailPage({
                       <Link
                         href={`/customer/feedback?feedback=${fb.id}`}
                         className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-700 hover:text-amber-800 hover:underline"
-                        title="Reply to this feedback in the inbox"
+                        title="Reply to this complaint in the inbox"
                       >
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
                         Awaiting reply

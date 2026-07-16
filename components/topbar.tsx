@@ -19,16 +19,18 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/lib/role-context";
+import { useNotifications, type NotifKind } from "@/lib/notifications";
 
 type MenuKey = "notif" | "user" | null;
 
 const TITLES: { match: string; title: string }[] = [
   { match: "/customer/accounts",      title: "Customers" },
   { match: "/customer/consultations", title: "Consultations" },
-  { match: "/customer/feedback",      title: "Feedback" },
+  { match: "/customer/feedback",      title: "Complaint" },
   { match: "/customer/applications",  title: "Loan Applications" },
   { match: "/loan-product",           title: "Loan Products" },
   { match: "/content/posts",          title: "Blog Posts" },
+  { match: "/content/csr",            title: "CSR Activity" },
   { match: "/chat",                   title: "Chat" },
 ];
 
@@ -38,6 +40,8 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const title = active?.title ?? "Dashboard";
 
   const { role, user } = useRole();
+  const { notifications } = useNotifications();
+  const hasUnread = notifications.some(n => (!n.forUser || n.forUser === user.name) && !n.read);
   const [open, setOpen] = useState<MenuKey>(null);
   const headerRef = useRef<HTMLElement>(null);
 
@@ -91,7 +95,9 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             aria-label="Notifications"
           >
             <Bell className="w-[18px] h-[18px]" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+            {hasUnread && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+            )}
           </button>
           {open === "notif" && <NotificationsMenu />}
         </div>
@@ -159,18 +165,11 @@ function Dropdown({
 
 /* ---------- Notifications ---------- */
 
-type NotifKind = "info" | "warn" | "success";
-type Notif = { id: number; title: React.ReactNode; meta: string; kind: NotifKind; read: boolean };
-
-const NOTIFS: Notif[] = [
-  { id: 1, title: <>New application <b className="font-medium">APP-10298</b> from Bopha Sok</>, meta: "2 min ago",      kind: "info",    read: false },
-  { id: 2, title: <>Payment overdue on <b className="font-medium">LN-55008</b></>,               meta: "1 hour ago",     kind: "warn",    read: false },
-  { id: 3, title: <>KYC verified for <b className="font-medium">C-0425</b></>,                   meta: "Yesterday",      kind: "success", read: false },
-  { id: 4, title: <>Disbursement completed — <b className="font-medium">APP-10295</b></>,        meta: "2 days ago",     kind: "success", read: true  },
-  { id: 5, title: <>Monthly portfolio report ready</>,                                           meta: "3 days ago",     kind: "info",    read: true  },
-];
-
 function NotificationsMenu() {
+  const { user } = useRole();
+  const { notifications, markAllRead, markRead } = useNotifications();
+  const visible = notifications.filter(n => !n.forUser || n.forUser === user.name);
+
   const iconFor = (k: NotifKind) => {
     const base = "w-4 h-4";
     if (k === "warn") return <AlertTriangle className={cn(base, "text-amber-600")} />;
@@ -180,7 +179,7 @@ function NotificationsMenu() {
   const bgFor = (k: NotifKind) =>
     k === "warn" ? "bg-amber-50" : k === "success" ? "bg-emerald-50" : "bg-brand-50";
 
-  const unread = NOTIFS.filter(n => !n.read).length;
+  const unread = visible.filter(n => !n.read).length;
 
   return (
     <Dropdown className="w-[360px] max-w-[calc(100vw-2rem)]">
@@ -193,32 +192,48 @@ function NotificationsMenu() {
             </span>
           )}
         </div>
-        <button className="text-xs text-brand-600 hover:underline font-medium">Mark all read</button>
+        <button
+          onClick={() => markAllRead(user.name)}
+          className="text-xs text-brand-600 hover:underline font-medium"
+        >
+          Mark all read
+        </button>
       </div>
 
       <div className="max-h-[360px] overflow-y-auto scrollbar-thin">
-        {NOTIFS.map(n => (
-          <button
-            key={n.id}
-            className="w-full text-left block px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0"
-          >
-            <div className="flex gap-3">
-              <div
-                className={cn(
-                  "w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0",
-                  bgFor(n.kind)
-                )}
-              >
-                {iconFor(n.kind)}
+        {visible.length === 0 ? (
+          <div className="px-4 py-10 text-center text-sm text-gray-500">No notifications.</div>
+        ) : (
+          visible.map(n => {
+            const content = (
+              <div className="flex gap-3">
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0",
+                    bgFor(n.kind)
+                  )}
+                >
+                  {iconFor(n.kind)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-gray-900 leading-snug">{n.title}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{n.meta}</div>
+                </div>
+                {!n.read && <div className="w-2 h-2 rounded-full bg-brand-500 mt-2 flex-shrink-0" />}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-gray-900 leading-snug">{n.title}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{n.meta}</div>
-              </div>
-              {!n.read && <div className="w-2 h-2 rounded-full bg-brand-500 mt-2 flex-shrink-0" />}
-            </div>
-          </button>
-        ))}
+            );
+            const cls = "w-full text-left block px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0";
+            return n.href ? (
+              <Link key={n.id} href={n.href} onClick={() => markRead(n.id)} className={cls}>
+                {content}
+              </Link>
+            ) : (
+              <button key={n.id} onClick={() => markRead(n.id)} className={cls}>
+                {content}
+              </button>
+            );
+          })
+        )}
       </div>
 
       <div className="px-4 py-2.5 border-t border-gray-200 text-center">
