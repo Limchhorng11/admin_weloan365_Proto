@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   X,
   ArrowLeft,
@@ -32,6 +32,10 @@ import {
   Plus,
   Cake,
   Send,
+  PawPrint,
+  Upload,
+  AlertTriangle,
+  Star,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -44,6 +48,7 @@ type SectionKey =
   | "app"
   | "users"
   | "menu"
+  | "mascot"
   | "company"
   | "branches"
   | "referral"
@@ -65,6 +70,7 @@ const SECTIONS: Section[] = [
   { key: "app",      label: "App Setting",      icon: Smartphone,  group: "main", badge: "Admin", permission: "setting.edit" },
   { key: "users",    label: "User & Role",      icon: Users,       group: "main", permission: "user.view" },
   { key: "menu",     label: "Apply Loan Setting", icon: LayoutGrid,  group: "main", permission: "setting.edit" },
+  { key: "mascot",   label: "App Mascot",       icon: PawPrint,    group: "main", permission: "setting.edit" },
   { key: "company",  label: "Company Profile",  icon: Building2,   group: "main", permission: "setting.view" },
   { key: "branches", label: "Branch Locator",   icon: MapPin,      group: "main", permission: "setting.view" },
   { key: "referral", label: "Referral Program", icon: Gift,        group: "main", badge: "New", permission: "setting.edit" },
@@ -231,6 +237,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             {section === "app"      && <AppSettingView />}
             {section === "users"    && <UsersRolesView />}
             {section === "menu"     && <MenuView />}
+            {section === "mascot"   && <MascotView />}
             {section === "company"  && <CompanyView />}
             {section === "branches" && <BranchesView />}
             {section === "referral" && <ReferralView />}
@@ -677,6 +684,15 @@ const STAFF_PAGES: FlowPage[] = [
   { name: "Step 3 — Face ID", show: true, fields: [
     req("Face ID scan"),
   ] },
+];
+
+/** Every application-flow screen with its "Mascot illustration" toggle on —
+ *  shown as read-only context in the App Mascot settings section, so admins
+ *  can see where the default mascot actually appears without leaving it. */
+const MASCOT_USAGE: { flow: string; page: string }[] = [
+  ...MWL_PAGES.filter(p => p.mascot).map(p => ({ flow: "MWL", page: p.name })),
+  ...NON_MWL_PAGES.filter(p => p.mascot).map(p => ({ flow: "Non-MWL", page: p.name })),
+  ...STAFF_PAGES.filter(p => p.mascot).map(p => ({ flow: "Staff Loan", page: p.name })),
 ];
 
 function SwitchToggle({
@@ -1146,6 +1162,199 @@ function MenuView() {
           })}
         </div>
       </Card>
+    </div>
+  );
+}
+
+/* ---------- App Mascot ---------- */
+
+type MascotAsset = { id: string; name: string; image: string; isDefault: boolean };
+
+const DEFAULT_MASCOTS: MascotAsset[] = [
+  { id: "m-default",   name: "Welcome Screen",      image: "", isDefault: true },
+  { id: "m-success",   name: "Success / Approved",  image: "", isDefault: false },
+  { id: "m-waiting",   name: "Waiting / Pending",   image: "", isDefault: false },
+  { id: "m-guarantor", name: "Guarantor",           image: "", isDefault: false },
+];
+
+function MascotView() {
+  const [mascots, setMascots] = useState<MascotAsset[]>(DEFAULT_MASCOTS);
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [confirmDelete, setConfirmDelete] = useState<MascotAsset | null>(null);
+
+  const onPick = (id: string) => fileRefs.current[id]?.click();
+
+  const onFileChange = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result || "");
+      setMascots(prev => prev.map(m => (m.id === id ? { ...m, image: url } : m)));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = (id: string) =>
+    setMascots(prev => prev.map(m => (m.id === id ? { ...m, image: "" } : m)));
+
+  const deleteMascot = (asset: MascotAsset) => {
+    setMascots(prev => prev.filter(m => m.id !== asset.id));
+    setConfirmDelete(null);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <H2>App Mascot</H2>
+        <P>Manage the mascot illustrations shown to customers in the mobile app.</P>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {mascots.map(m => (
+          <Card key={m.id} className="space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="text-sm font-medium text-gray-900 min-w-0 truncate">{m.name}</div>
+              {m.isDefault && (
+                <span className="text-[10px] font-medium bg-brand-50 text-brand-700 rounded-full px-2 py-0.5 flex-shrink-0">
+                  Default
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onPick(m.id)}
+              title={m.image ? "Replace image" : "Upload image"}
+              className={cn(
+                "w-full h-32 rounded-md flex items-center justify-center overflow-hidden transition",
+                m.image
+                  ? "border border-gray-200 bg-gray-50 hover:border-brand-300"
+                  : "border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 text-gray-400 hover:text-brand-700"
+              )}
+            >
+              {m.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={m.image} alt={m.name} className="max-w-full max-h-full object-contain" />
+              ) : (
+                <div className="flex flex-col items-center gap-1.5">
+                  <Upload className="w-5 h-5" />
+                  <span className="text-[11px] font-medium">Click to upload</span>
+                </div>
+              )}
+            </button>
+            <input
+              ref={el => { fileRefs.current[m.id] = el; }}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => onFileChange(m.id, e)}
+            />
+
+            {m.image && (
+              <div className="flex items-center gap-3 text-xs">
+                <button onClick={() => onPick(m.id)} className="text-brand-600 hover:underline font-medium">
+                  Replace
+                </button>
+                <button onClick={() => removeImage(m.id)} className="text-red-600 hover:underline font-medium">
+                  Remove
+                </button>
+              </div>
+            )}
+
+            {!m.isDefault && (
+              <button
+                onClick={() => setConfirmDelete(m)}
+                className="w-full pt-2.5 border-t border-gray-100 text-xs text-red-600 hover:underline font-medium inline-flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3 h-3" />
+                Delete mascot
+              </button>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      {MASCOT_USAGE.length > 0 && (
+        <Card>
+          <div className="text-sm font-medium text-gray-900">Where it&apos;s used</div>
+          <div className="text-xs text-gray-500 mt-0.5 mb-3">
+            The default mascot appears on these customer-app screens — each screen&apos;s
+            illustration can still be toggled off in Apply Loan Setting.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {MASCOT_USAGE.map((u, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1.5 text-[11px] bg-gray-50 border border-gray-200 rounded-full px-2.5 py-1 text-gray-700"
+              >
+                <span className="font-medium">{u.flow}</span>
+                <span className="text-gray-400">·</span>
+                {u.page}
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {confirmDelete && (
+        <MascotConfirmDialog
+          title={`Delete "${confirmDelete.name}"?`}
+          message="This mascot illustration will be removed. This can't be undone."
+          confirmLabel="Delete mascot"
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => deleteMascot(confirmDelete)}
+        />
+      )}
+    </div>
+  );
+}
+
+function MascotConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4" onClick={onCancel}>
+      <div
+        className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-5">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-gray-900">{title}</div>
+              <div className="text-xs text-gray-600 mt-1">{message}</div>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-3 py-1.5 text-sm bg-rose-600 text-white rounded-md hover:bg-rose-700 font-medium"
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
