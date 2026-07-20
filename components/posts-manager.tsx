@@ -13,7 +13,6 @@ import {
   type PostCategoryGroup,
   type PostCategoryId,
   type PostMedia,
-  type PostStatus,
   type Locale,
   type LocalizedText,
 } from "@/lib/data";
@@ -108,7 +107,7 @@ function localeFillStatus(title: string, excerpt: string, body: string): LocaleF
   return "partial";
 }
 
-/** Small flag row showing which of the 3 languages have content — greyed out
+/** Small flag row showing which languages have content — greyed out
  *  when a translation is still missing. Reused in the table and the editor's
  *  language tabs. */
 function LangDots({
@@ -353,7 +352,7 @@ export function PostsManager({
           <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-200">
-                {["Post", "Category", "Author", "Status", "Views", "Date"].map(h => (
+                {["Post", "Category", "Status", "Date"].map(h => (
                   <th
                     key={h}
                     className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap"
@@ -389,12 +388,8 @@ export function PostsManager({
                   <td className="px-6 py-3.5">
                     <CategoryBadge id={p.category} categories={categories} />
                   </td>
-                  <td className="px-6 py-3.5 text-gray-700 text-xs">{p.author}</td>
                   <td className="px-6 py-3.5">
                     <StatusBadge status={p.status} />
-                  </td>
-                  <td className="px-6 py-3.5 text-gray-700">
-                    {p.views.toLocaleString()}
                   </td>
                   <td className="px-6 py-3.5 text-gray-600 text-xs">{p.date}</td>
                   <td className="px-6 py-3.5 text-right">
@@ -577,8 +572,8 @@ function PostEditorModal({
   const [newCategoryLabel, setNewCategoryLabel] = useState("");
   const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<PostCategory | null>(null);
 
-  // Each text field is a per-language record — English is required, Khmer
-  // and Korean are optional translations filled in whenever ready.
+  // Each text field is a per-language record — Khmer is required, English
+  // is an optional translation filled in whenever ready.
   const [title, setTitleMap]     = useState<LocalizedText>(emptyLocalizedText());
   const [excerpt, setExcerptMap] = useState<LocalizedText>(emptyLocalizedText());
   const [body, setBodyMap]       = useState<LocalizedText>(emptyLocalizedText());
@@ -590,10 +585,11 @@ function PostEditorModal({
   // commitment" note on a CSR activity post).
   const [secondaryTitle, setSecondaryTitleMap] = useState<LocalizedText>(emptyLocalizedText());
   const [secondaryBody, setSecondaryBodyMap]   = useState<LocalizedText>(emptyLocalizedText());
-  const [status, setStatus]       = useState<PostStatus>("Draft");
+  const [scheduleOn, setScheduleOn] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
   const [error, setError]         = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [activeLocale, setActiveLocale] = useState<Locale>("en");
+  const [activeLocale, setActiveLocale] = useState<Locale>("km");
 
   // The form always edits whichever language tab is active.
   const titleVal   = title[activeLocale];
@@ -623,7 +619,8 @@ function PostEditorModal({
       setQuotation(initial.quotation ?? "");
       setSecondaryTitleMap(initial.secondaryTitle ?? emptyLocalizedText());
       setSecondaryBodyMap(initial.secondaryBody ?? emptyLocalizedText());
-      setStatus(initial.status);
+      setScheduleOn(initial.status === "Scheduled");
+      setScheduleDate(initial.status === "Scheduled" ? initial.date : "");
     } else {
       setTitleMap(emptyLocalizedText());
       setCategory(defaultCategory);
@@ -634,11 +631,12 @@ function PostEditorModal({
       setQuotation(group === "csr" ? CSR_DEFAULT_QUOTATION : "");
       setSecondaryTitleMap(emptyLocalizedText());
       setSecondaryBodyMap(emptyLocalizedText());
-      setStatus("Draft");
+      setScheduleOn(false);
+      setScheduleDate("");
     }
     setError(null);
     setShowPreview(false);
-    setActiveLocale("en");
+    setActiveLocale("km");
     // defaultCategory is intentionally NOT a dep — it only matters at open
     // time; re-running on category deletion would wipe an in-progress form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -747,24 +745,26 @@ function PostEditorModal({
     initial?.date && initial.date !== "—" ? initial.date : new Date().toISOString().slice(0, 10);
 
   /* ---- Submit ---- */
-  // English is the canonical/required language; Khmer and Korean are
-  // optional translations that can be filled in later.
+  // Khmer is the canonical/required language; English is an optional
+  // translation that can be filled in later.
   const validate = (): string | null => {
-    if (!title.en.trim()) return "English title is required.";
-    if (!body.en.trim()) return "English article body can't be empty.";
+    if (!title.km.trim()) return "Khmer title is required.";
+    if (!body.km.trim()) return "Khmer article body can't be empty.";
+    if (scheduleOn && !scheduleDate) return "Pick a publish date or turn scheduling off.";
     return null;
   };
 
   const trimAll = (m: LocalizedText): LocalizedText => ({
     en: m.en.trim(),
     km: m.km.trim(),
-    ko: m.ko.trim(),
   });
 
-  const submit = (s: PostStatus) => {
+  const submit = () => {
     const err = validate();
     if (err) return setError(err);
     const hasSecondary = secondaryTitle.en.trim() || secondaryBody.en.trim();
+    const today = new Date().toISOString().slice(0, 10);
+    const isScheduled = scheduleOn && scheduleDate > today;
     const post: Post = {
       id: initial?.id ?? nextId,
       title: trimAll(title),
@@ -777,13 +777,8 @@ function PostEditorModal({
       secondaryTitle: hasSecondary ? trimAll(secondaryTitle) : undefined,
       secondaryBody: hasSecondary ? trimAll(secondaryBody) : undefined,
       author: initial?.author ?? authorName,
-      status: s,
-      date:
-        s === "Published"
-          ? new Date().toISOString().slice(0, 10)
-          : initial?.date && s === initial.status
-          ? initial.date
-          : "—",
+      status: isScheduled ? "Scheduled" : "Published",
+      date: isScheduled ? scheduleDate : today,
       views: initial?.views ?? 0,
     };
     onSave(post);
@@ -859,8 +854,8 @@ function PostEditorModal({
             </div>
           )}
 
-          {/* Language tabs — English is required; Khmer/Korean are optional
-              translations, filled in whenever ready. Governs both the editor
+          {/* Language tabs — Khmer is required; English is an optional
+              translation, filled in whenever ready. Governs both the editor
               fields below and the Preview pane. */}
           <div className="flex items-center gap-1.5 mb-5">
             {LOCALES.map(l => {
@@ -880,7 +875,7 @@ function PostEditorModal({
                 >
                   <span>{l.flag}</span>
                   {l.label}
-                  {l.code === "en" && <span className="text-red-500">*</span>}
+                  {l.code === "km" && <span className="text-red-500">*</span>}
                   <span
                     title={fill === "complete" ? "Translated" : fill === "partial" ? "In progress" : "Not translated"}
                     className={cn(
@@ -914,13 +909,13 @@ function PostEditorModal({
               <div className="lg:col-span-2 space-y-4">
                 <div>
                   <label className="text-xs font-medium text-gray-700">
-                    Title{activeLocale === "en" && " *"}
+                    Title{activeLocale === "km" && " *"}
                   </label>
                   <input
                     value={titleVal}
                     onChange={e => setTitleVal(e.target.value)}
                     placeholder={
-                      activeLocale === "en"
+                      activeLocale === "km"
                         ? "e.g. 5 tips before taking your first loan"
                         : `Translate the title into ${LOCALES.find(l => l.code === activeLocale)?.label}`
                     }
@@ -1003,7 +998,7 @@ function PostEditorModal({
                 {/* Body with formatting toolbar */}
                 <div>
                   <label className="text-xs font-medium text-gray-700">
-                    Article body{activeLocale === "en" && " *"}
+                    Article body{activeLocale === "km" && " *"}
                   </label>
                   <div className="mt-1 border border-gray-200 rounded-md overflow-hidden focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20">
                     <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
@@ -1158,14 +1153,62 @@ function PostEditorModal({
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Author</label>
-                  <input
-                    value={initial?.author ?? authorName}
-                    readOnly
-                    className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-600"
-                  />
+                {/* Schedule — optional. Toggle to publish on a future date
+                    instead of immediately. Mirrors the deadline toggle on
+                    the Promotion editor. */}
+                <div className="border border-gray-200 rounded-md">
+                  <div
+                    className={cn(
+                      "flex items-center justify-between gap-3 px-3 py-2",
+                      !scheduleOn && "bg-gray-50/60"
+                    )}
+                  >
+                    <label
+                      className={cn(
+                        "text-xs font-medium",
+                        scheduleOn ? "text-gray-700" : "text-gray-400"
+                      )}
+                    >
+                      Schedule post
+                    </label>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={scheduleOn}
+                      onClick={() => setScheduleOn(v => !v)}
+                      title={scheduleOn ? "Disable scheduling" : "Enable scheduling"}
+                      className={cn(
+                        "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
+                        scheduleOn ? "bg-brand-600" : "bg-gray-300"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                          scheduleOn ? "translate-x-[18px]" : "translate-x-0.5"
+                        )}
+                      />
+                    </button>
+                  </div>
+                  <div
+                    className={cn(
+                      "px-3 pb-3 pt-1 transition-opacity",
+                      !scheduleOn && "opacity-50 pointer-events-none select-none"
+                    )}
+                    aria-disabled={!scheduleOn}
+                  >
+                    <input
+                      type="date"
+                      value={scheduleDate}
+                      onChange={e => setScheduleDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    />
+                    <div className="text-[11px] text-gray-400 mt-1">
+                      Publishes automatically on the mobile app on this date.
+                    </div>
+                  </div>
                 </div>
+
               </div>
             </div>
           )}
@@ -1181,16 +1224,14 @@ function PostEditorModal({
           </button>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => submit("Draft")}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
-            >
-              Save as draft
-            </button>
-            <button
-              onClick={() => submit("Published")}
+              onClick={() => submit()}
               className="px-3 py-1.5 text-sm font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700"
             >
-              {isEdit && initial?.status === "Published" ? "Update" : "Publish"}
+              {scheduleOn && scheduleDate > new Date().toISOString().slice(0, 10)
+                ? "Schedule"
+                : isEdit
+                ? "Update"
+                : "Publish"}
             </button>
           </div>
         </div>

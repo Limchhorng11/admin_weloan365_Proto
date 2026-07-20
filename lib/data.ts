@@ -842,22 +842,21 @@ export const POST_CATEGORIES: PostCategory[] = [
   { id: "community-welfare", label: "Community Welfare", tone: "rose", group: "csr" },
   { id: "public-service",    label: "Public Service",    tone: "blue", group: "csr" },
 ];
-export type PostStatus = "Published" | "Scheduled" | "Draft";
+export type PostStatus = "Published" | "Scheduled" | "Failed";
 
-/** Posts publish in 3 languages for the customer mobile app. English is the
- *  canonical/required language; Khmer and Korean are optional translations
- *  filled in as they become available. */
-export type Locale = "en" | "km" | "ko";
+/** Posts publish in 2 languages for the customer mobile app. Khmer is the
+ *  canonical/required language; English is an optional translation filled
+ *  in as it becomes available. */
+export type Locale = "km" | "en";
 
 export const LOCALES: { code: Locale; label: string; flag: string }[] = [
-  { code: "en", label: "English", flag: "🇬🇧" },
   { code: "km", label: "Khmer",   flag: "🇰🇭" },
-  { code: "ko", label: "Korean",  flag: "🇰🇷" },
+  { code: "en", label: "English", flag: "🇬🇧" },
 ];
 
 export type LocalizedText = Record<Locale, string>;
 
-export const emptyLocalizedText = (): LocalizedText => ({ en: "", km: "", ko: "" });
+export const emptyLocalizedText = (): LocalizedText => ({ km: "", en: "" });
 
 /** One item of a post's header media (image or video URL / data: URL). */
 export type PostMedia = { url: string; type: "image" | "video" };
@@ -889,8 +888,8 @@ export type Post = {
 };
 
 /** Seed posts were authored in English only — wrap as a localized record with
- *  Khmer/Korean left blank until translated. */
-const en = (text: string): LocalizedText => ({ en: text, km: "", ko: "" });
+ *  Khmer left blank until translated. */
+const en = (text: string): LocalizedText => ({ en: text, km: "" });
 
 export const POSTS: Post[] = [
   {
@@ -973,8 +972,23 @@ export const POSTS: Post[] = [
     ),
     media: [],
     author: "Sophea K.",
-    status: "Draft",
-    date: "—",
+    status: "Scheduled",
+    date: "2026-04-01",
+    views: 0,
+  },
+  {
+    id: "P-015",
+    title: en("Free financial literacy workshop — Battambang"),
+    category: "public-service",
+    excerpt: en("A half-day workshop on budgeting and responsible borrowing, open to the public."),
+    body: en(
+      "WeLoan365 hosted a free financial literacy workshop in Battambang, covering budgeting basics, responsible borrowing, and how to read a loan agreement.\n\n- Open to the public, no registration fee\n- Handouts provided in Khmer\n- Q&A session with branch staff"
+    ),
+    media: [],
+    location: "Battambang",
+    author: "Ratanak L.",
+    status: "Failed",
+    date: "2026-04-12",
     views: 0,
   },
   {
@@ -1019,8 +1033,8 @@ export const POSTS: Post[] = [
     ),
     media: [],
     author: "Sophea K.",
-    status: "Draft",
-    date: "—",
+    status: "Failed",
+    date: "2026-03-25",
     views: 0,
   },
 ];
@@ -1293,7 +1307,7 @@ export const BRANCHES: Branch[] = [
    PROMOTIONS (content management — Title, Description, Image)
    ==================================================================== */
 
-export type PromotionStatus = "Active" | "Inactive";
+export type PromotionStatus = "Published" | "Scheduled" | "Failed";
 
 /** The single action button shown on a promotion in the customer app —
  *  either deep-links to a loan product's detail page, or dials a number. */
@@ -1324,7 +1338,7 @@ export const PROMOTIONS: Promotion[] = [
     title: "Khmer New Year — 0% Processing Fee",
     description: "Apply for any Micro Loan during Khmer New Year and pay zero processing fee.",
     image: "",
-    status: "Active",
+    status: "Published",
     date: "2026-04-10",
     deadline: "2026-04-30",
     author: "Sophea K.",
@@ -1335,7 +1349,7 @@ export const PROMOTIONS: Promotion[] = [
     title: "Refer a Friend, Earn $10",
     description: "Get a $10 reward for every friend who is approved for their first loan.",
     image: "",
-    status: "Active",
+    status: "Failed",
     date: "2026-03-22",
     author: "Visal P.",
     cta: { type: "call", phone: "+855 23 999 000" },
@@ -1345,7 +1359,7 @@ export const PROMOTIONS: Promotion[] = [
     title: "Birthday Month — 0.5% Off APR",
     description: "Enjoy 0.5% off your APR on any new loan during your birthday month.",
     image: "",
-    status: "Active",
+    status: "Published",
     date: "2026-02-14",
     deadline: "2026-12-31",
     author: "Sophea K.",
@@ -1356,8 +1370,8 @@ export const PROMOTIONS: Promotion[] = [
     title: "Housing Loan Launch Offer",
     description: "Introductory rate from 9% APR on the new Housing Loan product. Limited time.",
     image: "",
-    status: "Inactive",
-    date: "2026-01-05",
+    status: "Scheduled",
+    date: "2026-05-01",
     author: "Admin",
     cta: { type: "loan", productId: "LP-10" }, // Housing Loan (HL)
   },

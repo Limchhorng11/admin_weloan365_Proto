@@ -21,7 +21,9 @@ import {
 // Loan products a promotion's "Loan Detail" button can deep-link to. The MWL
 // parent isn't directly appliable — customers apply to a specific country
 // sub-product — so it's excluded from the picker.
-const CTA_LOAN_PRODUCTS = PRODUCTS.filter(p => p.kind !== "mwl-parent");
+// MWL is offered as one product here — the destination-specific sub-products
+// (Korea/Japan/Singapore) aren't listed separately, only the parent.
+const CTA_LOAN_PRODUCTS = PRODUCTS.filter(p => p.kind !== "mwl-sub");
 
 function ctaLoanProductName(id: string) {
   return CTA_LOAN_PRODUCTS.find(p => p.id === id)?.name ?? id;
@@ -135,7 +137,7 @@ export default function PromotionsPage() {
           <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-200">
-                {["Promotion", "Author", "Status", "Date", "End date"].map(h => (
+                {["Promotion", "Status", "Date", "End date"].map(h => (
                   <th
                     key={h}
                     className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap"
@@ -178,7 +180,6 @@ export default function PromotionsPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-3.5 text-gray-700 text-xs">{p.author}</td>
                   <td className="px-6 py-3.5">
                     <StatusBadge status={p.status} />
                   </td>
@@ -279,6 +280,8 @@ function PromotionEditorModal({
   const [image, setImage] = useState("");
   const [deadlineOn, setDeadlineOn] = useState(false);
   const [deadline, setDeadline] = useState("");
+  const [scheduleOn, setScheduleOn] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   // Choice button — the single action a customer can take from this promo.
@@ -297,6 +300,8 @@ function PromotionEditorModal({
       setImage(initial.image);
       setDeadlineOn(!!initial.deadline);
       setDeadline(initial.deadline ?? "");
+      setScheduleOn(initial.status === "Scheduled");
+      setScheduleDate(initial.status === "Scheduled" ? initial.date : "");
       setCtaType(initial.cta.type);
       setCtaProductId(initial.cta.type === "loan" ? initial.cta.productId : "");
       setCtaPhone(initial.cta.type === "call" ? initial.cta.phone : "");
@@ -306,6 +311,8 @@ function PromotionEditorModal({
       setImage("");
       setDeadlineOn(false);
       setDeadline("");
+      setScheduleOn(false);
+      setScheduleDate("");
       setCtaType("loan");
       setCtaProductId("");
       setCtaPhone("");
@@ -340,20 +347,22 @@ function PromotionEditorModal({
   const submit = () => {
     if (!title.trim()) return setError("Title is required.");
     if (!description.trim()) return setError("Description is required.");
+    if (!image) return setError("Please upload an image.");
     if (deadlineOn && !deadline) return setError("Pick a deadline date or turn the deadline off.");
+    if (scheduleOn && !scheduleDate) return setError("Pick a start date or turn scheduling off.");
     if (ctaType === "loan" && !ctaProductId) return setError("Choose which loan product the button opens.");
     if (ctaType === "call" && !ctaPhone.trim()) return setError("Enter the phone number the button calls.");
     const cta: PromotionCta =
       ctaType === "loan" ? { type: "loan", productId: ctaProductId } : { type: "call", phone: ctaPhone.trim() };
+    const today = new Date().toISOString().slice(0, 10);
+    const isScheduled = scheduleOn && scheduleDate > today;
     const promo: Promotion = {
       id: initial?.id ?? nextId,
       title: title.trim(),
       description: description.trim(),
       image,
-      // Status is no longer set in the form — preserve the existing value on
-      // edit, default to "Active" for new promotions.
-      status: initial?.status ?? "Active",
-      date: initial?.date ?? new Date().toISOString().slice(0, 10),
+      status: isScheduled ? "Scheduled" : "Published",
+      date: isScheduled ? scheduleDate : initial?.date ?? today,
       deadline: deadlineOn ? deadline : undefined,
       // Preserve the original author on edit; set the current user on create
       // (mirrors the blog-post editor behavior).
@@ -379,7 +388,7 @@ function PromotionEditorModal({
               {isEdit ? "Edit promotion" : "New promotion"}
             </div>
             <div className="text-xs text-gray-500 mt-0.5">
-              Shown to customers in the mobile app.{" "}
+              Shown on the Promotion section of the customer mobile app.{" "}
               <span className="font-mono text-gray-600">{initial?.id ?? nextId}</span>
             </div>
           </div>
@@ -485,7 +494,7 @@ function PromotionEditorModal({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-700">Image</label>
+            <label className="text-xs font-medium text-gray-700">Image *</label>
             <div className="mt-1.5">
               {image ? (
                 <div className="relative">
@@ -531,17 +540,6 @@ function PromotionEditorModal({
                 onChange={onFileChange}
               />
             </div>
-          </div>
-
-          {/* Author — read-only; stamped from the current user on create,
-              preserved on edit. Mirrors the blog-post editor's Author field. */}
-          <div>
-            <label className="text-xs font-medium text-gray-700">Author</label>
-            <input
-              value={initial?.author ?? authorName}
-              readOnly
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-600"
-            />
           </div>
 
           {/* Deadline — optional. Toggle to enable a date picker. Mirrors the
@@ -598,6 +596,61 @@ function PromotionEditorModal({
               </div>
             </div>
           </div>
+
+          {/* Schedule — optional. Toggle to publish on a future date instead
+              of immediately. Mirrors the deadline toggle above. */}
+          <div className="border border-gray-200 rounded-md">
+            <div
+              className={cn(
+                "flex items-center justify-between gap-3 px-3 py-2",
+                !scheduleOn && "bg-gray-50/60"
+              )}
+            >
+              <label
+                className={cn(
+                  "text-xs font-medium",
+                  scheduleOn ? "text-gray-700" : "text-gray-400"
+                )}
+              >
+                Schedule post
+              </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={scheduleOn}
+                onClick={() => setScheduleOn(v => !v)}
+                title={scheduleOn ? "Disable scheduling" : "Enable scheduling"}
+                className={cn(
+                  "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
+                  scheduleOn ? "bg-brand-600" : "bg-gray-300"
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                    scheduleOn ? "translate-x-[18px]" : "translate-x-0.5"
+                  )}
+                />
+              </button>
+            </div>
+            <div
+              className={cn(
+                "px-3 pb-3 pt-1 transition-opacity",
+                !scheduleOn && "opacity-50 pointer-events-none select-none"
+              )}
+              aria-disabled={!scheduleOn}
+            >
+              <input
+                type="date"
+                value={scheduleDate}
+                onChange={e => setScheduleDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+              <div className="text-[11px] text-gray-400 mt-1">
+                Publishes automatically on the mobile app on this date.
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
@@ -612,7 +665,11 @@ function PromotionEditorModal({
             onClick={submit}
             className="px-3 py-1.5 text-sm font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700"
           >
-            {isEdit ? "Save changes" : "Create promotion"}
+            {scheduleOn && scheduleDate > new Date().toISOString().slice(0, 10)
+              ? "Schedule"
+              : isEdit
+              ? "Save changes"
+              : "Create promotion"}
           </button>
         </div>
       </div>
