@@ -1155,7 +1155,9 @@ function PostEditorModal({
 
                 {/* Schedule — optional. Toggle to publish on a future date
                     instead of immediately. Mirrors the deadline toggle on
-                    the Promotion editor. */}
+                    the Promotion editor. CSR activities publish immediately,
+                    so this doesn't apply there. */}
+                {group !== "csr" && (
                 <div className="border border-gray-200 rounded-md">
                   <div
                     className={cn(
@@ -1208,6 +1210,7 @@ function PostEditorModal({
                     </div>
                   </div>
                 </div>
+                )}
 
               </div>
             </div>
