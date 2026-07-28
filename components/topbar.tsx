@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Bell,
-  MessageCircle,
   ChevronDown,
   User,
   Settings,
@@ -101,18 +100,6 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           </button>
           {open === "notif" && <NotificationsMenu />}
         </div>
-
-        {/* Chat */}
-        <Link
-          href="/chat"
-          className="p-2 rounded-md hover:bg-gray-100 relative text-gray-600"
-          aria-label="Chat"
-        >
-          <MessageCircle className="w-[18px] h-[18px]" />
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-brand-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-            3
-          </span>
-        </Link>
 
         <div className="w-px h-6 bg-gray-200 mx-2" />
 

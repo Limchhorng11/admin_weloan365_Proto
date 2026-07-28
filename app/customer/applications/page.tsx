@@ -223,6 +223,8 @@ export default function ApplicationsPage() {
                   // that have a customer-submitted request.
                   const hasRestructure =
                     r.status === "Approved" && !!r.restructureRequest;
+                  const hasRejectReason =
+                    r.status === "Rejected" && !!r.rejectReason;
                   return (
                     <tr
                       key={r.id}
@@ -264,6 +266,14 @@ export default function ApplicationsPage() {
                               </span>
                             );
                           })()
+                        ) : hasRejectReason ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-xs text-red-600 max-w-[220px]"
+                            title={r.rejectReason}
+                          >
+                            <XCircle className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">{r.rejectReason}</span>
+                          </span>
                         ) : (
                           <span className="text-xs text-gray-300">—</span>
                         )}
@@ -288,6 +298,7 @@ export default function ApplicationsPage() {
             {paginated.map(r => {
               const decision = r.restructureRequest?.decision ?? "pending";
               const hasRestructure = r.status === "Approved" && !!r.restructureRequest;
+              const hasRejectReason = r.status === "Rejected" && !!r.rejectReason;
               const rsTone =
                 decision === "approved"
                   ? "bg-emerald-50 border-emerald-200 text-emerald-700"
@@ -332,6 +343,12 @@ export default function ApplicationsPage() {
                       <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border", rsTone)}>
                         {rsLabel}
                       </span>
+                    </div>
+                  )}
+                  {hasRejectReason && (
+                    <div className="mt-2 flex items-start gap-1 text-xs text-red-600">
+                      <XCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                      <span>{r.rejectReason}</span>
                     </div>
                   )}
                   <div className="mt-3 text-right">

@@ -14,6 +14,7 @@ import {
   PanelLeft,
   ChevronDown,
   MessageSquareText,
+  MessageCircle,
   Star,
   UserCircle2,
   HeartHandshake,
@@ -24,6 +25,7 @@ import { BrandLogo } from "./brand-logo";
 import { LATEST_VERSION } from "./app-version";
 import { SettingsModal } from "./settings-modal";
 import { useRole } from "@/lib/role-context";
+import { CHATS } from "@/lib/data";
 
 type Leaf = {
   label: string;
@@ -55,6 +57,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
           // Consultations and Feedback are separate sections, each with its own table.
           { label: "Consultation", href: "/customer/consultations", icon: MessageSquareText, permission: "consultation.view" },
           { label: "Complaint", href: "/customer/feedback", icon: Star, permission: "feedback.view" },
+          { label: "Chat", href: "/chat", icon: MessageCircle },
         ],
       },
       { label: "Loan Application", href: "/customer/applications", icon: FileText, permission: "loan.view" },
@@ -83,6 +86,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const { can } = useRole();
+  const hasUnreadChat = CHATS.some(c => c.unread > 0);
 
   // Filter NAV based on the current role's permissions.
   const filteredNav = useMemo(() => {
@@ -167,6 +171,9 @@ export function Sidebar({
                 >
                   {child.icon && <child.icon className="w-[14px] h-[14px]" />}
                   <span>{child.label}</span>
+                  {child.href === "/chat" && hasUnreadChat && (
+                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
+                  )}
                 </Link>
               ))}
             </div>

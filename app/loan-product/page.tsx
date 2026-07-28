@@ -7,7 +7,11 @@ import {
   PRODUCTS,
   MWL_COUNTRIES,
   countryCodeFor,
+  LOCALES,
+  emptyLocalizedText,
   type LoanProduct,
+  type Locale,
+  type LocalizedText,
 } from "@/lib/data";
 import { useRole } from "@/lib/role-context";
 import { cn } from "@/lib/utils";
@@ -86,7 +90,13 @@ export default function ProductsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter(p => {
-      if (q && !`${p.name} ${p.id} ${p.description}`.toLowerCase().includes(q)) return false;
+      if (
+        q &&
+        !`${p.name.km} ${p.name.en} ${p.id} ${p.description.km} ${p.description.en}`
+          .toLowerCase()
+          .includes(q)
+      )
+        return false;
       if (filters.status !== "all" && p.status !== filters.status) return false;
       return true;
     });
@@ -172,7 +182,7 @@ export default function ProductsPage() {
     const finalIdx = blocks.findIndex(b => b[0].id === draggedId);
     setProducts(blocks.flat());
     if (finalIdx !== -1 && finalIdx !== srcIdx) {
-      setReorderNotice(`Moved "${moved[0].name}" from position ${srcIdx + 1} to ${finalIdx + 1}`);
+      setReorderNotice(`Moved "${moved[0].name.en}" from position ${srcIdx + 1} to ${finalIdx + 1}`);
     }
   };
 
@@ -410,7 +420,7 @@ export default function ProductsPage() {
                             isSub ? "text-gray-700 text-sm" : "font-medium text-gray-900"
                           )}
                         >
-                          {p.name}
+                          {p.name.en}
                         </span>
                         {isParent && childCount > 0 && (
                           <button
@@ -734,13 +744,24 @@ function CreateProductModal({
   const [countryInput, setCountryInput] = useState("");
   const isEdit = !!editing;
 
-  const [name, setName] = useState("");
-  const [descItems, setDescItems] = useState<string[]>([]);
+  // Bilingual — same Khmer/English pattern as the Post editor.
+  const [activeLocale, setActiveLocale] = useState<Locale>("km");
+  const [nameMap, setNameMap] = useState<LocalizedText>(emptyLocalizedText());
+  const [descItemsMap, setDescItemsMap] = useState<Record<Locale, string[]>>({ km: [], en: [] });
+  const name = nameMap[activeLocale];
+  const setName = (v: string) => setNameMap(prev => ({ ...prev, [activeLocale]: v }));
+  const descItems = descItemsMap[activeLocale];
+  const setDescItems = (items: string[]) =>
+    setDescItemsMap(prev => ({ ...prev, [activeLocale]: items }));
   const [docItems, setDocItems] = useState<DocItem[]>([]);
   const [faqItems, setFaqItems] = useState<FaqItem[]>([]);
-  const [media, setMedia] = useState("");
-  const [mediaType, setMediaType] = useState<"image" | "video">("image");
-  const mediaRef = useRef<HTMLInputElement>(null);
+  // Thumbnail (3:4) — product list / carousel in the customer app. Image only.
+  const [thumbnail, setThumbnail] = useState("");
+  const thumbnailRef = useRef<HTMLInputElement>(null);
+  // Detail image or video (1:1) — the product's own detail page in the customer app.
+  const [detailImage, setDetailImage] = useState("");
+  const [detailImageType, setDetailImageType] = useState<"image" | "video">("image");
+  const detailImageRef = useRef<HTMLInputElement>(null);
   // Reference product icon — a small square image shown beside the name.
   const [icon, setIcon] = useState("");
   const iconRef = useRef<HTMLInputElement>(null);
@@ -766,15 +787,11 @@ function CreateProductModal({
       setKind(editing.kind === "non-mwl" || !editing.kind ? "non-mwl" : "mwl");
       setCountries([]); // editing a single product, not adding new sub-products
       setCountryInput("");
-      setName(editing.name);
-      setDescItems(
-        editing.description
-          ? editing.description
-              .split(/\r?\n/)
-              .map(s => s.replace(/^[•\-]\s*/, "").trim())
-              .filter(Boolean)
-          : []
-      );
+      setNameMap(editing.name);
+      setDescItemsMap({
+        km: parseDescLines(editing.description.km),
+        en: parseDescLines(editing.description.en),
+      });
       setDocItems(
         editing.requiredDocuments?.length
           ? editing.requiredDocuments.map(d => ({ name: d.name, note: d.note, icon: d.icon }))
@@ -787,8 +804,9 @@ function CreateProductModal({
           : []
       );
       setFaqItems(editing.faqs ? editing.faqs.map(f => ({ ...f })) : []);
-      setMedia(editing.media ?? "");
-      setMediaType(editing.mediaType ?? "image");
+      setThumbnail(editing.thumbnail ?? "");
+      setDetailImage(editing.detailImage ?? "");
+      setDetailImageType(editing.detailImageType ?? "image");
       setIcon(editing.icon ?? "");
       // Prefer saved dynamic rows; legacy products fall back to rows derived
       // from the structured numeric fields.
@@ -808,12 +826,13 @@ function CreateProductModal({
       setKind("non-mwl");
       setCountries([]);
       setCountryInput("");
-      setName("");
-      setDescItems([]);
+      setNameMap(emptyLocalizedText());
+      setDescItemsMap({ km: [], en: [] });
       setDocItems([]);
       setFaqItems(DEFAULT_FAQS.map(f => ({ ...f })));
-      setMedia("");
-      setMediaType("image");
+      setThumbnail("");
+      setDetailImage("");
+      setDetailImageType("image");
       setIcon("");
       setGlanceItems(DEFAULT_GLANCE_ROWS.map(g => ({ ...g })));
       setKfItems([...DEFAULT_KEY_FEATURES]);
@@ -824,6 +843,7 @@ function CreateProductModal({
       setActiveNow(true);
       setError(null);
     }
+    setActiveLocale("km");
   }, [open, editing]);
 
   useEffect(() => {
@@ -844,8 +864,9 @@ function CreateProductModal({
   const validate = (): string | null => {
     // Name is required in all modes that show the field — i.e. anything except
     // create-MWL (which derives the name from the parent and the country).
-    if ((isEdit || kind === "non-mwl") && !name.trim())
-      return "Product name is required.";
+    // Khmer is the required locale, same as the Post editor.
+    if ((isEdit || kind === "non-mwl") && !nameMap.km.trim())
+      return "Khmer product name is required.";
     if (!isEdit && kind === "mwl") {
       if (!mwlParent) return "No Migrant Worker Loan parent found to attach to.";
       if (countries.length === 0)
@@ -862,6 +883,16 @@ function CreateProductModal({
       .filter(Boolean)
       .map(t => `• ${t}`)
       .join("\n");
+
+  // Reverse of composeSentences — splits a stored "• line" string back into
+  // editable rows. Used to prefill descItemsMap per locale on edit.
+  const parseDescLines = (s: string): string[] =>
+    s
+      ? s
+          .split(/\r?\n/)
+          .map(x => x.replace(/^[•\-]\s*/, "").trim())
+          .filter(Boolean)
+      : [];
 
   const submit = (publish: boolean) => {
     const err = validate();
@@ -898,7 +929,10 @@ function CreateProductModal({
           : "inactive"
         : "draft") as "active" | "inactive" | "draft",
       loans: editing?.loans ?? 0,
-      description: descItems.map(s => `• ${s}`).join("\n"),
+      description: {
+        km: composeSentences(descItemsMap.km),
+        en: composeSentences(descItemsMap.en),
+      },
       eligibility: composeSentences(eligItems),
       keyFeatures: composeSentences(kfItems) || undefined,
       requiredDocs: docItems.map(d => d.name).join("\n"),
@@ -924,17 +958,20 @@ function CreateProductModal({
       // Purpose mirrors the matching glance row for backward compatibility.
       purpose: rowValue(/purpose/i) || undefined,
       atAGlance: glance.length ? glance : undefined,
-      media: media || undefined,
-      mediaType: media ? mediaType : undefined,
+      thumbnail: thumbnail || undefined,
+      detailImage: detailImage || undefined,
+      detailImageType: detailImage ? detailImageType : undefined,
       icon: icon || undefined,
     };
+
+    const trimmedName: LocalizedText = { km: nameMap.km.trim(), en: nameMap.en.trim() };
 
     // EDIT mode — replace the existing product, keep its id/kind/parent/country.
     if (editing) {
       const updated: LoanProduct = {
         ...editing,
         ...base,
-        name: name.trim(),
+        name: trimmedName,
       };
       onSave(updated);
       return;
@@ -944,7 +981,7 @@ function CreateProductModal({
       const product: LoanProduct = {
         ...base,
         id: nextId,
-        name: name.trim(),
+        name: trimmedName,
         kind: "non-mwl",
       };
       onSave(product);
@@ -964,7 +1001,9 @@ function CreateProductModal({
         id: `${nextId}-${code}-${idx + 1}`,
         // Use the short "MWL" prefix to match existing sub-products
         // (MWL — Korea, MWL — Japan, …) rather than the parent's full name.
-        name: `MWL — ${country}`,
+        // Auto-derived from the typed country name — English only, since
+        // there's no per-locale authoring UI for these generated sub-products.
+        name: { km: "", en: `MWL — ${country}` },
         kind: "mwl-sub",
         // Store the 2-letter code in the `country` field so the table badge
         // renders consistently regardless of whether the country existed in
@@ -991,8 +1030,23 @@ function CreateProductModal({
   const removeCountry = (name: string) =>
     setCountries(prev => prev.filter(c => c !== name));
 
-  const onMediaPick = () => mediaRef.current?.click();
-  const onMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onThumbnailPick = () => thumbnailRef.current?.click();
+  const onThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file for the thumbnail.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setThumbnail(String(reader.result || ""));
+    reader.readAsDataURL(file);
+    e.target.value = ""; // allow re-picking the same file
+    setError(null);
+  };
+
+  const onDetailImagePick = () => detailImageRef.current?.click();
+  const onDetailImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const isImage = file.type.startsWith("image/");
@@ -1003,8 +1057,8 @@ function CreateProductModal({
     }
     const reader = new FileReader();
     reader.onload = () => {
-      setMedia(String(reader.result || ""));
-      setMediaType(isVideo ? "video" : "image");
+      setDetailImage(String(reader.result || ""));
+      setDetailImageType(isVideo ? "video" : "image");
     };
     reader.readAsDataURL(file);
     setError(null);
@@ -1056,7 +1110,7 @@ function CreateProductModal({
                   New MWL sub-product
                   {countries.length > 1 ? "s" : ""} will attach to{" "}
                   <span className="font-medium text-gray-700">
-                    {mwlParent?.name ?? "Migrant Worker Loan"}
+                    {mwlParent?.name.en ?? "Migrant Worker Loan"}
                   </span>
                   .
                 </>
@@ -1113,72 +1167,40 @@ function CreateProductModal({
 
           {/* Basic Information */}
           <Section icon={FileText} title="Basic Information" hint="Customer-facing copy. Shown in the mobile app and web portal.">
-            <Field
-              label="Image or video"
-              hint="Shown on the product page in the customer app. PNG, JPG, GIF or MP4."
-            >
-              {media ? (
-                <div>
-                  {mediaType === "video" ? (
-                    <video
-                      src={media}
-                      controls
-                      className="w-full max-h-56 rounded-md border border-gray-200 bg-black object-contain"
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={media}
-                      alt="product media preview"
-                      className="w-full max-h-56 object-cover rounded-md border border-gray-200"
-                    />
-                  )}
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
-                      {mediaType === "video" ? (
-                        <Film className="w-3.5 h-3.5" />
-                      ) : (
-                        <ImageIcon className="w-3.5 h-3.5" />
+            {/* Language tabs — Khmer required, English optional translation.
+                Governs the Product name and Description fields below, same
+                pattern as the Post editor. */}
+            <div className="flex items-center gap-1.5">
+              {LOCALES.map(l => {
+                const active = activeLocale === l.code;
+                const filled = !!nameMap[l.code].trim() || descItemsMap[l.code].some(s => s.trim());
+                return (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => setActiveLocale(l.code)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border",
+                      active
+                        ? "bg-brand-50 border-brand-200 text-brand-700"
+                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    )}
+                  >
+                    <span>{l.flag}</span>
+                    {l.label}
+                    {l.code === "km" && <span className="text-red-500">*</span>}
+                    <span
+                      title={filled ? "Filled in" : "Not filled in"}
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full",
+                        filled ? "bg-emerald-500" : "bg-gray-300"
                       )}
-                      {mediaType === "video" ? "Video" : "Image"}
-                    </span>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={onMediaPick}
-                        className="text-xs text-brand-600 hover:underline font-medium"
-                      >
-                        Replace
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMedia("")}
-                        className="text-xs text-red-600 hover:underline font-medium"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onMediaPick}
-                  className="w-full h-36 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-brand-700 transition"
-                >
-                  <Upload className="w-5 h-5" />
-                  <span className="text-xs font-medium">Click to upload image or video</span>
-                  <span className="text-[10px] text-gray-400">PNG, JPG, GIF or MP4</span>
-                </button>
-              )}
-              <input
-                ref={mediaRef}
-                type="file"
-                accept="image/*,video/*"
-                className="hidden"
-                onChange={onMediaChange}
-              />
-            </Field>
+                    />
+                  </button>
+                );
+              })}
+            </div>
+
             <Field
               label="Reference product icon (42 × 42 px)"
               hint="Small icon shown beside the product name in the customer app. PNG or JPG."
@@ -1237,12 +1259,17 @@ function CreateProductModal({
                 onChange={onIconChange}
               />
             </Field>
+
             {isEdit || kind === "non-mwl" ? (
-              <Field label="Product name *">
+              <Field label={`Product name${activeLocale === "km" ? " *" : ""}`}>
                 <input
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder="e.g. Home Improvement Loan"
+                  placeholder={
+                    activeLocale === "km"
+                      ? "e.g. Home Improvement Loan"
+                      : `Translate the product name into ${LOCALES.find(l => l.code === activeLocale)?.label}`
+                  }
                   className="form-input"
                 />
               </Field>
@@ -1252,13 +1279,13 @@ function CreateProductModal({
                 <span className="font-medium text-gray-700">MWL — [Country]</span>
                 {" "}(consistent with existing entries under{" "}
                 <span className="font-medium text-gray-700">
-                  {mwlParent?.name ?? "Migrant Worker Loan"}
+                  {mwlParent?.name.en ?? "Migrant Worker Loan"}
                 </span>
                 ).
               </div>
             )}
             <Field
-              label="Description"
+              label={`Description${activeLocale === "km" ? "" : ` (${LOCALES.find(l => l.code === activeLocale)?.label})`}`}
               hint={`${descItems.length} point${descItems.length === 1 ? "" : "s"}. Type a point and press Enter to add.`}
             >
               <SortableListInput
@@ -1270,6 +1297,132 @@ function CreateProductModal({
 
           </Section>
 
+          {/* Thumbnail — shown in the product list / carousel in the customer app. */}
+          <Section
+            icon={ImageIcon}
+            title="Thumbnail"
+            hint="Shown in the product list and carousel in the customer app. Recommended 900 × 1200px."
+          >
+            {thumbnail ? (
+              <div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={thumbnail}
+                  alt="thumbnail preview"
+                  className="w-full max-h-56 object-cover rounded-md border border-gray-200"
+                />
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    Image
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={onThumbnailPick}
+                      className="text-xs text-brand-600 hover:underline font-medium"
+                    >
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setThumbnail("")}
+                      className="text-xs text-red-600 hover:underline font-medium"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onThumbnailPick}
+                className="w-full h-36 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-brand-700 transition"
+              >
+                <Upload className="w-5 h-5" />
+                <span className="text-xs font-medium text-center px-2">Click to upload thumbnail</span>
+                <span className="text-[10px] text-gray-400">PNG or JPG · 900 × 1200px</span>
+              </button>
+            )}
+            <input
+              ref={thumbnailRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onThumbnailChange}
+            />
+          </Section>
+
+          {/* Detail image/video — shown on the product's own detail page in the customer app. */}
+          <Section
+            icon={ImageIcon}
+            title="Loan Product Detail"
+            hint="Shown on the product's own detail page in the customer app. Recommended 1080 × 1080px."
+          >
+            {detailImage ? (
+              <div>
+                {detailImageType === "video" ? (
+                  <video
+                    src={detailImage}
+                    controls
+                    className="w-full max-h-56 rounded-md border border-gray-200 bg-black object-contain"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={detailImage}
+                    alt="product detail preview"
+                    className="w-full max-h-56 object-cover rounded-md border border-gray-200"
+                  />
+                )}
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+                    {detailImageType === "video" ? (
+                      <Film className="w-3.5 h-3.5" />
+                    ) : (
+                      <ImageIcon className="w-3.5 h-3.5" />
+                    )}
+                    {detailImageType === "video" ? "Video" : "Image"}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={onDetailImagePick}
+                      className="text-xs text-brand-600 hover:underline font-medium"
+                    >
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDetailImage("")}
+                      className="text-xs text-red-600 hover:underline font-medium"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onDetailImagePick}
+                className="w-full h-36 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-brand-700 transition"
+              >
+                <Upload className="w-5 h-5" />
+                <span className="text-xs font-medium">Click to upload image or video</span>
+                <span className="text-[10px] text-gray-400">PNG, JPG, GIF or MP4 · 1080 × 1080px</span>
+              </button>
+            )}
+            <input
+              ref={detailImageRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={onDetailImageChange}
+            />
+          </Section>
+
           {/* MWL-only: free-form destination country list. Admin types a country
               name and presses Enter (or +) to add it; one sub-product is created
               under the existing Migrant Worker Loan parent per added country.
@@ -1278,7 +1431,7 @@ function CreateProductModal({
             <Section
               icon={Globe}
               title="Destination countries"
-              hint={`Adds one sub-product to "${mwlParent?.name ?? "Migrant Worker Loan"}" per country. Type a country and press Enter to add.`}
+              hint={`Adds one sub-product to "${mwlParent?.name.en ?? "Migrant Worker Loan"}" per country. Type a country and press Enter to add.`}
             >
               <div className="flex items-center gap-2">
                 <input
@@ -1345,7 +1498,7 @@ function CreateProductModal({
                   Will create <b>{countries.length}</b> new sub-product
                   {countries.length === 1 ? "" : "s"} under{" "}
                   <span className="font-medium">
-                    {mwlParent?.name ?? "Migrant Worker Loan"}
+                    {mwlParent?.name.en ?? "Migrant Worker Loan"}
                   </span>
                   {mwlParent?.id && (
                     <>
@@ -2180,7 +2333,7 @@ function DetailProductModal({
             </div>
             <div className="min-w-0">
               <div className="text-xs font-mono text-gray-500">{product.id}</div>
-              <div className="text-lg font-semibold text-gray-900">{product.name}</div>
+              <div className="text-lg font-semibold text-gray-900">{product.name.en}</div>
               <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
                 <StatusBadge
                   status={
@@ -2221,24 +2374,45 @@ function DetailProductModal({
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-thin p-6 space-y-6">
-          {/* Image or video */}
+          {/* Thumbnail */}
           <div>
             <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
               <ImageIcon className="w-3 h-3" />
-              Image or video
+              Thumbnail (900 × 1200px)
             </div>
-            {product.media ? (
-              product.mediaType === "video" ? (
+            {product.thumbnail ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={product.thumbnail}
+                alt="product thumbnail"
+                className="w-full max-h-56 object-cover rounded-md border border-gray-200"
+              />
+            ) : (
+              <div className="h-24 rounded-md border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1 text-gray-400">
+                <ImageIcon className="w-4 h-4" />
+                <span className="text-xs">No thumbnail uploaded yet</span>
+              </div>
+            )}
+          </div>
+
+          {/* Loan Product Detail image/video */}
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
+              <ImageIcon className="w-3 h-3" />
+              Loan Product Detail (1080 × 1080px)
+            </div>
+            {product.detailImage ? (
+              product.detailImageType === "video" ? (
                 <video
-                  src={product.media}
+                  src={product.detailImage}
                   controls
                   className="w-full max-h-56 rounded-md border border-gray-200 bg-black object-contain"
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={product.media}
-                  alt="product media"
+                  src={product.detailImage}
+                  alt="product detail"
                   className="w-full max-h-56 object-cover rounded-md border border-gray-200"
                 />
               )
@@ -2281,14 +2455,14 @@ function DetailProductModal({
           </div>
 
           {/* Description */}
-          {product.description && (
+          {(product.description.km || product.description.en) && (
             <div>
               <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
                 <FileText className="w-3 h-3" />
                 Description
               </div>
               <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                {product.description}
+                {product.description.en || product.description.km}
               </p>
             </div>
           )}

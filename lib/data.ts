@@ -31,6 +31,8 @@ export type Application = {
   destination?: string;
   /** Set when an approved loan's borrower has requested re-structure. */
   restructureRequest?: RestructureRequest;
+  /** Set when an officer rejects the application — shown in the Remark column. */
+  rejectReason?: string;
 };
 
 export const APPLICATIONS: Application[] = [
@@ -440,7 +442,8 @@ export type LoanProductStatus = "active" | "inactive" | "draft";
 
 export type LoanProduct = {
   id: string;
-  name: string;
+  /** Khmer + English — same bilingual pattern as Post titles. */
+  name: LocalizedText;
   min: number;
   max: number;
   rateMin: number;
@@ -449,8 +452,8 @@ export type LoanProduct = {
   termMax: number;
   status: LoanProductStatus;
   loans: number;
-  /** Public-facing description (CMS body). Markdown-ish plain text. */
-  description: string;
+  /** Public-facing description (CMS body). Markdown-ish plain text, per locale. */
+  description: LocalizedText;
   /** Customer eligibility criteria (one per line). */
   eligibility: string;
   /** Key feature highlights (one "• line" per row, same format as eligibility). */
@@ -476,9 +479,13 @@ export type LoanProduct = {
   country?: string;
   /** For mwl-sub: the parent's product id. */
   parentId?: string;
-  /** Optional product media — an uploaded image or video (data URL in the prototype). */
-  media?: string;
-  mediaType?: "image" | "video";
+  /** Thumbnail (3:4 portrait) — shown in the product list / carousel in the
+   *  customer app. Image only (data URL in the prototype). */
+  thumbnail?: string;
+  /** Detail image or video (1:1 square) — shown on the product's own detail
+   *  page in the customer app (data URL in the prototype). */
+  detailImage?: string;
+  detailImageType?: "image" | "video";
   /** Reference product icon shown beside the product name (data URL in the prototype). */
   icon?: string;
   /** Structured required documents with an optional caption + uploaded icon
@@ -493,15 +500,18 @@ export const PRODUCTS: LoanProduct[] = [
   /* ───────── NHFC product catalogue (per reference sheet) ───────── */
   {
     id: "LP-07",
-    name: "Micro Loan (ML)",
+    name: { en: "Micro Loan (ML)", km: "" },
     min: 100, max: 3000,
     rateMin: 14.0, rateMax: 18.0,
     termMin: 6, termMax: 48,
     status: "active", loans: 0,
-    description:
-      "Micro Loan (ML) is designed to support low-income people in rural and urban " +
-      "areas through micro / small businesses and agricultural activities, offered " +
-      "in both Khmer Riel and US Dollars.",
+    description: {
+      en:
+        "Micro Loan (ML) is designed to support low-income people in rural and urban " +
+        "areas through micro / small businesses and agricultural activities, offered " +
+        "in both Khmer Riel and US Dollars.",
+      km: "",
+    },
     eligibility:
       "• Age 18 to 65 years old\n" +
       "• Permanent residential address at NHFC's operating area\n" +
@@ -515,15 +525,18 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-08",
-    name: "Small Business Loan (SBL)",
+    name: { en: "Small Business Loan (SBL)", km: "" },
     min: 1000, max: 30000,
     rateMin: 12.0, rateMax: 16.0,
     termMin: 6, termMax: 96,
     status: "active", loans: 0,
-    description:
-      "Small Business Loan (SBL) supports clients in starting or expanding micro / " +
-      "small businesses for improved profitability and sustainable growth. Provided " +
-      "to clients in both rural and urban areas, offered in US Dollars and Khmer Riel.",
+    description: {
+      en:
+        "Small Business Loan (SBL) supports clients in starting or expanding micro / " +
+        "small businesses for improved profitability and sustainable growth. Provided " +
+        "to clients in both rural and urban areas, offered in US Dollars and Khmer Riel.",
+      km: "",
+    },
     eligibility:
       "• Age 18 to 65 years old\n" +
       "• Permanent residential address at NHFC's operating area\n" +
@@ -537,15 +550,18 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-09",
-    name: "Small & Medium Enterprise (SME)",
+    name: { en: "Small & Medium Enterprise (SME)", km: "" },
     min: 5000, max: 100000,
     rateMin: 11.0, rateMax: 15.0,
     termMin: 6, termMax: 120,
     status: "active", loans: 0,
-    description:
-      "SME Loan supports existing and new clients or entrepreneurs in establishing " +
-      "new businesses or expanding existing ones, offered in both US Dollars and " +
-      "Khmer Riel.",
+    description: {
+      en:
+        "SME Loan supports existing and new clients or entrepreneurs in establishing " +
+        "new businesses or expanding existing ones, offered in both US Dollars and " +
+        "Khmer Riel.",
+      km: "",
+    },
     eligibility:
       "• Age 18 to 65 years old\n" +
       "• Permanent residential address at NHFC's operating area\n" +
@@ -559,15 +575,18 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-10",
-    name: "Housing Loan (HL)",
+    name: { en: "Housing Loan (HL)", km: "" },
     min: 10000, max: 300000,
     rateMin: 9.0, rateMax: 13.0,
     termMin: 12, termMax: 240,
     status: "active", loans: 0,
-    description:
-      "Housing Loan (HL) supports affordable housing in response to population growth " +
-      "and real-estate market demand. A long-term loan provided for house purchase, " +
-      "offered in both US Dollars and Khmer Riel.",
+    description: {
+      en:
+        "Housing Loan (HL) supports affordable housing in response to population growth " +
+        "and real-estate market demand. A long-term loan provided for house purchase, " +
+        "offered in both US Dollars and Khmer Riel.",
+      km: "",
+    },
     eligibility:
       "• Age 18 to 65 years old\n" +
       "• Permanent residential address at NHFC's operating area\n" +
@@ -581,15 +600,18 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-11",
-    name: "Staff Loan",
+    name: { en: "Staff Loan", km: "" },
     min: 500, max: 20000,
     rateMin: 8.0, rateMax: 10.0,
     termMin: 6, termMax: 60,
     status: "active", loans: 0,
-    description:
-      "Staff Loan is an exclusive benefit for NHFC employees, supporting personal " +
-      "needs such as housing, education, and emergencies at preferential rates, " +
-      "offered in both US Dollars and Khmer Riel.",
+    description: {
+      en:
+        "Staff Loan is an exclusive benefit for NHFC employees, supporting personal " +
+        "needs such as housing, education, and emergencies at preferential rates, " +
+        "offered in both US Dollars and Khmer Riel.",
+      km: "",
+    },
     eligibility:
       "• Full-time NHFC employee\n" +
       "• Minimum 12 months of employment\n" +
@@ -605,15 +627,18 @@ export const PRODUCTS: LoanProduct[] = [
   /* ───────── MWL family — parent + country sub-products ───────── */
   {
     id: "LP-06",
-    name: "Migrant Worker Loan",
+    name: { en: "Migrant Worker Loan", km: "" },
     min: 500, max: 8000,
     rateMin: 12.0, rateMax: 14.0,
     termMin: 6, termMax: 36,
     status: "active", loans: 0,
-    description:
-      "Pre-departure financing for Cambodian workers heading overseas — " +
-      "covers placement fees, visa, flight, training and settle-in costs. " +
-      "Country-specific terms live as sub-products under this family.",
+    description: {
+      en:
+        "Pre-departure financing for Cambodian workers heading overseas — " +
+        "covers placement fees, visa, flight, training and settle-in costs. " +
+        "Country-specific terms live as sub-products under this family.",
+      km: "",
+    },
     eligibility:
       "• Cambodian citizen aged 18–55\n" +
       "• Signed overseas employment contract / MOU\n" +
@@ -628,15 +653,18 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-06-KR",
-    name: "MWL — Korea",
+    name: { en: "MWL — Korea", km: "" },
     min: 1000, max: 8000,
     rateMin: 12.0, rateMax: 13.5,
     termMin: 12, termMax: 36,
     status: "active", loans: 38,
-    description:
-      "MWL variant for workers placed under the Korean Employment Permit " +
-      "System (EPS). Repayment aligned with the post-arrival KRW salary " +
-      "cycle. Disbursement timed with departure.",
+    description: {
+      en:
+        "MWL variant for workers placed under the Korean Employment Permit " +
+        "System (EPS). Repayment aligned with the post-arrival KRW salary " +
+        "cycle. Disbursement timed with departure.",
+      km: "",
+    },
     eligibility:
       "• EPS placement or letter of selection\n" +
       "• Passed Korean language test (TOPIK / EPS-TOPIK)\n" +
@@ -652,15 +680,18 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-06-JP",
-    name: "MWL — Japan",
+    name: { en: "MWL — Japan", km: "" },
     min: 800, max: 7000,
     rateMin: 12.5, rateMax: 14.0,
     termMin: 12, termMax: 36,
     status: "active", loans: 21,
-    description:
-      "MWL variant for workers on Technical Intern Training (TITP) or " +
-      "Specified Skilled Worker (SSW) visas. Covers JLPT certification, " +
-      "placement fees, and pre-departure training.",
+    description: {
+      en:
+        "MWL variant for workers on Technical Intern Training (TITP) or " +
+        "Specified Skilled Worker (SSW) visas. Covers JLPT certification, " +
+        "placement fees, and pre-departure training.",
+      km: "",
+    },
     eligibility:
       "• TITP / SSW placement letter\n" +
       "• JLPT N4 or higher (or SSW skill test pass)\n" +
@@ -676,15 +707,18 @@ export const PRODUCTS: LoanProduct[] = [
   },
   {
     id: "LP-06-SG",
-    name: "MWL — Singapore",
+    name: { en: "MWL — Singapore", km: "" },
     min: 500, max: 5000,
     rateMin: 13.0, rateMax: 14.0,
     termMin: 6, termMax: 24,
     status: "draft", loans: 0,
-    description:
-      "MWL variant for workers on a Singapore Work Permit (WP). Smaller " +
-      "ticket sizes reflect the shorter typical contract length and lower " +
-      "placement-fee structure.",
+    description: {
+      en:
+        "MWL variant for workers on a Singapore Work Permit (WP). Smaller " +
+        "ticket sizes reflect the shorter typical contract length and lower " +
+        "placement-fee structure.",
+      km: "",
+    },
     eligibility:
       "• In-Principle Approval (IPA) letter from MOM\n" +
       "• Confirmed employer & sector (construction / marine / process)\n" +

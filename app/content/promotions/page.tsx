@@ -26,7 +26,7 @@ import {
 const CTA_LOAN_PRODUCTS = PRODUCTS.filter(p => p.kind !== "mwl-sub");
 
 function ctaLoanProductName(id: string) {
-  return CTA_LOAN_PRODUCTS.find(p => p.id === id)?.name ?? id;
+  return CTA_LOAN_PRODUCTS.find(p => p.id === id)?.name.en ?? id;
 }
 
 export default function PromotionsPage() {
@@ -479,7 +479,7 @@ function PromotionEditorModal({
                 <option value="">Select a loan product…</option>
                 {CTA_LOAN_PRODUCTS.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.name}
+                    {p.name.en}
                   </option>
                 ))}
               </select>

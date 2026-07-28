@@ -53,8 +53,6 @@ export default function CustomerDetailPage({
   }
 
   const initials = c.name.split(" ").map(s => s[0]).join("");
-  const kycStatus =
-    c.kyc === "verified" ? "Verified" : c.kyc === "pending" ? "Pending" : "Rejected";
 
   const customerApps = APPLICATIONS.filter(a => a.cid === c.id);
   const custConsults = CONSULTATIONS.filter(rc => rc.customer === c.name);
@@ -72,7 +70,7 @@ export default function CustomerDetailPage({
 
       {/* Header card */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-card">
-        <div className="flex items-start justify-between px-6 py-5">
+        <div className="flex items-start px-6 py-5">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-brand-600 text-white flex items-center justify-center text-base font-semibold">
               {initials}
@@ -82,9 +80,6 @@ export default function CustomerDetailPage({
               <div className="text-xl font-semibold text-gray-900">{c.name}</div>
               <div className="text-sm text-gray-500">{c.phone}</div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <StatusBadge status={kycStatus} />
           </div>
         </div>
       </div>

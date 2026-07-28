@@ -59,7 +59,7 @@ type TabKey =
 /** NON-MWL = any product outside the MWL family and not the Staff Loan.
  *  The three product types (NON-MWL / MWL / Staff) show different detail data. */
 function isNonMwlProduct(productName: string): boolean {
-  const p = PRODUCTS.find(x => x.name === productName);
+  const p = PRODUCTS.find(x => x.name.en === productName);
   const isMwl = p?.kind === "mwl-parent" || p?.kind === "mwl-sub";
   return !isMwl && productName !== "Staff Loan";
 }
@@ -118,7 +118,6 @@ export default function ApplicationDetailPage({
   const mayApprove     = can("loan.approve") && inProgressStage;
   const mayApproveAmt  = canApprove(a.amount); // amount within approval limit
   const mayDisburse    = false;                // disbursement removed from workflow
-  const mayReopen      = role.key === "admin" && a.status === "Rejected"; // admin override
   const mayUnreject    = false;                // no Disbursed status to reverse
 
   // Tell the user *why* approve is blocked (no perm vs amount over limit)
@@ -206,12 +205,6 @@ export default function ApplicationDetailPage({
             )}
 
             {/* Admin overrides */}
-            {mayReopen && (
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-amber-200 text-amber-700 rounded-md hover:bg-amber-50">
-                <RotateCcw className="w-4 h-4" />
-                Reopen
-              </button>
-            )}
             {mayUnreject && (
               <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-amber-200 text-amber-700 rounded-md hover:bg-amber-50">
                 <RotateCcw className="w-4 h-4" />
@@ -220,7 +213,7 @@ export default function ApplicationDetailPage({
             )}
 
             {/* Stage-locked hint when role can't act on this status */}
-            {!mayRequestInfo && !mayReject && !mayDisburse && !mayApprove && !mayReopen && !mayUnreject && (
+            {!mayRequestInfo && !mayReject && !mayDisburse && !mayApprove && !mayUnreject && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-500">
                 <Lock className="w-3 h-3" />
                 No action available at this stage
@@ -267,7 +260,10 @@ export default function ApplicationDetailPage({
         onClose={() => setRejectOpen(false)}
         onSubmit={reason => {
           // Mock send — real app would call an API to reject + notify.
-          console.log("Reject:", a.id, { reason });
+          // `a` is a direct reference into the shared APPLICATIONS array, so
+          // this mutation is what the Applications list's Remark column reads.
+          a.status = "Rejected";
+          a.rejectReason = reason;
           setRejectOpen(false);
         }}
       />
@@ -606,7 +602,7 @@ function KycTab({ a }: { a: Application }) {
   // detail page and this loan application detail always show the same data.
   const customer = CUSTOMERS.find(c => c.id === a.cid);
   // The loan product the customer applied for (for its name + allowed range).
-  const product = PRODUCTS.find(p => p.name === a.product);
+  const product = PRODUCTS.find(p => p.name.en === a.product);
   // Product type — the personal-information rows differ per type
   // (NON-MWL / MWL / Staff). The Staff layout is still to be specced.
   const isNonMwl = isNonMwlProduct(a.product);
@@ -899,7 +895,7 @@ function GuarantorTab({ a }: { a: Application }) {
 
   // MWL applications in progress collect the guarantor's National ID
   // alongside the borrower's own documents (see KycTab).
-  const product = PRODUCTS.find(p => p.name === a.product);
+  const product = PRODUCTS.find(p => p.name.en === a.product);
   const isMwl = product?.kind === "mwl-parent" || product?.kind === "mwl-sub";
   const showGuarantorDocs = isMwl && a.status === "Progress";
   const guarantorDoc: KycDoc = {
@@ -992,21 +988,32 @@ function GuarantorTab({ a }: { a: Application }) {
 function RepaymentTab({ a }: { a: Application }) {
   // Build a simple schedule
   const monthly = (a.amount * (1 + a.rate / 100)) / a.term;
+  let cumulativePrincipal = 0;
   const schedule = Array.from({ length: a.term }).map((_, i) => {
     const due = new Date("2026-05-01");
     due.setMonth(due.getMonth() + i);
     const principal = 200 + i * 2;
     const interest  = 24 - i * 1.5;
+    // Flat per-installment service fee. No installment in this seed schedule
+    // is overdue, so penalties are always $0 — the field only ever bills
+    // when a payment is posted late.
+    const adminFee  = 1.5;
+    const penalties = 0;
+    cumulativePrincipal += principal;
+    const outstandingAfter = Math.max(a.amount - cumulativePrincipal, 0);
     const status =
       i < 2 ? "Posted" :
-      i === 2 ? "Pending" :
+      i === 2 ? "Upcoming" :
       "Scheduled";
     return {
       n: i + 1,
       due: due.toISOString().slice(0, 10),
       principal,
       interest,
+      adminFee,
+      penalties,
       total: principal + interest,
+      outstanding: outstandingAfter,
       status,
     };
   });
@@ -1023,15 +1030,15 @@ function RepaymentTab({ a }: { a: Application }) {
       </div>
 
       <div className="border border-gray-200 rounded-lg overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
+        <table className="w-full text-sm min-w-[880px]">
           <thead className="bg-gray-50">
             <tr>
-              {["#", "Due date", "Principal", "Interest", "Total", "Status"].map((h, i) => (
+              {["#", "Due date", "Principal", "Interest", "Total", "Admin Fee", "Penalties", "Outstanding", "Status"].map((h, i) => (
                 <th
                   key={h}
                   className={cn(
                     "text-left px-4 py-2.5 text-[12px] font-medium text-gray-500",
-                    i >= 2 && i <= 4 && "text-right"
+                    i >= 2 && i <= 7 && "text-right"
                   )}
                 >
                   {h}
@@ -1047,6 +1054,11 @@ function RepaymentTab({ a }: { a: Application }) {
                 <td className="px-4 py-3 text-gray-700 text-right">${r.principal.toFixed(2)}</td>
                 <td className="px-4 py-3 text-gray-700 text-right">${r.interest.toFixed(2)}</td>
                 <td className="px-4 py-3 text-gray-900 font-medium text-right">${r.total.toFixed(2)}</td>
+                <td className="px-4 py-3 text-gray-700 text-right">${r.adminFee.toFixed(2)}</td>
+                <td className="px-4 py-3 text-gray-700 text-right">${r.penalties.toFixed(2)}</td>
+                <td className="px-4 py-3 text-gray-700 text-right">
+                  ${r.outstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
                 <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
               </tr>
             ))}

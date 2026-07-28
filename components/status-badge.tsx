@@ -7,6 +7,7 @@ const TONES: Record<string, string> = {
   Approved:               "bg-emerald-50 text-emerald-700",
   Disbursed:              "bg-violet-50 text-violet-700",
   Pending:                "bg-amber-50 text-amber-700",
+  Upcoming:               "bg-amber-50 text-amber-700",
   Review:                 "bg-sky-50 text-sky-700",
   Rejected:               "bg-red-50 text-red-700",
   Active:                 "bg-emerald-50 text-emerald-700",
