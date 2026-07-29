@@ -851,8 +851,9 @@ export const CHATS = [
 
 export type PostCategoryId = string;
 
-/** Which page manages the category: "media" = Blog Posts, "csr" = CSR Activity. */
-export type PostCategoryGroup = "media" | "csr";
+/** Which page manages the category: "media" = Blog Posts, "csr" = CSR Activity,
+ *  "announcement" = Announcement. */
+export type PostCategoryGroup = "media" | "csr" | "announcement";
 
 /** `tone` is one of the fixed swatch names in CATEGORY_TONE /
  *  CATEGORY_OVERLAY_TONE (see components/posts-manager.tsx). */
@@ -875,6 +876,9 @@ export const POST_CATEGORIES: PostCategory[] = [
   // customer app (e.g. "COMMUNITY WELFARE" over the header photo).
   { id: "community-welfare", label: "Community Welfare", tone: "rose", group: "csr" },
   { id: "public-service",    label: "Public Service",    tone: "blue", group: "csr" },
+  // Announcement sub-categories.
+  { id: "general",     label: "General",     tone: "emerald", group: "announcement" },
+  { id: "maintenance", label: "Maintenance",  tone: "amber",   group: "announcement" },
 ];
 export type PostStatus = "Published" | "Scheduled" | "Failed";
 
@@ -892,8 +896,10 @@ export type LocalizedText = Record<Locale, string>;
 
 export const emptyLocalizedText = (): LocalizedText => ({ km: "", en: "" });
 
-/** One item of a post's header media (image or video URL / data: URL). */
-export type PostMedia = { url: string; type: "image" | "video" };
+/** One item of a post's header media (image or video URL / data: URL, or a
+ *  linked YouTube video — shown in the mobile app's cover media section
+ *  alongside uploaded images/videos). */
+export type PostMedia = { url: string; type: "image" | "video" | "youtube" };
 
 export type Post = {
   id: string;
@@ -1069,6 +1075,48 @@ export const POSTS: Post[] = [
     author: "Sophea K.",
     status: "Failed",
     date: "2026-03-25",
+    views: 0,
+  },
+  {
+    id: "P-016",
+    title: en("Public holiday — office closed Apr 13–15"),
+    category: "general",
+    excerpt: en("All branches closed for Khmer New Year. Mobile app support remains available."),
+    body: en(
+      "All NHFC branches will be closed for the Khmer New Year public holiday from **April 13 to 15, 2026**. Normal branch hours resume April 16.\n\nCustomer support through the mobile app chat remains available throughout the holiday for urgent matters."
+    ),
+    media: [],
+    author: "Admin",
+    status: "Published",
+    date: "2026-04-10",
+    views: 640,
+  },
+  {
+    id: "P-017",
+    title: en("Scheduled maintenance — mobile app, Apr 20"),
+    category: "maintenance",
+    excerpt: en("Brief downtime expected between 1:00–2:00 AM while we roll out an update."),
+    body: en(
+      "The customer mobile app will be briefly unavailable between **1:00 AM and 2:00 AM on April 20, 2026** while we deploy a scheduled update. Loan applications and payments are not affected outside this window.\n\nWe recommend completing any pending actions before 1:00 AM."
+    ),
+    media: [],
+    author: "Admin",
+    status: "Scheduled",
+    date: "2026-04-20",
+    views: 0,
+  },
+  {
+    id: "P-018",
+    title: en("Updated privacy policy — effective May 1"),
+    category: "general",
+    excerpt: en("Push notification failed to send; announcement was not delivered to customers."),
+    body: en(
+      "Our privacy policy has been updated to clarify how loan application data is shared with credit bureaus. The updated policy takes effect **May 1, 2026** and is available in the mobile app under Settings > Legal.\n\nThis announcement failed to publish due to a push notification delivery error and needs to be re-sent."
+    ),
+    media: [],
+    author: "Admin",
+    status: "Failed",
+    date: "2026-04-22",
     views: 0,
   },
 ];
@@ -1351,10 +1399,13 @@ export type PromotionCta =
 
 export type Promotion = {
   id: string;
-  title: string;
-  description: string;
-  /** data URL (uploaded) or remote URL; empty = placeholder */
-  image: string;
+  title: LocalizedText;
+  description: LocalizedText;
+  /** Shown on the promotion card/list in the customer app. Image only.
+   *  data URL (uploaded) or remote URL; empty = placeholder */
+  thumbnail: string;
+  /** Optional image shown on the promotion's own detail page. */
+  detailImage?: string;
   status: PromotionStatus;
   date: string;
   /** Optional end date (ISO YYYY-MM-DD) — when set, promo auto-expires on this day. */
@@ -1369,9 +1420,9 @@ export type Promotion = {
 export const PROMOTIONS: Promotion[] = [
   {
     id: "PM-001",
-    title: "Khmer New Year — 0% Processing Fee",
-    description: "Apply for any Micro Loan during Khmer New Year and pay zero processing fee.",
-    image: "",
+    title: en("Khmer New Year — 0% Processing Fee"),
+    description: en("Apply for any Micro Loan during Khmer New Year and pay zero processing fee."),
+    thumbnail: "",
     status: "Published",
     date: "2026-04-10",
     deadline: "2026-04-30",
@@ -1380,9 +1431,9 @@ export const PROMOTIONS: Promotion[] = [
   },
   {
     id: "PM-002",
-    title: "Refer a Friend, Earn $10",
-    description: "Get a $10 reward for every friend who is approved for their first loan.",
-    image: "",
+    title: en("Refer a Friend, Earn $10"),
+    description: en("Get a $10 reward for every friend who is approved for their first loan."),
+    thumbnail: "",
     status: "Failed",
     date: "2026-03-22",
     author: "Visal P.",
@@ -1390,9 +1441,9 @@ export const PROMOTIONS: Promotion[] = [
   },
   {
     id: "PM-003",
-    title: "Birthday Month — 0.5% Off APR",
-    description: "Enjoy 0.5% off your APR on any new loan during your birthday month.",
-    image: "",
+    title: en("Birthday Month — 0.5% Off APR"),
+    description: en("Enjoy 0.5% off your APR on any new loan during your birthday month."),
+    thumbnail: "",
     status: "Published",
     date: "2026-02-14",
     deadline: "2026-12-31",
@@ -1401,9 +1452,9 @@ export const PROMOTIONS: Promotion[] = [
   },
   {
     id: "PM-004",
-    title: "Housing Loan Launch Offer",
-    description: "Introductory rate from 9% APR on the new Housing Loan product. Limited time.",
-    image: "",
+    title: en("Housing Loan Launch Offer"),
+    description: en("Introductory rate from 9% APR on the new Housing Loan product. Limited time."),
+    thumbnail: "",
     status: "Scheduled",
     date: "2026-05-01",
     author: "Admin",

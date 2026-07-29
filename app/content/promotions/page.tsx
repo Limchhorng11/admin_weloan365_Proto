@@ -3,7 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
-import { PROMOTIONS, PRODUCTS, type Promotion, type PromotionCta } from "@/lib/data";
+import {
+  PROMOTIONS,
+  PRODUCTS,
+  LOCALES,
+  emptyLocalizedText,
+  type Promotion,
+  type PromotionCta,
+  type Locale,
+  type LocalizedText,
+} from "@/lib/data";
 import { useRole } from "@/lib/role-context";
 import { cn } from "@/lib/utils";
 import {
@@ -42,9 +51,11 @@ export default function PromotionsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return list;
-    return list.filter(p =>
-      `${p.title} ${p.description}`.toLowerCase().includes(q)
-    );
+    return list.filter(p => {
+      // Search across every language's title/description, not just English.
+      const haystack = `${Object.values(p.title).join(" ")} ${Object.values(p.description).join(" ")}`;
+      return haystack.toLowerCase().includes(q);
+    });
   }, [list, query]);
 
   const nextId = useMemo(() => {
@@ -156,13 +167,13 @@ export default function PromotionsPage() {
                 >
                   <td className="px-6 py-3.5">
                     <div className="flex items-center gap-3">
-                      <Thumb url={p.image} />
+                      <Thumb url={p.thumbnail} />
                       <div className="min-w-0">
                         <div className="font-medium text-gray-900 truncate max-w-[420px]">
-                          {p.title}
+                          {p.title.en}
                         </div>
                         <div className="text-xs text-gray-500 truncate max-w-[420px] mt-0.5">
-                          {p.description}
+                          {p.description.en}
                         </div>
                         <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-gray-400">
                           {p.cta.type === "loan" ? (
@@ -275,9 +286,23 @@ function PromotionEditorModal({
 }) {
   const isEdit = !!initial;
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [image, setImage] = useState("");
+  const [activeLocale, setActiveLocale] = useState<Locale>("km");
+  const [titleMap, setTitleMap] = useState<LocalizedText>(emptyLocalizedText());
+  const [descriptionMap, setDescriptionMap] = useState<LocalizedText>(emptyLocalizedText());
+
+  // The form always edits whichever language tab is active.
+  const title = titleMap[activeLocale];
+  const description = descriptionMap[activeLocale];
+  const setTitle = (v: string) => setTitleMap(prev => ({ ...prev, [activeLocale]: v }));
+  const setDescription = (v: string) => setDescriptionMap(prev => ({ ...prev, [activeLocale]: v }));
+
+  // Thumbnail — shown on the promotion card/list in the customer app. Image only.
+  const [thumbnail, setThumbnail] = useState("");
+  const thumbnailRef = useRef<HTMLInputElement>(null);
+  // Detail image — optional, shown on the promotion's own detail page. Image only.
+  const [detailImage, setDetailImage] = useState("");
+  const detailImageRef = useRef<HTMLInputElement>(null);
+
   const [deadlineOn, setDeadlineOn] = useState(false);
   const [deadline, setDeadline] = useState("");
   const [scheduleOn, setScheduleOn] = useState(false);
@@ -289,15 +314,14 @@ function PromotionEditorModal({
   const [ctaProductId, setCtaProductId] = useState("");
   const [ctaPhone, setCtaPhone] = useState("");
 
-  const fileRef = useRef<HTMLInputElement>(null);
-
   // Init / reset whenever the modal opens
   useEffect(() => {
     if (!open) return;
     if (initial) {
-      setTitle(initial.title);
-      setDescription(initial.description);
-      setImage(initial.image);
+      setTitleMap(initial.title);
+      setDescriptionMap(initial.description);
+      setThumbnail(initial.thumbnail);
+      setDetailImage(initial.detailImage ?? "");
       setDeadlineOn(!!initial.deadline);
       setDeadline(initial.deadline ?? "");
       setScheduleOn(initial.status === "Scheduled");
@@ -306,9 +330,10 @@ function PromotionEditorModal({
       setCtaProductId(initial.cta.type === "loan" ? initial.cta.productId : "");
       setCtaPhone(initial.cta.type === "call" ? initial.cta.phone : "");
     } else {
-      setTitle("");
-      setDescription("");
-      setImage("");
+      setTitleMap(emptyLocalizedText());
+      setDescriptionMap(emptyLocalizedText());
+      setThumbnail("");
+      setDetailImage("");
       setDeadlineOn(false);
       setDeadline("");
       setScheduleOn(false);
@@ -318,6 +343,7 @@ function PromotionEditorModal({
       setCtaPhone("");
     }
     setError(null);
+    setActiveLocale("km");
   }, [open, initial]);
 
   useEffect(() => {
@@ -330,24 +356,40 @@ function PromotionEditorModal({
 
   if (!open) return null;
 
-  const onPickFile = () => fileRef.current?.click();
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onThumbnailPick = () => thumbnailRef.current?.click();
+  const onThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setError("Please pick an image file.");
+      setError("Please choose an image file for the thumbnail.");
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setImage(String(reader.result || ""));
+    reader.onload = () => setThumbnail(String(reader.result || ""));
     reader.readAsDataURL(file);
+    e.target.value = "";
+    setError(null);
+  };
+
+  const onDetailImagePick = () => detailImageRef.current?.click();
+  const onDetailImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setDetailImage(String(reader.result || ""));
+    reader.readAsDataURL(file);
+    e.target.value = "";
     setError(null);
   };
 
   const submit = () => {
-    if (!title.trim()) return setError("Title is required.");
-    if (!description.trim()) return setError("Description is required.");
-    if (!image) return setError("Please upload an image.");
+    if (!titleMap.km.trim()) return setError("Khmer title is required.");
+    if (!descriptionMap.km.trim()) return setError("Khmer description is required.");
+    if (!thumbnail) return setError("Please upload a thumbnail image.");
     if (deadlineOn && !deadline) return setError("Pick a deadline date or turn the deadline off.");
     if (scheduleOn && !scheduleDate) return setError("Pick a start date or turn scheduling off.");
     if (ctaType === "loan" && !ctaProductId) return setError("Choose which loan product the button opens.");
@@ -358,9 +400,10 @@ function PromotionEditorModal({
     const isScheduled = scheduleOn && scheduleDate > today;
     const promo: Promotion = {
       id: initial?.id ?? nextId,
-      title: title.trim(),
-      description: description.trim(),
-      image,
+      title: { km: titleMap.km.trim(), en: titleMap.en.trim() },
+      description: { km: descriptionMap.km.trim(), en: descriptionMap.en.trim() },
+      thumbnail,
+      detailImage: detailImage || undefined,
       status: isScheduled ? "Scheduled" : "Published",
       date: isScheduled ? scheduleDate : initial?.date ?? today,
       deadline: deadlineOn ? deadline : undefined,
@@ -378,7 +421,7 @@ function PromotionEditorModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl"
+        className="bg-white rounded-xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -402,252 +445,364 @@ function PromotionEditorModal({
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-4 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-6">
           {error && (
-            <div className="px-3 py-2 rounded-md bg-red-50 border border-red-100 text-sm text-red-700">
+            <div className="mb-4 px-3 py-2 rounded-md bg-red-50 border border-red-100 text-sm text-red-700">
               {error}
             </div>
           )}
 
-          <div>
-            <label className="text-xs font-medium text-gray-700">Title *</label>
-            <input
-              autoFocus
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="e.g. Khmer New Year — 0% Processing Fee"
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-gray-700">Description *</label>
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="A short summary of the offer shown under the title."
-              rows={3}
-              maxLength={200}
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm resize-y focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
-            <div className="text-[11px] text-gray-400 mt-1">{description.length} / 200</div>
-          </div>
-
-          {/* Choice button — the single action customers can take from this
-              promotion in the mobile app: open a loan product's detail page,
-              or call a number. */}
-          <div>
-            <label className="text-xs font-medium text-gray-700">Choice button *</label>
-            <div className="mt-1.5 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setCtaType("loan")}
-                className={cn(
-                  "inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border",
-                  ctaType === "loan"
-                    ? "border-brand-500 bg-brand-50 text-brand-700"
-                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                )}
-              >
-                <Package className="w-3.5 h-3.5" />
-                Loan Detail
-              </button>
-              <button
-                type="button"
-                onClick={() => setCtaType("call")}
-                className={cn(
-                  "inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border",
-                  ctaType === "call"
-                    ? "border-brand-500 bg-brand-50 text-brand-700"
-                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                )}
-              >
-                <Phone className="w-3.5 h-3.5" />
-                Call
-              </button>
-            </div>
-            <div className="text-[11px] text-gray-400 mt-1">
-              What tapping this promotion does in the customer app.
-            </div>
-
-            {ctaType === "loan" ? (
-              <select
-                value={ctaProductId}
-                onChange={e => setCtaProductId(e.target.value)}
-                className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              >
-                <option value="">Select a loan product…</option>
-                {CTA_LOAN_PRODUCTS.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name.en}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                value={ctaPhone}
-                onChange={e => setCtaPhone(e.target.value)}
-                placeholder="e.g. +855 23 999 000"
-                className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              />
-            )}
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-gray-700">Image *</label>
-            <div className="mt-1.5">
-              {image ? (
-                <div className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={image}
-                    alt="promotion preview"
-                    className="w-full h-40 object-cover rounded-md border border-gray-200"
-                  />
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={onPickFile}
-                      className="text-xs text-brand-600 hover:underline font-medium"
-                    >
-                      Replace
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImage("")}
-                      className="text-xs text-red-600 hover:underline font-medium"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ) : (
+          {/* Language tabs — Khmer is required; English is an optional
+              translation, filled in whenever ready. Governs the Title and
+              Description fields below. Sits at the top of the form. */}
+          <div className="flex items-center gap-1.5 mb-5">
+            {LOCALES.map(l => {
+              const active = activeLocale === l.code;
+              const filled = !!titleMap[l.code].trim() || !!descriptionMap[l.code].trim();
+              return (
                 <button
+                  key={l.code}
                   type="button"
-                  onClick={onPickFile}
-                  className="w-full h-40 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-brand-700 transition"
+                  onClick={() => setActiveLocale(l.code)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border",
+                    active
+                      ? "bg-brand-50 border-brand-200 text-brand-700"
+                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                  )}
                 >
-                  <Upload className="w-5 h-5" />
-                  <span className="text-xs font-medium">Click to upload</span>
-                  <span className="text-[10px] text-gray-400">PNG, JPG up to ~2 MB</span>
+                  <span>{l.flag}</span>
+                  {l.label}
+                  {l.code === "km" && <span className="text-red-500">*</span>}
+                  <span
+                    title={filled ? "Filled in" : "Not filled in"}
+                    className={cn("w-1.5 h-1.5 rounded-full", filled ? "bg-emerald-500" : "bg-gray-300")}
+                  />
                 </button>
-              )}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={onFileChange}
-              />
-            </div>
+              );
+            })}
           </div>
 
-          {/* Deadline — optional. Toggle to enable a date picker. Mirrors the
-              on/off switch + disabled-input pattern from the create-product form. */}
-          <div className="border border-gray-200 rounded-md">
-            <div
-              className={cn(
-                "flex items-center justify-between gap-3 px-3 py-2",
-                !deadlineOn && "bg-gray-50/60"
-              )}
-            >
-              <label
-                className={cn(
-                  "text-xs font-medium",
-                  deadlineOn ? "text-gray-700" : "text-gray-400"
-                )}
-              >
-                Set deadline
-              </label>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={deadlineOn}
-                onClick={() => setDeadlineOn(v => !v)}
-                title={deadlineOn ? "Disable deadline" : "Enable deadline"}
-                className={cn(
-                  "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
-                  deadlineOn ? "bg-brand-600" : "bg-gray-300"
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
-                    deadlineOn ? "translate-x-[18px]" : "translate-x-0.5"
-                  )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main editor area */}
+            <div className="lg:col-span-2 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-gray-700">
+                  Title{activeLocale === "km" && " *"}
+                </label>
+                <input
+                  autoFocus
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder={
+                    activeLocale === "km"
+                      ? "e.g. Khmer New Year — 0% Processing Fee"
+                      : `Translate the title into ${LOCALES.find(l => l.code === activeLocale)?.label}`
+                  }
+                  className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
                 />
-              </button>
-            </div>
-            <div
-              className={cn(
-                "px-3 pb-3 pt-1 transition-opacity",
-                !deadlineOn && "opacity-50 pointer-events-none select-none"
-              )}
-              aria-disabled={!deadlineOn}
-            >
-              <input
-                type="date"
-                value={deadline}
-                onChange={e => setDeadline(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              />
-              <div className="text-[11px] text-gray-400 mt-1">
-                Optional — the promotion will be hidden from customers after this date.
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-700">
+                  Description{activeLocale === "km" && " *"}
+                </label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder={
+                    activeLocale === "km"
+                      ? "A short summary of the offer shown under the title."
+                      : `Translate the description into ${LOCALES.find(l => l.code === activeLocale)?.label}`
+                  }
+                  rows={3}
+                  maxLength={200}
+                  className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm resize-y focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+                <div className="text-[11px] text-gray-400 mt-1">{description.length} / 200</div>
+              </div>
+
+              {/* Thumbnail — shown on the promotion card/list in the customer app. */}
+              <div>
+                <label className="text-xs font-medium text-gray-700">Thumbnail *</label>
+                <div className="text-[11px] text-gray-400 mb-1.5">
+                  Shown on the promotion card/list in the customer app.
+                </div>
+                <div>
+                  {thumbnail ? (
+                    <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={thumbnail}
+                        alt="thumbnail preview"
+                        className="w-full h-40 object-cover rounded-md border border-gray-200"
+                      />
+                      <div className="mt-1.5 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={onThumbnailPick}
+                          className="text-xs text-brand-600 hover:underline font-medium"
+                        >
+                          Replace
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setThumbnail("")}
+                          className="text-xs text-red-600 hover:underline font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onThumbnailPick}
+                      className="w-full h-40 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-brand-700 transition"
+                    >
+                      <Upload className="w-5 h-5" />
+                      <span className="text-xs font-medium">Click to upload thumbnail</span>
+                      <span className="text-[10px] text-gray-400">PNG, JPG up to ~2 MB</span>
+                    </button>
+                  )}
+                  <input
+                    ref={thumbnailRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={onThumbnailChange}
+                  />
+                </div>
+              </div>
+
+              {/* Detail image — optional, shown on the promotion's own detail
+                  page in the customer app. Image only (no video, unlike the
+                  Loan Product Detail field this is otherwise modeled on). */}
+              <div>
+                <label className="text-xs font-medium text-gray-700">
+                  Detail image <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <div className="text-[11px] text-gray-400 mb-1.5">
+                  Shown on the promotion's own detail page in the customer app.
+                </div>
+                <div>
+                  {detailImage ? (
+                    <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={detailImage}
+                        alt="detail preview"
+                        className="w-full h-40 object-cover rounded-md border border-gray-200"
+                      />
+                      <div className="mt-1.5 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={onDetailImagePick}
+                          className="text-xs text-brand-600 hover:underline font-medium"
+                        >
+                          Replace
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDetailImage("")}
+                          className="text-xs text-red-600 hover:underline font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onDetailImagePick}
+                      className="w-full h-40 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-brand-700 transition"
+                    >
+                      <Upload className="w-5 h-5" />
+                      <span className="text-xs font-medium">Click to upload</span>
+                      <span className="text-[10px] text-gray-400">PNG, JPG up to ~2 MB</span>
+                    </button>
+                  )}
+                  <input
+                    ref={detailImageRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={onDetailImageChange}
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Schedule — optional. Toggle to publish on a future date instead
-              of immediately. Mirrors the deadline toggle above. */}
-          <div className="border border-gray-200 rounded-md">
-            <div
-              className={cn(
-                "flex items-center justify-between gap-3 px-3 py-2",
-                !scheduleOn && "bg-gray-50/60"
-              )}
-            >
-              <label
-                className={cn(
-                  "text-xs font-medium",
-                  scheduleOn ? "text-gray-700" : "text-gray-400"
+            {/* Sidebar */}
+            <div className="space-y-5">
+              {/* Choice button — the single action customers can take from this
+                  promotion in the mobile app: open a loan product's detail page,
+                  or call a number. */}
+              <div>
+                <label className="text-xs font-medium text-gray-700">Choice button *</label>
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCtaType("loan")}
+                    className={cn(
+                      "inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border",
+                      ctaType === "loan"
+                        ? "border-brand-500 bg-brand-50 text-brand-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                    )}
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    Loan Detail
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCtaType("call")}
+                    className={cn(
+                      "inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border",
+                      ctaType === "call"
+                        ? "border-brand-500 bg-brand-50 text-brand-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                    )}
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    Call
+                  </button>
+                </div>
+                <div className="text-[11px] text-gray-400 mt-1">
+                  What tapping this promotion does in the customer app.
+                </div>
+
+                {ctaType === "loan" ? (
+                  <select
+                    value={ctaProductId}
+                    onChange={e => setCtaProductId(e.target.value)}
+                    className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  >
+                    <option value="">Select a loan product…</option>
+                    {CTA_LOAN_PRODUCTS.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name.en}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={ctaPhone}
+                    onChange={e => setCtaPhone(e.target.value)}
+                    placeholder="e.g. +855 23 999 000"
+                    className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
                 )}
-              >
-                Schedule post
-              </label>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={scheduleOn}
-                onClick={() => setScheduleOn(v => !v)}
-                title={scheduleOn ? "Disable scheduling" : "Enable scheduling"}
-                className={cn(
-                  "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
-                  scheduleOn ? "bg-brand-600" : "bg-gray-300"
-                )}
-              >
-                <span
+              </div>
+
+              {/* Schedule — optional. Toggle to publish on a future date instead
+                  of immediately. */}
+              <div className="border border-gray-200 rounded-md">
+                <div
                   className={cn(
-                    "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
-                    scheduleOn ? "translate-x-[18px]" : "translate-x-0.5"
+                    "flex items-center justify-between gap-3 px-3 py-2",
+                    !scheduleOn && "bg-gray-50/60"
                   )}
-                />
-              </button>
-            </div>
-            <div
-              className={cn(
-                "px-3 pb-3 pt-1 transition-opacity",
-                !scheduleOn && "opacity-50 pointer-events-none select-none"
-              )}
-              aria-disabled={!scheduleOn}
-            >
-              <input
-                type="date"
-                value={scheduleDate}
-                onChange={e => setScheduleDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              />
-              <div className="text-[11px] text-gray-400 mt-1">
-                Publishes automatically on the mobile app on this date.
+                >
+                  <label
+                    className={cn(
+                      "text-xs font-medium",
+                      scheduleOn ? "text-gray-700" : "text-gray-400"
+                    )}
+                  >
+                    Schedule post
+                  </label>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={scheduleOn}
+                    onClick={() => setScheduleOn(v => !v)}
+                    title={scheduleOn ? "Disable scheduling" : "Enable scheduling"}
+                    className={cn(
+                      "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
+                      scheduleOn ? "bg-brand-600" : "bg-gray-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                        scheduleOn ? "translate-x-[18px]" : "translate-x-0.5"
+                      )}
+                    />
+                  </button>
+                </div>
+                <div
+                  className={cn(
+                    "px-3 pb-3 pt-1 transition-opacity",
+                    !scheduleOn && "opacity-50 pointer-events-none select-none"
+                  )}
+                  aria-disabled={!scheduleOn}
+                >
+                  <input
+                    type="date"
+                    value={scheduleDate}
+                    onChange={e => setScheduleDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
+                  <div className="text-[11px] text-gray-400 mt-1">
+                    Publishes automatically on the mobile app on this date.
+                  </div>
+                </div>
+              </div>
+
+              {/* Deadline — optional. Toggle to enable a date picker. Mirrors the
+                  on/off switch + disabled-input pattern from the create-product form. */}
+              <div className="border border-gray-200 rounded-md">
+                <div
+                  className={cn(
+                    "flex items-center justify-between gap-3 px-3 py-2",
+                    !deadlineOn && "bg-gray-50/60"
+                  )}
+                >
+                  <label
+                    className={cn(
+                      "text-xs font-medium",
+                      deadlineOn ? "text-gray-700" : "text-gray-400"
+                    )}
+                  >
+                    Set deadline
+                  </label>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={deadlineOn}
+                    onClick={() => setDeadlineOn(v => !v)}
+                    title={deadlineOn ? "Disable deadline" : "Enable deadline"}
+                    className={cn(
+                      "relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
+                      deadlineOn ? "bg-brand-600" : "bg-gray-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                        deadlineOn ? "translate-x-[18px]" : "translate-x-0.5"
+                      )}
+                    />
+                  </button>
+                </div>
+                <div
+                  className={cn(
+                    "px-3 pb-3 pt-1 transition-opacity",
+                    !deadlineOn && "opacity-50 pointer-events-none select-none"
+                  )}
+                  aria-disabled={!deadlineOn}
+                >
+                  <input
+                    type="date"
+                    value={deadline}
+                    onChange={e => setDeadline(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
+                  <div className="text-[11px] text-gray-400 mt-1">
+                    Optional — the promotion will be hidden from customers after this date.
+                  </div>
+                </div>
               </div>
             </div>
           </div>

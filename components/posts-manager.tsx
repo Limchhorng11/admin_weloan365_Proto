@@ -40,9 +40,22 @@ import {
   MapPin,
   AlertTriangle,
   Camera,
+  Youtube,
 } from "lucide-react";
 
 const PAGE_SIZE = 8;
+
+/** Pulls the 11-char video ID out of any common YouTube URL shape
+ *  (watch?v=, youtu.be/, embed/, shorts/). */
+function youtubeId(url: string): string | null {
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
+function youtubeThumb(url: string): string {
+  const id = youtubeId(url);
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : "";
+}
 
 const CATEGORY_TONE: Record<string, string> = {
   blue:    "bg-sky-50 text-sky-700",
@@ -287,7 +300,9 @@ export function PostsManager({
           </div>
         </div>
 
-        {/* Category filter chips — this page's group only. */}
+        {/* Category filter chips — this page's group only. Announcement has
+            no category concept, so this row doesn't apply there. */}
+        {group !== "announcement" && (
         <div className="flex items-center gap-1.5 px-6 py-3 border-b border-gray-200 flex-wrap">
           <button
             onClick={() => setCategory("all")}
@@ -327,6 +342,7 @@ export function PostsManager({
             );
           })}
         </div>
+        )}
 
         {/* Table */}
         {filtered.length === 0 ? (
@@ -352,7 +368,7 @@ export function PostsManager({
           <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-200">
-                {["Post", "Category", "Status", "Date"].map(h => (
+                {(group === "announcement" ? ["Post", "Status", "Date"] : ["Post", "Category", "Status", "Date"]).map(h => (
                   <th
                     key={h}
                     className="text-left px-6 py-3 text-[12px] font-medium text-gray-500 whitespace-nowrap"
@@ -385,9 +401,11 @@ export function PostsManager({
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-3.5">
-                    <CategoryBadge id={p.category} categories={categories} />
-                  </td>
+                  {group !== "announcement" && (
+                    <td className="px-6 py-3.5">
+                      <CategoryBadge id={p.category} categories={categories} />
+                    </td>
+                  )}
                   <td className="px-6 py-3.5">
                     <StatusBadge status={p.status} />
                   </td>
@@ -512,6 +530,15 @@ function Thumb({
       </div>
     );
   }
+  if (first && first.type === "youtube") {
+    return (
+      <div className="relative w-12 h-12 rounded-md overflow-hidden bg-gray-900 flex-shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={youtubeThumb(first.url)} alt="" className="w-full h-full object-cover opacity-70" />
+        <Play className="w-4 h-4 text-white absolute inset-0 m-auto" fill="white" />
+      </div>
+    );
+  }
   if (first) {
     return (
       <div className="relative w-12 h-12 rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
@@ -540,6 +567,8 @@ function Thumb({
 /* ====================================================================
    Post editor modal (CMS-style)
    ==================================================================== */
+
+const MAX_MEDIA = 10;
 
 function PostEditorModal({
   open,
@@ -579,6 +608,7 @@ function PostEditorModal({
   const [body, setBodyMap]       = useState<LocalizedText>(emptyLocalizedText());
   const [category, setCategory]   = useState<PostCategoryId>("blog");
   const [media, setMedia] = useState<PostMedia[]>([]);
+  const [youtubeInput, setYoutubeInput] = useState("");
   const [location, setLocation]   = useState("");
   const [quotation, setQuotation] = useState("");
   // Optional follow-up block shown below the article body (e.g. "A continued
@@ -634,6 +664,7 @@ function PostEditorModal({
       setScheduleOn(false);
       setScheduleDate("");
     }
+    setYoutubeInput("");
     setError(null);
     setShowPreview(false);
     setActiveLocale("km");
@@ -692,7 +723,11 @@ function PostEditorModal({
     setBodyVal(bodyVal.slice(0, start) + snippet + bodyVal.slice(end));
   };
 
-  /* ---- Cover media upload (multiple images and/or videos) ---- */
+  /* ---- Cover media upload ----
+   * CSR supports a multi-image/video gallery (up to MAX_MEDIA). Every other
+   * group (Blog Posts, Announcement) is limited to a single image or video,
+   * matching the Promotion editor's single-image pattern. */
+  const allowMultipleMedia = group === "csr";
   const onPickFile = () => fileRef.current?.click();
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -701,7 +736,29 @@ function PostEditorModal({
       setError("Please pick image or video files only.");
       return;
     }
-    files.forEach(file => {
+
+    if (!allowMultipleMedia) {
+      const file = files[0];
+      const type: PostMedia["type"] = file.type.startsWith("video/") ? "video" : "image";
+      const reader = new FileReader();
+      reader.onload = () => {
+        const url = String(reader.result || "");
+        if (url) setMedia([{ url, type }]);
+      };
+      reader.readAsDataURL(file);
+      setError(null);
+      e.target.value = "";
+      return;
+    }
+
+    const remaining = MAX_MEDIA - media.length;
+    if (remaining <= 0) {
+      setError(`You can only add up to ${MAX_MEDIA} images/videos per post.`);
+      e.target.value = "";
+      return;
+    }
+    const accepted = files.slice(0, remaining);
+    accepted.forEach(file => {
       const type: PostMedia["type"] = file.type.startsWith("video/") ? "video" : "image";
       const reader = new FileReader();
       reader.onload = () => {
@@ -710,12 +767,36 @@ function PostEditorModal({
       };
       reader.readAsDataURL(file);
     });
-    setError(null);
+    setError(
+      files.length > accepted.length
+        ? `Only added ${accepted.length} of ${files.length} files — up to ${MAX_MEDIA} images/videos per post.`
+        : null
+    );
     // Allow re-picking the same file(s) later.
     e.target.value = "";
   };
   const removeMedia = (index: number) => {
     setMedia(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addYoutubeLink = () => {
+    const url = youtubeInput.trim();
+    if (!url) return;
+    if (!youtubeId(url)) {
+      setError("Please paste a valid YouTube link.");
+      return;
+    }
+    if (!allowMultipleMedia) {
+      setMedia([{ url, type: "youtube" }]);
+    } else {
+      if (media.length >= MAX_MEDIA) {
+        setError(`You can only add up to ${MAX_MEDIA} images/videos per post.`);
+        return;
+      }
+      setMedia(prev => [...prev, { url, type: "youtube" }]);
+    }
+    setYoutubeInput("");
+    setError(null);
   };
 
   /* ---- Category management (add/delete custom categories) ---- */
@@ -837,26 +918,9 @@ function PostEditorModal({
             </div>
           )}
 
-          {/* CSR-only: a short pull-quote highlighted in the article. Sits
-              above the language tabs — it's not translated per-language. */}
-          {group === "csr" && !showPreview && (
-            <div className="mb-5">
-              <label className="text-xs font-medium text-gray-700">CSR quotation</label>
-              <input
-                value={quotation}
-                onChange={e => setQuotation(e.target.value)}
-                placeholder={'e.g. "Giving back to the communities we serve is at the heart of who we are."'}
-                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm italic focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              />
-              <div className="text-[11px] text-gray-400 mt-1">
-                Optional — shown as a highlighted quote inside the article.
-              </div>
-            </div>
-          )}
-
           {/* Language tabs — Khmer is required; English is an optional
               translation, filled in whenever ready. Governs both the editor
-              fields below and the Preview pane. */}
+              fields below and the Preview pane. Kept at the top of the form. */}
           <div className="flex items-center gap-1.5 mb-5">
             {LOCALES.map(l => {
               const fill = localeFillStatus(title[l.code], excerpt[l.code], body[l.code]);
@@ -887,6 +951,23 @@ function PostEditorModal({
               );
             })}
           </div>
+
+          {/* CSR-only: a short pull-quote highlighted in the article — not
+              translated per-language. */}
+          {group === "csr" && !showPreview && (
+            <div className="mb-5">
+              <label className="text-xs font-medium text-gray-700">CSR quotation</label>
+              <input
+                value={quotation}
+                onChange={e => setQuotation(e.target.value)}
+                placeholder={'e.g. "Giving back to the communities we serve is at the heart of who we are."'}
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm italic focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              />
+              <div className="text-[11px] text-gray-400 mt-1">
+                Optional — shown as a highlighted quote inside the article.
+              </div>
+            </div>
+          )}
 
           {showPreview ? (
             <PostPreview
@@ -924,53 +1005,123 @@ function PostEditorModal({
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-gray-700">Cover images or video</label>
+                  <label className="text-xs font-medium text-gray-700">
+                    Cover {allowMultipleMedia ? "images or video" : "image or video"}
+                  </label>
                   <div className="mt-1.5">
-                    {media.length > 0 ? (
-                      <>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {media.map((m, i) => (
-                            <div
-                              key={i}
-                              className="relative h-24 rounded-md overflow-hidden border border-gray-200 bg-gray-900 group"
-                            >
-                              {m.type === "video" ? (
-                                <>
-                                  <video src={m.url} className="w-full h-full object-cover opacity-80" muted />
-                                  <Play className="w-6 h-6 text-white absolute inset-0 m-auto" fill="white" />
-                                </>
-                              ) : (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={m.url} alt="" className="w-full h-full object-cover" />
-                              )}
-                              <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 px-1 py-0.5 rounded bg-black/60 text-white text-[9px] font-medium">
-                                {m.type === "video" ? <Film className="w-2.5 h-2.5" /> : <ImageIcon className="w-2.5 h-2.5" />}
-                                {i + 1}/{media.length}
-                              </span>
+                    {allowMultipleMedia ? (
+                      media.length > 0 ? (
+                        <>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {media.map((m, i) => (
+                              <div
+                                key={i}
+                                className="relative h-24 rounded-md overflow-hidden border border-gray-200 bg-gray-900 group"
+                              >
+                                {m.type === "video" ? (
+                                  <>
+                                    <video src={m.url} className="w-full h-full object-cover opacity-80" muted />
+                                    <Play className="w-6 h-6 text-white absolute inset-0 m-auto" fill="white" />
+                                  </>
+                                ) : m.type === "youtube" ? (
+                                  <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={youtubeThumb(m.url)} alt="" className="w-full h-full object-cover opacity-80" />
+                                    <Play className="w-6 h-6 text-white absolute inset-0 m-auto" fill="white" />
+                                  </>
+                                ) : (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={m.url} alt="" className="w-full h-full object-cover" />
+                                )}
+                                <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 px-1 py-0.5 rounded bg-black/60 text-white text-[9px] font-medium">
+                                  {m.type === "video" ? (
+                                    <Film className="w-2.5 h-2.5" />
+                                  ) : m.type === "youtube" ? (
+                                    <Youtube className="w-2.5 h-2.5" />
+                                  ) : (
+                                    <ImageIcon className="w-2.5 h-2.5" />
+                                  )}
+                                  {i + 1}/{media.length}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeMedia(i)}
+                                  title="Remove"
+                                  aria-label={`Remove media ${i + 1}`}
+                                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white hover:bg-red-600 flex items-center justify-center"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {media.length < MAX_MEDIA && (
                               <button
                                 type="button"
-                                onClick={() => removeMedia(i)}
-                                title="Remove"
-                                aria-label={`Remove media ${i + 1}`}
-                                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white hover:bg-red-600 flex items-center justify-center"
+                                onClick={onPickFile}
+                                className="h-24 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand-700 transition"
                               >
-                                <X className="w-3 h-3" />
+                                <Plus className="w-4 h-4" />
+                                <span className="text-[10px] font-medium">Add more</span>
                               </button>
-                            </div>
-                          ))}
+                            )}
+                          </div>
+                          <div className="text-[11px] text-gray-400 mt-1">
+                            The customer app shows multiple items as a swipeable gallery.{" "}
+                            {media.length}/{MAX_MEDIA} used.
+                          </div>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={onPickFile}
+                          className="w-full h-40 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-brand-700 transition"
+                        >
+                          <Upload className="w-5 h-5" />
+                          <span className="text-xs font-medium">Click to upload</span>
+                          <span className="text-[10px] text-gray-400">
+                            Up to {MAX_MEDIA} images / videos, ~5 MB each
+                          </span>
+                        </button>
+                      )
+                    ) : media[0] ? (
+                      <div className="relative">
+                        {media[0].type === "video" ? (
+                          <video src={media[0].url} className="w-full h-40 object-cover rounded-md border border-gray-200" controls />
+                        ) : media[0].type === "youtube" ? (
+                          <div className="relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={youtubeThumb(media[0].url)}
+                              alt=""
+                              className="w-full h-40 object-cover rounded-md border border-gray-200 bg-gray-900"
+                            />
+                            <Play className="w-8 h-8 text-white absolute inset-0 m-auto" fill="white" />
+                          </div>
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={media[0].url}
+                            alt=""
+                            className="w-full h-40 object-cover rounded-md border border-gray-200"
+                          />
+                        )}
+                        <div className="mt-1.5 flex items-center justify-between">
                           <button
                             type="button"
                             onClick={onPickFile}
-                            className="h-24 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand-700 transition"
+                            className="text-xs text-brand-600 hover:underline font-medium"
                           >
-                            <Plus className="w-4 h-4" />
-                            <span className="text-[10px] font-medium">Add more</span>
+                            Replace
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMedia([])}
+                            className="text-xs text-red-600 hover:underline font-medium"
+                          >
+                            Remove
                           </button>
                         </div>
-                        <div className="text-[11px] text-gray-400 mt-1">
-                          The customer app shows multiple items as a swipeable gallery.
-                        </div>
-                      </>
+                      </div>
                     ) : (
                       <button
                         type="button"
@@ -979,19 +1130,44 @@ function PostEditorModal({
                       >
                         <Upload className="w-5 h-5" />
                         <span className="text-xs font-medium">Click to upload</span>
-                        <span className="text-[10px] text-gray-400">
-                          One or more images / videos, up to ~2 MB each
-                        </span>
+                        <span className="text-[10px] text-gray-400">One image or video, ~5 MB</span>
                       </button>
                     )}
                     <input
                       ref={fileRef}
                       type="file"
                       accept="image/*,video/*"
-                      multiple
+                      multiple={allowMultipleMedia}
                       className="hidden"
                       onChange={onFileChange}
                     />
+
+                    {/* Or link a YouTube video instead of uploading a file —
+                        shown in the mobile app's cover media section like any
+                        other item. Blog Posts only. */}
+                    {group === "media" && (
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <div className="relative flex-1">
+                        <Youtube className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          value={youtubeInput}
+                          onChange={e => setYoutubeInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") { e.preventDefault(); addYoutubeLink(); }
+                          }}
+                          placeholder="Or paste a YouTube link"
+                          className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addYoutubeLink}
+                        className="px-2.5 py-1.5 text-xs font-medium bg-white border border-gray-200 text-gray-700 rounded-md hover:bg-gray-50"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -1064,6 +1240,7 @@ function PostEditorModal({
 
               {/* Sidebar */}
               <div className="space-y-5">
+                {group !== "announcement" && (
                 <div>
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-medium text-gray-700">Category *</label>
@@ -1139,7 +1316,9 @@ function PostEditorModal({
                     </div>
                   )}
                 </div>
+                )}
 
+                {group !== "announcement" && (
                 <div>
                   <label className="text-xs font-medium text-gray-700">Location</label>
                   <input
@@ -1152,6 +1331,7 @@ function PostEditorModal({
                     Optional — shown under the title, e.g. for CSR activities.
                   </div>
                 </div>
+                )}
 
                 {/* Schedule — optional. Toggle to publish on a future date
                     instead of immediately. Mirrors the deadline toggle on
@@ -1371,6 +1551,16 @@ function PostPreview({
           {current.type === "video" ? (
             <>
               <video src={current.url} className="w-full h-full object-cover" muted />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center">
+                  <Play className="w-6 h-6 text-white" fill="white" />
+                </div>
+              </div>
+            </>
+          ) : current.type === "youtube" ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={youtubeThumb(current.url)} alt="" className="w-full h-full object-cover" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center">
                   <Play className="w-6 h-6 text-white" fill="white" />

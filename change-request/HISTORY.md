@@ -24,6 +24,15 @@ This log uses semantic versioning (`MAJOR.MINOR.PATCH`):
 add an entry below** (newest on top). One entry per shipped batch of work is fine — it
 doesn't need to be one entry per commit.
 
+> **File location & naming:** this is `change-request/HISTORY.md` — the full running
+> history, in one place, under a fixed name (it does not get renamed as versions bump).
+> Alongside it, **every version also gets its own standalone file** in the same folder,
+> named after that version (`v0.13.0.md`, `v0.14.0.md`, …) — a short, focused document
+> of just that version's work, so a developer can open one file and see exactly what a
+> given release changed without scrolling the full history. Each entry below is kept in
+> sync with its standalone file; when a version's standalone file is written or updated,
+> mirror the same content into its entry here.
+
 > Entries from `v0.1.0` through `v0.6.0` (2026-06-11 → 2026-07-11) are reconstructed from
 > git history to establish this baseline — they predate this changelog and are
 > best-effort summaries from the diffs, not first-hand notes from whoever built them.

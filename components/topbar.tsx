@@ -30,6 +30,7 @@ const TITLES: { match: string; title: string }[] = [
   { match: "/loan-product",           title: "Loan Products" },
   { match: "/content/posts",          title: "Blog Posts" },
   { match: "/content/csr",            title: "CSR Activity" },
+  { match: "/content/announcement",   title: "Announcement" },
   { match: "/chat",                   title: "Chat" },
 ];
 

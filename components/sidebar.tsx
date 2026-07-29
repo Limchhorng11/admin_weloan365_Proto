@@ -18,6 +18,7 @@ import {
   Star,
   UserCircle2,
   HeartHandshake,
+  Radio,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,9 @@ const NAV: { section: string; items: NavItem[] }[] = [
           // Own route — reuses the Blog Posts editor/table with the category
           // locked to CSR (see app/content/csr/page.tsx).
           { label: "CSR", href: "/content/csr", icon: HeartHandshake, permission: "post.manage" },
+          // Own route — reuses the Blog Posts editor/table with the category
+          // locked to Announcement (see app/content/announcement/page.tsx).
+          { label: "Announcement", href: "/content/announcement", icon: Radio, permission: "post.manage" },
         ],
       },
     ],
@@ -169,11 +173,15 @@ export function Sidebar({
                       : "text-gray-600 hover:bg-gray-100"
                   )}
                 >
-                  {child.icon && <child.icon className="w-[14px] h-[14px]" />}
-                  <span>{child.label}</span>
-                  {child.href === "/chat" && hasUnreadChat && (
-                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
+                  {child.icon && (
+                    <span className="relative inline-flex flex-shrink-0">
+                      <child.icon className="w-[14px] h-[14px]" />
+                      {child.href === "/chat" && hasUnreadChat && (
+                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
+                      )}
+                    </span>
                   )}
+                  <span>{child.label}</span>
                 </Link>
               ))}
             </div>
