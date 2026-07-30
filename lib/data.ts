@@ -1131,21 +1131,34 @@ export type StaffUser = {
   branch: string;
   status: StaffUserStatus;
   lastActive: string;
-  /** 5-char referral code given to customers (CO referral program). When
-   *  present, the user appears in Settings → Referral → Credit Officer codes. */
-  code?: string;
+  /** Company staff ID. Its **last 5 digits** double as the officer's referral
+   *  code (see `referralCodeFromStaffId`) — the code customers enter at signup
+   *  is always derived from this, never stored separately, so the two can't
+   *  drift apart. Optional: staff whose ID hasn't been issued yet don't take
+   *  part in the referral program. */
+  staffId?: string;
   /** Lightweight referral metrics — populated for demo seed users so the
    *  CO codes table has realistic numbers. New users start at zero. */
   referralStats?: { referrals: number; applications: number; disbursed: number };
 };
 
+/** The referral code an officer gives to customers: the last 5 digits of their
+ *  staff ID. Returns null when the ID carries fewer than 5 digits (or is unset),
+ *  meaning that staff member has no referral code yet. */
+export function referralCodeFromStaffId(staffId: string | undefined): string | null {
+  const digits = (staffId ?? "").replace(/\D/g, "");
+  return digits.length >= 5 ? digits.slice(-5) : null;
+}
+
 export const USERS: StaffUser[] = [
-  { id: "U-01", name: "Visal P.",    email: "visal.p@nonghyup.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago",  code: "10247", referralStats: { referrals: 28, applications: 19, disbursed: 11 } },
-  { id: "U-02", name: "Sophea K.",    email: "sophea.k@nonghyup.com.kh",      role: "Senior Officer",        branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago",   code: "10248", referralStats: { referrals: 41, applications: 32, disbursed: 21 } },
-  { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@nonghyup.com.kh",     role: "Senior Officer",        branch: "Battambang",  status: "Active",   lastActive: "Today",      code: "10312", referralStats: { referrals: 14, applications:  9, disbursed:  5 } },
-  { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@nonghyup.com.kh",   role: "Customer Service",      branch: "HQ",          status: "Active",   lastActive: "Today",      code: "10402", referralStats: { referrals:  9, applications:  4, disbursed:  2 } },
-  { id: "U-05", name: "Kosal M.",     email: "kosal.m@nonghyup.com.kh",       role: "Admin",                 branch: "HQ",          status: "Inactive", lastActive: "30 d ago",   code: "10502", referralStats: { referrals:  0, applications:  0, disbursed:  0 } },
-  { id: "U-06", name: "Pisey C.",     email: "pisey.c@nonghyup.com.kh",       role: "Customer Service",      branch: "Phnom Penh",  status: "Active",   lastActive: "10 min ago", code: "10401", referralStats: { referrals:  6, applications:  3, disbursed:  1 } },
+  { id: "U-01", name: "Visal P.",    email: "visal.p@nonghyup.com.kh", role: "Credit Officer",        branch: "Phnom Penh",  status: "Active",   lastActive: "2 min ago",  staffId: "NH-20110247", referralStats: { referrals: 28, applications: 19, disbursed: 11 } },
+  { id: "U-02", name: "Sophea K.",    email: "sophea.k@nonghyup.com.kh",      role: "Senior Officer",        branch: "Siem Reap",   status: "Active",   lastActive: "1 hr ago",   staffId: "NH-20110248", referralStats: { referrals: 41, applications: 32, disbursed: 21 } },
+  { id: "U-03", name: "Ratanak L.",   email: "ratanak.l@nonghyup.com.kh",     role: "Senior Officer",        branch: "Battambang",  status: "Active",   lastActive: "Today",      staffId: "NH-20110312", referralStats: { referrals: 14, applications:  9, disbursed:  5 } },
+  { id: "U-04", name: "Sreyneang P.", email: "sreyneang.p@nonghyup.com.kh",   role: "Customer Service",      branch: "HQ",          status: "Active",   lastActive: "Today",      staffId: "NH-20110402", referralStats: { referrals:  9, applications:  4, disbursed:  2 } },
+  { id: "U-05", name: "Kosal M.",     email: "kosal.m@nonghyup.com.kh",       role: "Admin",                 branch: "HQ",          status: "Inactive", lastActive: "30 d ago",   staffId: "NH-20110502", referralStats: { referrals:  0, applications:  0, disbursed:  0 } },
+  { id: "U-06", name: "Pisey C.",     email: "pisey.c@nonghyup.com.kh",       role: "Customer Service",      branch: "Phnom Penh",  status: "Active",   lastActive: "10 min ago", staffId: "NH-20110401", referralStats: { referrals:  6, applications:  3, disbursed:  1 } },
+  // No staff ID issued yet — so no referral code. Keeps the "not in the
+  // referral program" case visible in the demo data.
   { id: "U-07", name: "Mengsrun H.",  email: "mengsrun.h@nonghyup.com.kh",    role: "Senior Officer",        branch: "HQ",          status: "Active",   lastActive: "Yesterday" },
 ];
 

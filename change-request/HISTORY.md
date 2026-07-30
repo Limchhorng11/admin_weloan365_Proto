@@ -27,15 +27,61 @@ doesn't need to be one entry per commit.
 > **File location & naming:** this is `change-request/HISTORY.md` — the full running
 > history, in one place, under a fixed name (it does not get renamed as versions bump).
 > Alongside it, **every version also gets its own standalone file** in the same folder,
-> named after that version (`v0.13.0.md`, `v0.14.0.md`, …) — a short, focused document
-> of just that version's work, so a developer can open one file and see exactly what a
-> given release changed without scrolling the full history. Each entry below is kept in
-> sync with its standalone file; when a version's standalone file is written or updated,
+> named after that version (`v0.13.0.md`, `v0.15.0.md`, …) — a focused document of just
+> that version's work, so a developer can open one file and see exactly what a given
+> release changed without scrolling the full history. Each entry below is kept in sync
+> with its standalone file; when a version's standalone file is written or updated,
 > mirror the same content into its entry here.
+>
+> A version file covers a batch of work, not a single commit — one file can span a few
+> days and several commits, grouped by the area of the app it touches.
 
 > Entries from `v0.1.0` through `v0.6.0` (2026-06-11 → 2026-07-11) are reconstructed from
 > git history to establish this baseline — they predate this changelog and are
 > best-effort summaries from the diffs, not first-hand notes from whoever built them.
+
+---
+
+## v0.15.0 — 2026-07-29 → 2026-07-30
+**Announcement content type; bilingual Promotion editor; media upload refinements;
+read-only Branch Locator; Staff ID + bulk staff import**
+
+- Commits: `0aa09f7` + *(pending)*
+
+**Business logic:**
+- **Announcement** — new content type under Media (`/content/announcement`), below
+  CSR. Reuses the shared Post editor; no Category or Location (both hidden in the
+  form, table, and filter row). Seeded with all three statuses.
+- **Cover media upload:** CSR keeps a multi-image/video gallery (capped at 10, "N/10
+  used" counter). Blog Posts and Announcement are single image/video only. Blog Posts
+  additionally gets an **"Or paste a YouTube link"** input — renders a real YouTube
+  thumbnail with a play overlay everywhere cover media displays. Size hint bumped to
+  ~5 MB across the board.
+- **Promotion editor:** bilingual Khmer/English title/description with language tabs
+  at the top; the single Image field split into **Thumbnail** (required) + **Detail
+  image** (optional, image-only); matches the 2-column layout used by the other Media
+  editors; sidebar reordered to Schedule post before Set deadline.
+- **CSR post editor:** language tabs moved above the quotation field.
+- **Sidebar:** Chat's unread dot moved onto the icon itself (top-right corner badge)
+  instead of floating after the label.
+- **Settings → Branch Locator** is now read-only: Add branch / Edit / Delete removed,
+  replaced by a single **View** action opening a read-only detail modal.
+- **Settings → User & Role — Staff ID:** the standalone 5-char referral `code` field
+  became **`staffId`**, with the referral code now *derived* as its last 5 digits via
+  a new `referralCodeFromStaffId()` helper. The Add user form previews the derived
+  code live; the Referral Program table derives each officer's code from their ID.
+  Seed IDs end in the previously hard-coded codes so existing customer referral links
+  stay intact.
+- **Settings → User & Role — bulk import:** new **Import** button reads staff from an
+  `.xlsx` file (Name, Email, Staff ID, Branch), shows a validated per-row preview
+  with skip reasons, and imports only the valid rows.
+- Reorganized `change-request/` into this stable `HISTORY.md` plus one file per
+  version (see [`v0.15.0.md`](v0.15.0.md) for the full write-up).
+
+**Files touched:** `lib/data.ts`, `app/content/announcement/page.tsx` (new),
+`app/content/promotions/page.tsx`, `components/sidebar.tsx`, `components/topbar.tsx`,
+`components/posts-manager.tsx`, `components/settings-modal.tsx`,
+`components/users-roles-view.tsx`, `package.json`, `package-lock.json`
 
 ---
 

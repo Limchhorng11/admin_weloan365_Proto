@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   ShieldCheck,
@@ -22,7 +22,11 @@ import {
   Eye,
   EyeOff,
   Pencil,
+  Upload,
+  FileSpreadsheet,
+  CheckCircle2,
 } from "lucide-react";
+import { readSheet } from "read-excel-file/web-worker";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/lib/role-context";
 import { StatusBadge } from "./status-badge";
@@ -31,9 +35,11 @@ import {
   ROLES,
   PERMISSIONS,
   PERMISSION_REQUIRES,
+  referralCodeFromStaffId,
   type Role,
   type Permission,
   type PermissionCategory,
+  type StaffUser,
 } from "@/lib/data";
 
 type Tab = "users" | "roles";
@@ -133,14 +139,13 @@ function Card({ children, className }: { children: React.ReactNode; className?: 
 
 /* ---------- USERS ---------- */
 
-type StaffUser = (typeof USERS)[number];
-
 function UsersTab() {
   const { can } = useRole();
   const [users, setUsers] = useState<StaffUser[]>(USERS);
   const [filter, setFilter] = useState("");
   const [editing, setEditing] = useState<StaffUser | null>(null);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const filtered = users.filter(
     u =>
@@ -174,6 +179,22 @@ function UsersTab() {
     setCreating(false);
   };
 
+  // Imported rows get sequential IDs starting right after the current
+  // highest — same numbering scheme as a single Add user.
+  const handleImport = (rows: Array<Omit<StaffUser, "id" | "lastActive">>) => {
+    const maxN = users.reduce((m, u) => {
+      const n = parseInt((u.id ?? "").replace(/[^0-9]/g, ""), 10);
+      return Number.isFinite(n) && n > m ? n : m;
+    }, 0);
+    const created: StaffUser[] = rows.map((row, i) => ({
+      ...row,
+      id: `U-${String(maxN + 1 + i).padStart(2, "0")}`,
+      lastActive: "Just now",
+    }));
+    setUsers(prev => [...created, ...prev]);
+    setImporting(false);
+  };
+
   return (
     <Card className="!p-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-3 border-b border-gray-200">
@@ -194,13 +215,22 @@ function UsersTab() {
             />
           </div>
           {can("user.create") && (
-            <button
-              onClick={() => setCreating(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add user
-            </button>
+            <>
+              <button
+                onClick={() => setImporting(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-700 rounded-md hover:bg-gray-50 font-medium"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import
+              </button>
+              <button
+                onClick={() => setCreating(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add user
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -226,10 +256,10 @@ function UsersTab() {
                   <td className="px-5 py-3">
                     <div className="font-medium text-gray-900">{u.name}</div>
                     <div className="text-xs text-gray-500 mt-0.5">
-                      {u.code ? (
-                        <span className="font-mono tracking-wider">{u.code}</span>
+                      {u.staffId ? (
+                        <span className="font-mono tracking-wider">{u.staffId}</span>
                       ) : (
-                        <span className="italic text-gray-400">No code</span>
+                        <span className="italic text-gray-400">No staff ID</span>
                       )}
                     </div>
                   </td>
@@ -278,6 +308,15 @@ function UsersTab() {
           onSave={handleSave}
         />
       )}
+
+      {importing && (
+        <ImportUsersModal
+          existingEmails={users.map(u => u.email.toLowerCase())}
+          existingStaffIds={users.flatMap(u => (u.staffId ? [u.staffId.toUpperCase()] : []))}
+          onCancel={() => setImporting(false)}
+          onImport={handleImport}
+        />
+      )}
     </Card>
   );
 }
@@ -313,7 +352,7 @@ function UserModal({
   const [branch, setBranch] = useState(user?.branch ?? "Phnom Penh");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [code, setCode] = useState(user?.code ?? "");
+  const [staffId, setStaffId] = useState(user?.staffId ?? "");
   // Status as an on/off toggle — Active = on, Inactive = off.
   // Editing inherits the user's current status; creating defaults to Active.
   const [active, setActive] = useState<boolean>(user?.status !== "Inactive");
@@ -329,8 +368,10 @@ function UserModal({
       if (!password) return setError("Password is required");
       if (password.length < 6) return setError("Password must be at least 6 characters");
     }
-    if (code && code.length !== 5)
-      return setError("Code must be exactly 5 characters");
+    // A staff ID needs at least 5 digits, since its last 5 become the
+    // referral code customers type in at signup.
+    if (staffId.trim() && !referralCodeFromStaffId(staffId))
+      return setError("Staff ID must contain at least 5 digits");
 
     onSave({
       id: user?.id,
@@ -339,9 +380,9 @@ function UserModal({
       role,
       branch: branch.trim(),
       status: active ? "Active" : "Inactive",
-      // Persist the 5-char referral code (or strip it if cleared). When set,
-      // the user appears in Settings → Referral → Credit Officer codes.
-      code: code.trim() ? code.trim() : undefined,
+      // Persist the staff ID (or strip it if cleared). When set, the user's
+      // referral code — its last 5 digits — appears in Settings → Referral.
+      staffId: staffId.trim() ? staffId.trim() : undefined,
       // Preserve existing referral stats on edit; new users start blank.
       referralStats: user?.referralStats,
     });
@@ -350,7 +391,7 @@ function UserModal({
   const branches = Array.from(new Set(["Phnom Penh", "Siem Reap", "Battambang", "HQ", "Kampong Cham", ...USERS.map(u => u.branch)]));
 
   // When editing an existing user, only Role, Branch and Status are editable.
-  // Identity fields (name, email, password, code) are shown read-only.
+  // Identity fields (name, email, password, staff ID) are shown read-only.
   const lockedInput = editMode
     ? "bg-gray-50 text-gray-500 cursor-not-allowed"
     : "bg-white";
@@ -438,34 +479,42 @@ function UserModal({
               </div>
             )}
 
-            {/* User code — exactly 5 characters, width is sized to fit just 5. */}
+            {/* Staff ID — its last 5 digits become the referral code, previewed
+                live beside the field so it's obvious where the code comes from. */}
             <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600">Code</label>
+              <label className="text-xs font-medium text-gray-600">Staff ID</label>
               <div className="mt-1 flex items-center gap-2">
                 <input
-                  value={code}
+                  value={staffId}
                   onChange={e =>
-                    setCode(
+                    setStaffId(
                       e.target.value
                         .toUpperCase()
-                        .replace(/[^A-Z0-9]/g, "")
-                        .slice(0, 5)
+                        .replace(/[^A-Z0-9-]/g, "")
+                        .slice(0, 16)
                     )
                   }
                   disabled={editMode}
-                  placeholder="ABC12"
+                  placeholder="NH-20110247"
                   inputMode="text"
-                  maxLength={5}
-                  // Width sized to fit exactly 5 mono characters + padding.
-                  // text-center to keep partial codes visually centered in the slot.
+                  maxLength={16}
                   className={cn(
-                    "w-[7.5rem] px-3 py-2 border border-gray-200 rounded-md text-sm font-mono tracking-[0.4em] text-center uppercase focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+                    "w-[11rem] px-3 py-2 border border-gray-200 rounded-md text-sm font-mono tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
                     lockedInput
                   )}
                 />
-                <span className="text-[11px] text-gray-400">
-                  {code.length} / 5 · letters & digits
-                </span>
+                {referralCodeFromStaffId(staffId) ? (
+                  <span className="text-[11px] text-gray-500">
+                    Referral code:{" "}
+                    <span className="font-mono font-medium tracking-wider text-gray-900">
+                      {referralCodeFromStaffId(staffId)}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-gray-400">
+                    Last 5 digits become the referral code
+                  </span>
+                )}
               </div>
             </div>
 
@@ -566,6 +615,304 @@ function UserModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+type ImportRow = {
+  name: string;
+  staffId: string;
+  email: string;
+  branch: string;
+  errors: string[];
+};
+
+function ImportUsersModal({
+  existingEmails,
+  existingStaffIds,
+  onCancel,
+  onImport,
+}: {
+  existingEmails: string[];
+  existingStaffIds: string[];
+  onCancel: () => void;
+  onImport: (rows: Array<Omit<StaffUser, "id" | "lastActive">>) => void;
+}) {
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [rows, setRows] = useState<ImportRow[] | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  const onPickFile = () => inputRef.current?.click();
+
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setParsing(true);
+    setParseError(null);
+    setRows(null);
+    try {
+      const data = await readSheet(file);
+      if (!data || data.length < 2) {
+        throw new Error("The file is empty or has no data rows.");
+      }
+      const [headerRow, ...dataRows] = data;
+      const headers = headerRow.map(h => String(h ?? "").trim().toLowerCase());
+      const findCol = (aliases: string[]) => headers.findIndex(h => aliases.includes(h));
+      const nameIdx = findCol(["name", "full name", "staff name"]);
+      const staffIdIdx = findCol(["staff id", "staffid", "staff_id", "id"]);
+      const emailIdx = findCol(["email", "email address"]);
+      const branchIdx = findCol(["branch"]);
+      if (nameIdx === -1 || emailIdx === -1) {
+        throw new Error(
+          'Couldn\'t find "Name" and "Email" columns. Expected headers: Name, Staff ID, Email, Branch.'
+        );
+      }
+
+      const seenEmails = new Set<string>();
+      const seenStaffIds = new Set<string>();
+      const parsed: ImportRow[] = dataRows
+        .filter(r => r.some(c => c !== null && c !== undefined && String(c).trim() !== ""))
+        .map(r => {
+          const name = String(r[nameIdx] ?? "").trim();
+          const email = String(r[emailIdx] ?? "").trim();
+          const staffId =
+            staffIdIdx >= 0 ? String(r[staffIdIdx] ?? "").trim().toUpperCase() : "";
+          const branchRaw = branchIdx >= 0 ? String(r[branchIdx] ?? "").trim() : "";
+
+          const errors: string[] = [];
+          if (!name) errors.push("Missing name");
+          if (!email) errors.push("Missing email");
+          else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("Invalid email");
+          else {
+            const key = email.toLowerCase();
+            if (existingEmails.includes(key)) errors.push("Email already exists");
+            else if (seenEmails.has(key)) errors.push("Duplicate email in file");
+            seenEmails.add(key);
+          }
+          if (staffId) {
+            // Needs 5+ digits so the last 5 can serve as the referral code.
+            if (!referralCodeFromStaffId(staffId)) {
+              errors.push("Staff ID needs 5+ digits");
+            } else if (existingStaffIds.includes(staffId)) {
+              errors.push("Staff ID already exists");
+            } else if (seenStaffIds.has(staffId)) {
+              errors.push("Duplicate staff ID in file");
+            }
+            seenStaffIds.add(staffId);
+          }
+
+          return {
+            name,
+            staffId,
+            email,
+            branch: branchRaw || "Phnom Penh",
+            errors,
+          };
+        });
+
+      setRows(parsed);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : "Couldn't read that file.");
+    } finally {
+      setParsing(false);
+      e.target.value = "";
+    }
+  };
+
+  const validRows = rows?.filter(r => r.errors.length === 0) ?? [];
+  const invalidRows = rows?.filter(r => r.errors.length > 0) ?? [];
+
+  const submit = () => {
+    if (!validRows.length) return;
+    onImport(
+      validRows.map(r => ({
+        name: r.name,
+        email: r.email,
+        // Role isn't part of the import sheet — everyone lands on the
+        // least-privileged non-admin role and is promoted from the Users table.
+        role: DEFAULT_NEW_USER_ROLE,
+        branch: r.branch,
+        status: "Active" as const,
+        staffId: r.staffId || undefined,
+      }))
+    );
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="h-14 px-5 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+          <div>
+            <div className="text-sm font-semibold text-gray-900">Import staff users</div>
+            <div className="text-[11px] text-gray-500">From an Excel (.xlsx) file</div>
+          </div>
+          <button onClick={onCancel} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500" aria-label="Close">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-4">
+          {!rows ? (
+            <>
+              <button
+                type="button"
+                onClick={onPickFile}
+                disabled={parsing}
+                className="w-full h-36 rounded-md border-2 border-dashed border-gray-200 hover:border-brand-300 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-1.5 text-gray-500 hover:text-brand-700 transition disabled:opacity-60"
+              >
+                <FileSpreadsheet className="w-6 h-6" />
+                <span className="text-sm font-medium">
+                  {parsing ? "Reading file…" : "Click to upload an Excel file"}
+                </span>
+                <span className="text-[11px] text-gray-400">.xlsx — Name, Staff ID, Email, Branch columns</span>
+              </button>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={onFileChange}
+              />
+              {parseError && (
+                <div className="px-3 py-2 rounded-md bg-red-50 border border-red-100 text-sm text-red-700">
+                  {parseError}
+                </div>
+              )}
+              <div className="text-[11px] text-gray-500 space-y-1">
+                <div>
+                  Expected columns: <span className="font-mono">Name</span>,{" "}
+                  <span className="font-mono">Email</span>,{" "}
+                  <span className="font-mono">Staff ID</span> (optional),{" "}
+                  <span className="font-mono">Branch</span> (optional).
+                </div>
+                <div>
+                  The <strong>last 5 digits</strong> of each Staff ID become that
+                  officer&apos;s referral code. Imported users start on the{" "}
+                  {DEFAULT_NEW_USER_ROLE} role.
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-600 inline-flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-gray-400" />
+                  {fileName}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRows(null);
+                    setFileName(null);
+                  }}
+                  className="text-xs text-brand-600 hover:underline font-medium"
+                >
+                  Choose a different file
+                </button>
+              </div>
+
+              <div className="flex items-center gap-4 text-xs">
+                <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {validRows.length} ready to import
+                </span>
+                {invalidRows.length > 0 && (
+                  <span className="inline-flex items-center gap-1 text-amber-700 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {invalidRows.length} skipped
+                  </span>
+                )}
+              </div>
+
+              <div className="border border-gray-200 rounded-md overflow-x-auto max-h-[320px] overflow-y-auto">
+                <table className="w-full text-xs min-w-[520px]">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      {["Name", "Staff ID", "Referral code", "Email", "Branch", "Status"].map(h => (
+                        <th key={h} className="text-left px-3 py-2 font-medium text-gray-500 whitespace-nowrap">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => (
+                      <tr
+                        key={i}
+                        className={cn("border-t border-gray-100", r.errors.length > 0 && "bg-red-50/40")}
+                      >
+                        <td className="px-3 py-2 text-gray-900">
+                          {r.name || <span className="italic text-gray-400">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 font-mono">
+                          {r.staffId || <span className="italic text-gray-400 font-sans">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 font-mono">
+                          {referralCodeFromStaffId(r.staffId) ?? (
+                            <span className="italic text-gray-400 font-sans">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {r.email || <span className="italic text-gray-400">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">{r.branch}</td>
+                        <td className="px-3 py-2">
+                          {r.errors.length === 0 ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-700">
+                              <CheckCircle2 className="w-3 h-3" /> Ready
+                            </span>
+                          ) : (
+                            <span className="text-red-600" title={r.errors.join("; ")}>
+                              {r.errors[0]}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-end gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            Cancel
+          </button>
+          {rows && (
+            <button
+              type="button"
+              onClick={submit}
+              disabled={validRows.length === 0}
+              className="px-3 py-1.5 text-sm font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Import {validRows.length} user{validRows.length === 1 ? "" : "s"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

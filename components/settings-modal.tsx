@@ -28,8 +28,6 @@ import {
   List,
   Map as MapIcon,
   Pencil,
-  Trash2,
-  Plus,
   Cake,
   Send,
   PawPrint,
@@ -38,7 +36,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BRANCHES, USERS, type Branch } from "@/lib/data";
+import { BRANCHES, USERS, referralCodeFromStaffId, type Branch } from "@/lib/data";
 import { UsersRolesView } from "./users-roles-view";
 import { StatusBadge } from "./status-badge";
 import { useRole } from "@/lib/role-context";
@@ -1363,51 +1361,15 @@ function CompanyView() {
 }
 
 function BranchesView() {
-  const { can } = useRole();
-  const canEdit = can("setting.edit");
-
   const [tab, setTab] = useState<"list" | "map">("list");
-  const [list, setList] = useState<Branch[]>(BRANCHES);
-  const [editing, setEditing] = useState<Branch | null>(null);
-  const [creating, setCreating] = useState(false);
-
-  const nextId = (): string => {
-    const maxN = list.reduce((m, b) => {
-      const n = parseInt(b.id.replace(/[^0-9]/g, ""), 10);
-      return Number.isFinite(n) && n > m ? n : m;
-    }, 0);
-    return `BR-${String(maxN + 1).padStart(2, "0")}`;
-  };
-
-  const handleSave = (b: Branch) => {
-    setList(prev => {
-      const exists = prev.find(x => x.id === b.id);
-      return exists ? prev.map(x => (x.id === b.id ? b : x)) : [...prev, b];
-    });
-    setEditing(null);
-    setCreating(false);
-  };
-
-  const handleDelete = (id: string) => {
-    setList(prev => prev.filter(b => b.id !== id));
-  };
+  const list = BRANCHES;
+  const [viewing, setViewing] = useState<Branch | null>(null);
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <H2>Branch Locator</H2>
-          <P>Manage list of all branches and show them on a map in the customer app.</P>
-        </div>
-        {canEdit && (
-          <button
-            onClick={() => setCreating(true)}
-            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add branch
-          </button>
-        )}
+      <div>
+        <H2>Branch Locator</H2>
+        <P>Browse the list of all branches and see them on a map in the customer app.</P>
       </div>
 
       {/* Sub-tabs */}
@@ -1417,26 +1379,13 @@ function BranchesView() {
       </div>
 
       {tab === "list" ? (
-        <BranchListPanel
-          list={list}
-          canEdit={canEdit}
-          onEdit={setEditing}
-          onDelete={handleDelete}
-        />
+        <BranchListPanel list={list} onView={setViewing} />
       ) : (
-        <BranchMapPanel list={list} canEdit={canEdit} onEdit={setEditing} />
+        <BranchMapPanel list={list} onView={setViewing} />
       )}
 
-      {(creating || editing) && (
-        <BranchEditorModal
-          initial={editing}
-          nextId={nextId()}
-          onClose={() => {
-            setCreating(false);
-            setEditing(null);
-          }}
-          onSave={handleSave}
-        />
+      {viewing && (
+        <BranchViewModal branch={viewing} onClose={() => setViewing(null)} />
       )}
     </div>
   );
@@ -1473,14 +1422,10 @@ function SubTab({
 
 function BranchListPanel({
   list,
-  canEdit,
-  onEdit,
-  onDelete,
+  onView,
 }: {
   list: Branch[];
-  canEdit: boolean;
-  onEdit: (b: Branch) => void;
-  onDelete: (id: string) => void;
+  onView: (b: Branch) => void;
 }) {
   return (
     <Card className="!p-0">
@@ -1515,24 +1460,13 @@ function BranchListPanel({
                 <td className="px-4 py-2.5 text-gray-600">{b.address}</td>
                 <td className="px-4 py-2.5 text-gray-600">{b.phone}</td>
                 <td className="px-4 py-2.5 text-right">
-                  {canEdit && (
-                    <div className="inline-flex items-center gap-3">
-                      <button
-                        onClick={() => onEdit(b)}
-                        className="text-xs text-brand-600 hover:underline font-medium inline-flex items-center gap-1"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => onDelete(b.id)}
-                        className="text-xs text-red-600 hover:underline font-medium inline-flex items-center gap-1"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        Delete
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => onView(b)}
+                    className="text-xs text-brand-600 hover:underline font-medium inline-flex items-center gap-1"
+                  >
+                    <Eye className="w-3 h-3" />
+                    View
+                  </button>
                 </td>
               </tr>
             ))}
@@ -1556,12 +1490,10 @@ function projectPin(lat: number, lng: number) {
 
 function BranchMapPanel({
   list,
-  canEdit,
-  onEdit,
+  onView,
 }: {
   list: Branch[];
-  canEdit: boolean;
-  onEdit: (b: Branch) => void;
+  onView: (b: Branch) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(list[0]?.id ?? null);
   const selected = list.find(b => b.id === selectedId) ?? null;
@@ -1715,15 +1647,13 @@ function BranchMapPanel({
                 <span>{selected.phone}</span>
               </div>
             </div>
-            {canEdit && (
-              <button
-                onClick={() => onEdit(selected)}
-                className="mt-3 inline-flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium"
-              >
-                <Pencil className="w-3 h-3" />
-                Edit branch
-              </button>
-            )}
+            <button
+              onClick={() => onView(selected)}
+              className="mt-3 inline-flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium"
+            >
+              <Eye className="w-3 h-3" />
+              View branch
+            </button>
           </Card>
         )}
       </div>
@@ -1731,30 +1661,15 @@ function BranchMapPanel({
   );
 }
 
-/* ---------- Branch editor modal ---------- */
+/* ---------- Branch view modal (read-only) ---------- */
 
-function BranchEditorModal({
-  initial,
-  nextId,
+function BranchViewModal({
+  branch,
   onClose,
-  onSave,
 }: {
-  initial: Branch | null;
-  nextId: string;
+  branch: Branch;
   onClose: () => void;
-  onSave: (b: Branch) => void;
 }) {
-  const isEdit = !!initial;
-
-  const [name, setName]       = useState(initial?.name ?? "");
-  const [address, setAddress] = useState(initial?.address ?? "");
-  const [phone, setPhone]     = useState(initial?.phone ?? "+855 ");
-  // Picked location (null until the user clicks on the map for a new branch).
-  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(
-    initial ? { lat: initial.lat, lng: initial.lng } : null
-  );
-  const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -1763,37 +1678,9 @@ function BranchEditorModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Other branches shown as light reference pins.
-  const otherBranches = BRANCHES.filter(b => b.id !== initial?.id);
-
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const newLng =
-      MAP_BOUNDS.lngMin + (x / rect.width) * (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin);
-    const newLat =
-      MAP_BOUNDS.latMax - (y / rect.height) * (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin);
-    setPin({ lat: newLat, lng: newLng });
-  };
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return setError("Branch name is required.");
-    if (!address.trim()) return setError("Address is required.");
-    if (!phone.trim()) return setError("Phone is required.");
-    if (!pin) return setError("Click on the map to set the branch location.");
-
-    const b: Branch = {
-      id: initial?.id ?? nextId,
-      name: name.trim(),
-      address: address.trim(),
-      phone: phone.trim(),
-      lat: pin.lat,
-      lng: pin.lng,
-    };
-    onSave(b);
-  };
+  // Other branches shown as light reference pins, same as the map tab.
+  const otherBranches = BRANCHES.filter(b => b.id !== branch.id);
+  const pos = projectPin(branch.lat, branch.lng);
 
   return (
     <div
@@ -1806,12 +1693,8 @@ function BranchEditorModal({
       >
         <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
           <div>
-            <div className="text-base font-semibold text-gray-900">
-              {isEdit ? "Edit branch" : "Add branch"}
-            </div>
-            <div className="text-xs text-gray-500 mt-0.5">
-              {isEdit ? `Updating ${initial?.id}` : "Create a new branch record."}
-            </div>
+            <div className="text-base font-semibold text-gray-900">View branch</div>
+            <div className="text-xs text-gray-500 mt-0.5 font-mono">{branch.id}</div>
           </div>
           <button
             onClick={onClose}
@@ -1822,63 +1705,26 @@ function BranchEditorModal({
           </button>
         </div>
 
-        <form onSubmit={submit} className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-4">
-          {error && (
-            <div className="px-3 py-2 rounded-md bg-red-50 border border-red-100 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-4">
           <div>
-            <label className="text-xs font-medium text-gray-700">Branch name *</label>
-            <input
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="e.g. Phnom Penh — Central"
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
+            <div className="text-xs font-medium text-gray-700">Branch name</div>
+            <div className="mt-1 text-sm text-gray-900">{branch.name}</div>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-700">Address *</label>
-            <input
-              value={address}
-              onChange={e => setAddress(e.target.value)}
-              placeholder="#123, St. 271, Sangkat BKK1"
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
+            <div className="text-xs font-medium text-gray-700">Address</div>
+            <div className="mt-1 text-sm text-gray-900">{branch.address}</div>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-700">Phone *</label>
-            <input
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              placeholder="+855 23 900 000"
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
+            <div className="text-xs font-medium text-gray-700">Phone</div>
+            <div className="mt-1 text-sm text-gray-900">{branch.phone}</div>
           </div>
 
-          {/* Location picker — replaces operating hours + lat/lng inputs */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-medium text-gray-700">Location on map *</label>
-              {pin && (
-                <button
-                  type="button"
-                  onClick={() => setPin(null)}
-                  className="text-[11px] text-gray-500 hover:text-gray-900 font-medium"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
+            <div className="text-xs font-medium text-gray-700 mb-1.5">Location on map</div>
             <div
-              role="button"
-              tabIndex={0}
-              onClick={handleMapClick}
-              className="relative h-[230px] rounded-lg border border-gray-200 overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-50 cursor-crosshair"
+              className="relative h-[230px] rounded-lg border border-gray-200 overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-50"
               style={{
                 backgroundImage:
                   "linear-gradient(to right, rgba(99,102,241,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(99,102,241,0.12) 1px, transparent 1px)",
@@ -1887,12 +1733,12 @@ function BranchEditorModal({
             >
               {/* Reference pins for other branches (subtle) */}
               {otherBranches.map(b => {
-                const pos = projectPin(b.lat, b.lng);
+                const p = projectPin(b.lat, b.lng);
                 return (
                   <div
                     key={b.id}
                     className="absolute -translate-x-1/2 -translate-y-full pointer-events-none"
-                    style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
+                    style={{ left: `${p.left}%`, top: `${p.top}%` }}
                     title={b.name}
                   >
                     <svg width="16" height="20" viewBox="0 0 22 28" className="opacity-50">
@@ -1907,67 +1753,37 @@ function BranchEditorModal({
               })}
 
               {/* This branch's pin (brand-blue, big) */}
-              {pin && (
-                <div
-                  className="absolute -translate-x-1/2 -translate-y-full pointer-events-none"
-                  style={{
-                    left: `${projectPin(pin.lat, pin.lng).left}%`,
-                    top:  `${projectPin(pin.lat, pin.lng).top}%`,
-                  }}
-                >
-                  <svg width="26" height="33" viewBox="0 0 22 28" className="drop-shadow-md">
-                    <path
-                      d="M11 0c6.075 0 11 4.925 11 11 0 5.225-6.111 12.722-10.34 16.97a1 1 0 0 1-1.32 0C6.111 23.722 0 16.225 0 11 0 4.925 4.925 0 11 0Z"
-                      className="fill-brand-600"
-                    />
-                    <circle cx="11" cy="11" r="4" fill="white" />
-                  </svg>
-                </div>
-              )}
-
-              {/* Empty state hint */}
-              {!pin && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="px-3 py-1.5 rounded-md bg-white/85 backdrop-blur-sm border border-gray-200 text-xs text-gray-600 shadow-sm inline-flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-brand-600" />
-                    Click anywhere on the map to drop a pin
-                  </div>
-                </div>
-              )}
+              <div
+                className="absolute -translate-x-1/2 -translate-y-full pointer-events-none"
+                style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
+              >
+                <svg width="26" height="33" viewBox="0 0 22 28" className="drop-shadow-md">
+                  <path
+                    d="M11 0c6.075 0 11 4.925 11 11 0 5.225-6.111 12.722-10.34 16.97a1 1 0 0 1-1.32 0C6.111 23.722 0 16.225 0 11 0 4.925 4.925 0 11 0Z"
+                    className="fill-brand-600"
+                  />
+                  <circle cx="11" cy="11" r="4" fill="white" />
+                </svg>
+              </div>
             </div>
 
             <div className="text-[11px] text-gray-500 mt-1.5 flex items-center justify-between">
-              <span>Click on the map to set the branch location. Light pins are existing branches.</span>
-              {pin && (
-                <span className="font-mono text-gray-600">
-                  {pin.lat.toFixed(4)}°, {pin.lng.toFixed(4)}°
-                </span>
-              )}
+              <span>Light pins are other branches.</span>
+              <span className="font-mono text-gray-600">
+                {branch.lat.toFixed(4)}°, {branch.lng.toFixed(4)}°
+              </span>
             </div>
           </div>
-        </form>
+        </div>
 
-        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between">
-          <div className="text-[11px] text-gray-500">
-            {isEdit ? "" : `Will be created as `}
-            <span className="font-mono text-gray-700">{initial?.id ?? nextId}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={submit}
-              className="px-3 py-1.5 text-sm font-medium bg-brand-600 text-white rounded-md hover:bg-brand-700"
-            >
-              {isEdit ? "Save changes" : "Create branch"}
-            </button>
-          </div>
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50/60 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-white"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -1978,12 +1794,14 @@ function ReferralView() {
   const { can } = useRole();
   const readOnly = !can("setting.edit");
 
-  /* Derive the CO codes table from the central USERS list — any user that has
-   * a 5-char code on their profile shows up here. Inactive users render in a
-   * disabled style so the operator can see why a code stopped working. */
+  /* Derive the CO codes table from the central USERS list — any user with a
+   * staff ID shows up here, their code being its last 5 digits. Inactive users
+   * render in a disabled style so the operator can see why a code stopped
+   * working. */
   type CodeRow = {
     id: string;
     code: string;
+    staffId: string;
     name: string;
     role: string;
     branch: string;
@@ -1993,17 +1811,22 @@ function ReferralView() {
     disabled: boolean;
   };
 
-  const CO_CODES: CodeRow[] = USERS.filter(u => !!u.code).map(u => ({
-    id: u.id,
-    code: u.code as string,
-    name: u.name,
-    role: u.role,
-    branch: u.branch,
-    referrals: u.referralStats?.referrals ?? 0,
-    applications: u.referralStats?.applications ?? 0,
-    disbursed: u.referralStats?.disbursed ?? 0,
-    disabled: u.status !== "Active",
-  }));
+  const CO_CODES: CodeRow[] = USERS.flatMap(u => {
+    const code = referralCodeFromStaffId(u.staffId);
+    if (!code) return [];
+    return [{
+      id: u.id,
+      code,
+      staffId: u.staffId as string,
+      name: u.name,
+      role: u.role,
+      branch: u.branch,
+      referrals: u.referralStats?.referrals ?? 0,
+      applications: u.referralStats?.applications ?? 0,
+      disbursed: u.referralStats?.disbursed ?? 0,
+      disabled: u.status !== "Active",
+    }];
+  });
 
   return (
     <div className="space-y-5">
@@ -2023,7 +1846,9 @@ function ReferralView() {
       <Card>
         <div className="mb-3">
           <div className="font-medium text-gray-900">Credit Officer codes</div>
-          <div className="text-xs text-gray-500 mt-0.5">One unique 5-digit code per officer.</div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            Each officer&apos;s code is the last 5 digits of their staff ID.
+          </div>
         </div>
         <div className="border border-gray-200 rounded-lg overflow-hidden overflow-x-auto">
           <table className="w-full text-sm min-w-[560px]">
@@ -2040,7 +1865,7 @@ function ReferralView() {
               {CO_CODES.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-500">
-                    No referral codes assigned yet. Add a code to a user in Users & Roles → Add user.
+                    No referral codes yet. Assign a staff ID to a user in Users & Roles → Add user.
                   </td>
                 </tr>
               ) : (
@@ -2088,7 +1913,10 @@ function ReferralView() {
                       >
                         {r.name}
                       </div>
-                      <div className="text-xs text-gray-500">{r.role}</div>
+                      <div className="text-xs text-gray-500">
+                        {r.role} ·{" "}
+                        <span className="font-mono">{r.staffId}</span>
+                      </div>
                     </td>
                     <td className="px-4 py-2.5 text-gray-600">{r.branch}</td>
                     <td className="px-4 py-2.5 text-gray-600">{r.applications}</td>
