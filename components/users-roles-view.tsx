@@ -348,6 +348,7 @@ function UserModal({
     editMode && ROLES.find(r => r.name === user!.role)?.key === "admin";
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
+  const [phone, setPhone] = useState(user?.phone ?? "");
   const [role, setRole] = useState(user?.role ?? DEFAULT_NEW_USER_ROLE);
   const [branch, setBranch] = useState(user?.branch ?? "Phnom Penh");
   const [password, setPassword] = useState("");
@@ -380,6 +381,7 @@ function UserModal({
       role,
       branch: branch.trim(),
       status: active ? "Active" : "Inactive",
+      phone: phone.trim() ? phone.trim() : undefined,
       // Persist the staff ID (or strip it if cleared). When set, the user's
       // referral code — its last 5 digits — appears in Settings → Referral.
       staffId: staffId.trim() ? staffId.trim() : undefined,
@@ -443,6 +445,20 @@ function UserModal({
                 onChange={e => setEmail(e.target.value)}
                 disabled={editMode}
                 placeholder="name@nonghyup.com.kh"
+                className={cn(
+                  "mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
+                  lockedInput
+                )}
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600">Phone number</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                disabled={editMode}
+                placeholder="012 345 678"
                 className={cn(
                   "mt-1 w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500",
                   lockedInput

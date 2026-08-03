@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { ChangePinModal } from "@/components/change-pin-modal";
 import { CUSTOMERS, BRANCHES } from "@/lib/data";
+import { useRole } from "@/lib/role-context";
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,6 +16,8 @@ import {
   ChevronDown,
   Check,
   KeyRound,
+  RotateCcw,
+  UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,8 +34,14 @@ type KycFacet = "all" | "verified" | "pending";
 type AccountFacet = "all" | "suspended";
 
 export default function CustomersPage() {
-  // The mock data is the source of truth — no add/edit on this page anymore.
-  const customers = CUSTOMERS;
+  const { can } = useRole();
+  // Reactivating a self-deleted account is gated separately from viewing the
+  // list — it's the one mutable action on an otherwise read-only page.
+  const canReactivate = can("customer.reactivate");
+
+  // The mock data is the source of truth — no add/edit on this page, other
+  // than reactivating a self-deleted account (see `reactivate` below).
+  const [customers, setCustomers] = useState(CUSTOMERS);
 
   /* ---------- toolbar state ---------- */
   const [query, setQuery] = useState("");
@@ -45,6 +54,15 @@ export default function CustomersPage() {
   // Customer whose PIN is being changed — drives the in-place modal so the
   // "Change pin" action no longer needs to navigate to the detail page.
   const [pinCustomer, setPinCustomer] = useState<string | null>(null);
+
+  // A customer who deleted their own account can be restored by an admin —
+  // e.g. the deletion turns out to have been accidental or made in error.
+  // Confirmed via a dialog first since it's a meaningful account change.
+  const [reactivateTarget, setReactivateTarget] = useState<{ id: string; name: string } | null>(null);
+  const reactivate = (id: string) =>
+    setCustomers(prev =>
+      prev.map(c => (c.id === id ? { ...c, accountStatus: undefined, deletedAt: undefined } : c))
+    );
 
   // Close filter dropdown on outside click / Escape.
   useEffect(() => {
@@ -391,7 +409,18 @@ export default function CustomersPage() {
                       </td>
                       <td className="px-6 py-3.5">
                         {suspended ? (
-                          <span className="text-gray-300">—</span>
+                          canReactivate ? (
+                            <button
+                              onClick={() => setReactivateTarget({ id: c.id, name: c.name })}
+                              title="Restore this account to active"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
+                              Active
+                            </button>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )
                         ) : (
                           <button
                             onClick={() => setPinCustomer(c.name)}
@@ -464,7 +493,17 @@ export default function CustomersPage() {
                   </div>
                   <div className="mt-3 flex items-center justify-between">
                     {suspended ? (
-                      <span className="text-xs text-gray-300">No actions</span>
+                      canReactivate ? (
+                        <button
+                          onClick={() => setReactivateTarget({ id: c.id, name: c.name })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
+                          Active
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-300">No actions</span>
+                      )
                     ) : (
                       <button
                         onClick={() => setPinCustomer(c.name)}
@@ -539,6 +578,69 @@ export default function CustomersPage() {
           onClose={() => setPinCustomer(null)}
         />
       )}
+
+      {reactivateTarget && (
+        <ReactivateConfirmDialog
+          customerName={reactivateTarget.name}
+          onCancel={() => setReactivateTarget(null)}
+          onConfirm={() => {
+            reactivate(reactivateTarget.id);
+            setReactivateTarget(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReactivateConfirmDialog({
+  customerName,
+  onCancel,
+  onConfirm,
+}: {
+  customerName: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-5">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
+              <UserCheck className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-gray-900">Activate this account?</div>
+              <div className="text-xs text-gray-600 mt-1">
+                {customerName} deleted their account from the mobile app. Activating it restores
+                full access to their branch, device, and loan history in this list, and lets them
+                sign back in on the mobile app.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 font-medium"
+          >
+            Activate account
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

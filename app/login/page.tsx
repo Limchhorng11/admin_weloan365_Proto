@@ -101,13 +101,13 @@ export default function LoginPage() {
           </div>
 
           <Field
-            label="Email"
+            label="Email/Phone Number"
             icon={Mail}
-            type="email"
+            type="text"
             value={email}
             onChange={setEmail}
-            placeholder="you@company.com"
-            autoComplete="email"
+            placeholder="you@company.com or phone number"
+            autoComplete="username"
             required
           />
 

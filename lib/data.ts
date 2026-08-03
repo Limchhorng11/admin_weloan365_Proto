@@ -837,12 +837,98 @@ export const FEEDBACK: Feedback[] = [
   { id: "FB-005", customer: "Pisey Ros",   rating: 4, subject: "Suggestion",                     text: "Khmer translation could be more natural.",        date: "2026-02-15" },
 ];
 
-export const CHATS = [
-  { id: "CH-88", customer: "Sokha Chan", last: "When will the loan be disbursed?",     unread: 2, at: "09:42" },
-  { id: "CH-87", customer: "Pisey Ros",  last: "Thanks, received the confirmation!",   unread: 0, at: "08:11" },
-  { id: "CH-86", customer: "Bopha Sok",  last: "I need to update my phone number.",    unread: 1, at: "Yday" },
-  { id: "CH-85", customer: "Dara Meas",  last: "Can we reschedule next installment?",  unread: 0, at: "Mon" },
+/** The two places a customer conversation can live.
+ *  "officer"  — 1:1 with the customer's own loan officer. Replies go out under
+ *               that officer's personal name; nobody else answers for them.
+ *  "support"  — the shared Customer Support channel. Replies go out as the team
+ *               ("NHFC Support"), and every officer assigned to the channel can
+ *               answer any customer in it — there's no per-conversation owner. */
+export type ChatChannel = "officer" | "support";
+
+/** A file, photo/video, or voice note attached to a message. `url` is a local
+ *  blob: URL (from the browser's own file picker or microphone) — it only
+ *  lives for the current session, there's no real upload/storage behind it. */
+export type ChatAttachment = {
+  kind: "image" | "video" | "file" | "voice";
+  name: string;
+  url: string;
+  size?: number;
+  /** Voice notes only — recording length in whole seconds. */
+  duration?: number;
+};
+
+export type ChatMessage = {
+  from: "customer" | "staff";
+  text: string;
+  /** Display name shown on a staff message — the officer's own name in the
+   *  officer channel, the team name in the support channel. */
+  author?: string;
+  /** Clock time the message was sent, e.g. "09:42". */
+  at?: string;
+  /** Staff messages only — whether the customer has opened it yet. Drives the
+   *  Sent / Read tick on outgoing bubbles. */
+  read?: boolean;
+  attachment?: ChatAttachment;
+};
+
+export type Chat = {
+  id: string;
+  customer: string;
+  channel: ChatChannel;
+  last: string;
+  at: string;
+  unread: number;
+  /** Officer channel only — the loan officer who owns the relationship.
+   *  Support conversations have no individual owner: anyone on the channel
+   *  roster answers them, so this is left unset there. */
+  assignee?: string;
+  messages: ChatMessage[];
+};
+
+export const CHATS: Chat[] = [
+  {
+    id: "CH-88", customer: "Sokha Chan", channel: "officer", assignee: "Visal P.",
+    last: "When will the loan be disbursed?", unread: 2, at: "09:42",
+    messages: [
+      { from: "customer", at: "09:18", text: "Hi, I applied for a personal loan yesterday." },
+      { from: "staff", author: "Visal P.", at: "09:31", read: true, text: "Hello Sokha, thanks for reaching out. Your application is under review." },
+      { from: "customer", at: "09:42", text: "When will the loan be disbursed?" },
+    ],
+  },
+  {
+    id: "CH-85", customer: "Dara Meas", channel: "officer", assignee: "Ratanak L.",
+    last: "Can we reschedule next installment?", unread: 0, at: "Mon",
+    messages: [
+      { from: "customer", at: "14:02", text: "Something came up this month." },
+      { from: "customer", at: "14:03", text: "Can we reschedule next installment?" },
+      // Sent but not opened yet — shows the "Sent" state next to "Read" above.
+      { from: "staff", author: "Ratanak L.", at: "14:20", read: false, text: "Let me check your schedule and come back to you today." },
+    ],
+  },
+  {
+    id: "CH-87", customer: "Pisey Ros", channel: "support",
+    last: "Thanks, received the confirmation!", unread: 0, at: "08:11",
+    messages: [
+      { from: "customer", at: "07:52", text: "I didn't get the SMS confirmation for my payment." },
+      { from: "staff", author: "Sreyneang P.", at: "08:05", read: true, text: "We've re-sent it just now — could you check again?" },
+      { from: "customer", at: "08:11", text: "Thanks, received the confirmation!" },
+    ],
+  },
+  {
+    id: "CH-86", customer: "Bopha Sok", channel: "support",
+    last: "I need to update my phone number.", unread: 1, at: "Yday",
+    messages: [
+      { from: "customer", at: "16:40", text: "Hello, I changed my number." },
+      { from: "customer", at: "16:41", text: "I need to update my phone number." },
+    ],
+  },
 ];
+
+/** Officers assigned to the shared Customer Support channel. Being on this list
+ *  is the permission to chat with *every* customer in the channel — there's no
+ *  per-conversation assignment. Seeded with the Customer Service team; an admin
+ *  edits it from Chat → Customer Support → Assign officer. */
+export const SUPPORT_CHANNEL_AGENTS: string[] = ["Sreyneang P.", "Pisey C."];
 
 /* ====================================================================
    Blog Posts (CMS)
@@ -1127,6 +1213,7 @@ export type StaffUser = {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: string;
   branch: string;
   status: StaffUserStatus;
@@ -1189,6 +1276,7 @@ export type PermissionCategory =
   | "Customer — All Accounts"
   | "Customer — Consultations"
   | "Customer — Complaint & Rate"
+  | "Customer — Chat"
   | "Loan Application"
   | "Loan Product"
   | "Blog Posts"
@@ -1201,8 +1289,9 @@ export const PERMISSIONS: Permission[] = [
   { key: "report.export", label: "Export reports",                  category: "Overview" },
 
   /* ---------- CUSTOMER — All Accounts ---------- */
-  { key: "customer.view",      label: "View customer accounts",   category: "Customer — All Accounts" },
-  { key: "customer.pin_reset", label: "Reset customer PIN",       category: "Customer — All Accounts", sensitive: true },
+  { key: "customer.view",       label: "View customer accounts",       category: "Customer — All Accounts" },
+  { key: "customer.pin_reset",  label: "Reset customer PIN",           category: "Customer — All Accounts", sensitive: true },
+  { key: "customer.reactivate", label: "Allow active customer account", category: "Customer — All Accounts", sensitive: true },
 
   /* ---------- CUSTOMER — Consultations ---------- */
   { key: "consultation.view",   label: "View consultation requests", category: "Customer — Consultations" },
@@ -1212,6 +1301,10 @@ export const PERMISSIONS: Permission[] = [
   /* ---------- CUSTOMER — Feedback & Rate ---------- */
   { key: "feedback.view",  label: "View customer complaints", category: "Customer — Complaint & Rate" },
   { key: "feedback.reply", label: "Reply to complaint",       category: "Customer — Complaint & Rate" },
+
+  /* ---------- CUSTOMER — Chat ---------- */
+  { key: "chat.view",           label: "View the chat",                               category: "Customer — Chat" },
+  { key: "chat.support_assign", label: "Assign to customer support channel",         category: "Customer — Chat", sensitive: true },
 
   /* ---------- LOAN APPLICATION ---------- */
   { key: "loan.view",        label: "View applications",          category: "Loan Application" },
@@ -1258,9 +1351,11 @@ export const PERMISSIONS: Permission[] = [
 export const PERMISSION_REQUIRES: Record<string, string> = {
   "report.export": "report.view",
   "customer.pin_reset": "customer.view",
+  "customer.reactivate": "customer.view",
   "consultation.assign": "consultation.view",
   "consultation.close": "consultation.view",
   "feedback.reply": "feedback.view",
+  "chat.support_assign": "chat.view",
   "loan.review": "loan.view",
   "loan.approve": "loan.view",
   "loan.reject": "loan.view",
@@ -1314,6 +1409,7 @@ export const ROLES: Role[] = [
       "customer.view",
       "consultation.view", "consultation.assign", "consultation.close",
       "feedback.view",
+      "chat.view",
       "loan.view", "loan.review", "loan.approve", "loan.reject",
       "loan.reassign", "loan.restructure",
       "payment.view", "payment.record",
@@ -1334,6 +1430,7 @@ export const ROLES: Role[] = [
       "report.view",
       "customer.view",
       "consultation.view", "consultation.close",
+      "chat.view",
       "loan.view", "loan.review",
       "payment.view",
       "product.view",
@@ -1352,6 +1449,7 @@ export const ROLES: Role[] = [
     permissions: [
       "customer.view", "customer.pin_reset",
       "feedback.view", "feedback.reply",
+      "chat.view",
       "payment.view", "payment.record",
       "post.view", "post.manage",
       "promotion.view", "promotion.manage",

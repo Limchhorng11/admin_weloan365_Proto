@@ -42,6 +42,47 @@ doesn't need to be one entry per commit.
 
 ---
 
+## v0.16.0 — 2026-08-02 → 2026-08-03
+**Chat rebuilt around Officer chat vs. Customer Support; uniform read-privacy;
+account reactivation; Phone number field**
+
+- Commits: *(pending)*
+
+**Business logic:**
+- **Chat** now distinguishes two discussion types: **Officer chat** (1:1,
+  customer ↔ their own officer) and **Customer Support** (shared team channel,
+  answered under "NHFC Support"). Holding a Customer Support seat is a
+  channel-level permission — no per-conversation "Unassigned" state.
+- **Read-privacy is uniform across every role, including Admin** — a
+  conversation's messages are visible only to actual parties to it; there is no
+  oversight/masked-view exception, and each user's own list is filtered to
+  exactly what they can participate in.
+- **Admin's Chat page now matches the officer-style two-pane layout** (sidebar +
+  thread) instead of a special single-section manager view — the two-pane
+  layout collapses to one section only for roles with neither conversations nor
+  manage permission.
+- **Assign officer** opens a centered modal dialog (portal-rendered, to avoid a
+  `backdrop-blur` ancestor clipping an anchored popover) — pick a role, click an
+  officer chip to grant/revoke their seat instantly, with the full roster shown
+  as an Officer/Role/Branch table and a Done button to close.
+- Removed the redundant "Officer: {name}" header chip, the per-row assignee
+  label in Officer chat, the "Replying as …" composer banner, and the
+  profile/Info icon on Customer Support threads (kept on Officer chat).
+- **Customer — Chat permissions simplified**: `chat.officer`/`chat.support`
+  removed (participation alone now drives visibility); only `chat.view` and
+  `chat.support_assign` remain.
+- **Customer accounts**: a self-deleted (inactive) account can now be
+  reactivated via a new **"Active"** button + confirmation dialog, gated by a
+  new **"Allow active customer account"** permission (`customer.reactivate`,
+  sensitive) — granted to Admin only by default.
+- **Add/Edit User** form gained an optional **Phone number** field, locked
+  (read-only) after creation like the other identity fields.
+
+**Files touched:** `app/chat/page.tsx`, `app/customer/accounts/page.tsx`,
+`components/users-roles-view.tsx`, `lib/data.ts`
+
+---
+
 ## v0.15.0 — 2026-07-29 → 2026-07-30
 **Announcement content type; bilingual Promotion editor; media upload refinements;
 read-only Branch Locator; Staff ID + bulk staff import**
